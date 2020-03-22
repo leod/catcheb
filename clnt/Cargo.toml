@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 quicksilver = { version = "=0.4.0-alpha0.2", features = ["stdweb"] }
+stdweb = "0.4"
