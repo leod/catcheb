@@ -1,5 +1,3 @@
-// Example 1: The Square
-// Open a window, and draw a colored square in it
 use quicksilver::{
     geom::{Rectangle, Vector},
     graphics::{Color, Graphics},
@@ -11,7 +9,7 @@ fn main() {
     run(
         Settings {
             size: Vector::new(800.0, 600.0).into(),
-            title: "Square Example",
+            title: "Play Catcheb",
             ..Settings::default()
         },
         app,

@@ -1,0 +1,9 @@
+[package]
+name = "comn"
+version = "0.1.0"
+authors = ["leod <subtle.frustration@proton.me>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
