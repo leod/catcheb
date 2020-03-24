@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use stdweb::web::Date;
 
 use quicksilver::{
-    geom::{Rectangle, Vector},
+    geom::{Rectangle, Vector, Transform},
     graphics::{Color, Graphics},
     lifecycle::{run, EventStream, Settings, Window, Event, Key},
     Result,
@@ -12,7 +12,7 @@ use quicksilver::{
 fn main() {
     run(
         Settings {
-            size: Vector::new(800.0, 600.0).into(),
+            size: Vector::new(1280.0, 720.0).into(),
             fullscreen: true,
             title: "Play Catcheb",
             ..Settings::default()
@@ -61,18 +61,25 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         }
 
         if delta.len2() > 0.0 {
-            delta = delta.normalize();
-            pos += delta * 300.0 * delta_s;
+            pos += delta.normalize() * 300.0 * delta_s;
         }
 
-        // Clear the screen to a blank, white color
+        let size = if delta.len2() > 0.0 {
+            let angle = delta.y.atan2(delta.x).to_degrees();
+            gfx.set_transform(Transform::rotate(angle).then(Transform::translate(pos)));
+            Vector::new(70.0, 35.714)
+        } else {
+            gfx.set_transform(Transform::translate(pos));
+            Vector::new(50.0, 50.0)
+        };
+
         gfx.clear(Color::WHITE);
-        // Paint a blue square with a red outline in the center of our screen
-        // It should have a top-left of (350, 100) and a size of (150, 100)
-        let rect = Rectangle::new(pos, Vector::new(100.0, 100.0));
+
+        let rect = Rectangle::new(-size / 2.0, size);
+
         gfx.fill_rect(&rect, Color::BLUE);
         gfx.stroke_rect(&rect, Color::RED);
-        // Send the data to be drawn
+
         gfx.present(&window)?;
     }
 }
