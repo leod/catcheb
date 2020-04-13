@@ -1,6 +1,5 @@
 mod http_server;
 
-use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use clap::Arg;
@@ -17,12 +16,14 @@ async fn main() {
     let matches = clap::App::new("serv")
         .arg(
             Arg::with_name("http_address")
+                .long("http_address")
                 .takes_value(true)
                 .required(true)
                 .help("listen on the specified address/port for HTTP")
         )
         .arg(
             Arg::with_name("clnt_deploy_dir")
+                .long("clnt_deploy_dir")
                 .takes_value(true)
                 .required(true)
                 .help("Directory in which the clnt has been deployed (containing static files to be served over HTTP")
