@@ -1,6 +1,7 @@
-mod game;
+pub mod game;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoinRequest {
@@ -11,6 +12,6 @@ pub struct JoinRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoinReply {
     pub game_id: Uuid,
-    pub your_token_id: Uuid,    
+    pub your_token_id: Uuid,
     pub your_player_id: game::PlayerId,
 }

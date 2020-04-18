@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 pub struct Player {
-    pub name: String,    
+    pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,9 +11,7 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self {
-            max_players: 16,
-        }
+        Self { max_players: 16 }
     }
 }
 

@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
@@ -28,9 +28,7 @@ pub struct PlayerInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Item {
-    Gun {
-        shots: u32,
-    },
+    Gun { shots: u32 },
     StunGun,
 }
 
@@ -71,24 +69,11 @@ pub enum EntityData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
-    PlayerJoined {
-        player_id: PlayerId,
-        name: String,
-    },
-    PlayerShotGun {
-        player_id: PlayerId,
-        dir: Vector,
-    },
-    PlayerShotStunGun {
-        player_id: PlayerId,
-        dir: Vector,
-    },
-    EntityRemoved {
-        entity_id: EntityId,
-    },
-    PlayerSpawned {
-        pos: Point,
-    },
+    PlayerJoined { player_id: PlayerId, name: String },
+    PlayerShotGun { player_id: PlayerId, dir: Vector },
+    PlayerShotStunGun { player_id: PlayerId, dir: Vector },
+    EntityRemoved { entity_id: EntityId },
+    PlayerSpawned { pos: Point },
 }
 
 pub struct Tick {
@@ -98,5 +83,4 @@ pub struct Tick {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ServerMsg {
-}
+pub enum ServerMsg {}
