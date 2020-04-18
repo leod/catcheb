@@ -1,4 +1,6 @@
 mod http_server;
+mod game;
+mod runner;
 
 use std::path::PathBuf;
 
@@ -41,5 +43,7 @@ async fn main() {
 
     let http_server = http_server::Server::new(config.http_server);
 
-    http_server.serve().await.expect("HTTP server died");
+    tokio::spawn(async move {
+        http_server.serve().await.expect("HTTP server died");
+    });
 }
