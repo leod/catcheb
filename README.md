@@ -3,7 +3,7 @@
 ## Running
 Build the client:
 ```
-cd clnt && cargo web deploy -j8 && cd ../
+cd clnt && cargo web deploy && cd ../
 ```
 This will create the files `clnt.wasm`, `clnt.js` and `index.html` in `target/deploy/`.
 

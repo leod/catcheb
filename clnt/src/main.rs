@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use stdweb::web::Date;
 
 use quicksilver::{
-    geom::{Rectangle, Vector, Transform},
+    geom::{Rectangle, Transform, Vector},
     graphics::{Color, Graphics},
-    lifecycle::{run, EventStream, Settings, Window, Event, Key},
+    lifecycle::{run, Event, EventStream, Key, Settings, Window},
     Result,
 };
 

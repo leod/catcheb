@@ -1,15 +1,10 @@
-use std::path::PathBuf;
-use std::net::SocketAddr;
-use std::future::Future;
-use std::sync::Arc;
+use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::{fs::File, io::AsyncReadExt};
 
-use hyper::{
-    server::conn::AddrStream,
-    Body, Method, Response, StatusCode, Request,
-};
+use hyper::{server::conn::AddrStream, Body, Method, Request, Response, StatusCode};
+
+use crate::runner::{JoinMessage, JoinTx};
 
 static INTERNAL_SERVER_ERROR: &[u8] = b"Internal Server Error";
 static NOT_FOUND: &[u8] = b"Not Found";
@@ -23,16 +18,18 @@ pub struct Config {
 #[derive(Clone)]
 pub struct Server {
     config: Arc<Config>,
+    join_tx: JoinTx,
 }
 
 impl Server {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, join_tx: JoinTx) -> Self {
         Self {
             config: Arc::new(config),
+            join_tx,
         }
     }
 
-    pub fn serve(&self) -> impl Future<Output=Result<(), hyper::Error>> + '_ {
+    pub fn serve(&self) -> impl Future<Output = Result<(), hyper::Error>> + '_ {
         let make_service = hyper::service::make_service_fn(move |_: &AddrStream| {
             let config = self.config.clone();
 
@@ -43,20 +40,18 @@ impl Server {
             }
         });
 
-        hyper::Server::bind(&self.config.listen_addr)
-            .serve(make_service)
+        hyper::Server::bind(&self.config.listen_addr).serve(make_service)
     }
 }
 
 async fn service(config: Arc<Config>, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     match (req.method(), req.uri().path()) {
         // Serve static files
-        (&Method::GET, "/") | (&Method::GET, "/index.html") => 
-            send_file(config, "index.html", "text/html").await,
-        (&Method::GET, "/clnt.js") =>
-            send_file(config, "clnt.js", "text/javascript").await,
-        (&Method::GET, "/clnt.wasm") =>
-            send_file(config, "clnt.wasm", "application/wasm").await,
+        (&Method::GET, "/") | (&Method::GET, "/index.html") => {
+            send_file(config, "index.html", "text/html").await
+        }
+        (&Method::GET, "/clnt.js") => send_file(config, "clnt.js", "text/javascript").await,
+        (&Method::GET, "/clnt.wasm") => send_file(config, "clnt.wasm", "application/wasm").await,
 
         // Return 404 Not Found for other routes
         _ => Ok(not_found()),
@@ -64,12 +59,16 @@ async fn service(config: Arc<Config>, req: Request<Body>) -> Result<Response<Bod
 }
 
 /// Serve a file.
-/// 
+///
 /// TODO: We'll need to cache the files eventually, but for now reloading
 /// allows for quicker development.
-/// 
+///
 /// Source: https://github.com/hyperium/hyper/blob/master/examples/send_file.rs
-async fn send_file(config: Arc<Config>, filename: &str, content_type: &str) -> Result<Response<Body>, hyper::Error> {
+async fn send_file(
+    config: Arc<Config>,
+    filename: &str,
+    content_type: &str,
+) -> Result<Response<Body>, hyper::Error> {
     // Serve a file by asynchronously reading it entirely into memory.
     // Uses tokio_fs to open file asynchronously, then tokio::io::AsyncReadExt
     // to read into memory asynchronously.

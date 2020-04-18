@@ -12,5 +12,5 @@ tokio = { version = "0.2", features = ["full"] }
 clap = "2.33"
 env_logger = "0.7"
 log = "0.4"
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "0.8", features = ["v4", "serde"] }
 comn = { path = "../comn" }
