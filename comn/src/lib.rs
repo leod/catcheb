@@ -10,8 +10,17 @@ pub struct JoinRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JoinReply {
+pub struct JoinSuccess {
     pub game_id: Uuid,
     pub your_token_id: Uuid,
     pub your_player_id: game::PlayerId,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum JoinError {
+    InvalidGameId,
+    InvalidPlayerName,
+    FullGame,
+}
+
+pub type JoinReply = Result<JoinSuccess, JoinError>;
