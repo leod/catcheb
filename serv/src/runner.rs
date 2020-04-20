@@ -12,7 +12,7 @@ use comn::{JoinReply, JoinRequest};
 
 pub struct JoinMessage {
     pub request: JoinRequest,
-    pub reply: oneshot::Sender<JoinReply>,
+    pub reply_tx: oneshot::Sender<JoinReply>,
 }
 
 pub type JoinTx = mpsc::UnboundedSender<JoinMessage>;

@@ -1,6 +1,8 @@
 use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use tokio::{fs::File, io::AsyncReadExt};
+use futures::TryStreamExt;
+use log::{info, warn};
+use tokio::{fs::File, io::AsyncReadExt, stream::StreamExt, sync::oneshot};
 
 use hyper::{server::conn::AddrStream, Body, Method, Request, Response, StatusCode};
 
@@ -8,6 +10,7 @@ use crate::runner::{JoinMessage, JoinTx};
 
 static INTERNAL_SERVER_ERROR: &[u8] = b"Internal Server Error";
 static NOT_FOUND: &[u8] = b"Not Found";
+static BAD_REQUEST: &[u8] = b"Bad Request";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
@@ -30,12 +33,19 @@ impl Server {
     }
 
     pub fn serve(&self) -> impl Future<Output = Result<(), hyper::Error>> + '_ {
+        info!("Starting HTTP server at {:?}", self.config.listen_addr);
+        info!(
+            "Will serve client directory {:?}",
+            self.config.clnt_deploy_dir
+        );
+
         let make_service = hyper::service::make_service_fn(move |_: &AddrStream| {
             let config = self.config.clone();
+            let join_tx = self.join_tx.clone();
 
             async move {
                 Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
-                    service(config.clone(), req)
+                    service(config.clone(), join_tx.clone(), req)
                 }))
             }
         });
@@ -44,7 +54,11 @@ impl Server {
     }
 }
 
-async fn service(config: Arc<Config>, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
+async fn service(
+    config: Arc<Config>,
+    join_tx: JoinTx,
+    req: Request<Body>,
+) -> Result<Response<Body>, hyper::Error> {
     match (req.method(), req.uri().path()) {
         // Serve static files
         (&Method::GET, "/") | (&Method::GET, "/index.html") => {
@@ -52,6 +66,43 @@ async fn service(config: Arc<Config>, req: Request<Body>) -> Result<Response<Bod
         }
         (&Method::GET, "/clnt.js") => send_file(config, "clnt.js", "text/javascript").await,
         (&Method::GET, "/clnt.wasm") => send_file(config, "clnt.wasm", "application/wasm").await,
+
+        // Join a game
+        (&Method::POST, "/join") => {
+            // FIXME: Does this allow attackers to OOM the server by sending an infinite request?
+            let body = req
+                .into_body()
+                .map(|chunk| chunk.map(|chunk| chunk.as_ref().to_vec()))
+                .try_concat()
+                .await?;
+
+            let join_request = serde_json::from_slice(body.as_slice());
+
+            if let Ok(join_request) = join_request {
+                let (reply_tx, reply_rx) = oneshot::channel();
+                let join_message = JoinMessage {
+                    request: join_request,
+                    reply_tx,
+                };
+
+                if join_tx.send(join_message).is_ok() {
+                    if let Ok(join_reply) = reply_rx.await {
+                        Ok(Response::builder()
+                            .header("Content-Type", "application/json")
+                            .body(serde_json::to_string(&join_reply).unwrap().into())
+                            .unwrap())
+                    } else {
+                        warn!("Sender of reply_tx was dropped, ignoring join request");
+                        Ok(internal_server_error())
+                    }
+                } else {
+                    warn!("Receiver of join_tx was dropped, ignoring join request");
+                    Ok(internal_server_error())
+                }
+            } else {
+                Ok(bad_request())
+            }
+        }
 
         // Return 404 Not Found for other routes
         _ => Ok(not_found()),
@@ -75,7 +126,7 @@ async fn send_file(
 
     let filename = config.clnt_deploy_dir.join(filename);
 
-    if let Ok(mut file) = File::open(filename).await {
+    if let Ok(mut file) = File::open(&filename).await {
         let mut buf = Vec::new();
 
         if let Ok(_) = file.read_to_end(&mut buf).await {
@@ -85,11 +136,19 @@ async fn send_file(
                 .unwrap();
             Ok(response)
         } else {
+            warn!("Could not open file for reading: {:?}", filename);
             Ok(internal_server_error())
         }
     } else {
         Ok(not_found())
     }
+}
+
+fn bad_request() -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body(BAD_REQUEST.into())
+        .unwrap()
 }
 
 fn not_found() -> Response<Body> {
