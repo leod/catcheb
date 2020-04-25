@@ -27,11 +27,11 @@ async fn main() {
                 .help("listen on the specified address/port for HTTP")
         )
         .arg(
-            Arg::with_name("clnt_deploy_dir")
-                .long("clnt_deploy_dir")
+            Arg::with_name("clnt_dir")
+                .long("clnt_dir")
                 .takes_value(true)
-                .required(true)
-                .help("Directory in which the clnt has been deployed (containing static files to be served over HTTP")
+                .default_value("clnt")
+                .help("Directory containing static files to be served over HTTP")
         )
         .get_matches();
 
@@ -41,7 +41,7 @@ async fn main() {
             .unwrap()
             .parse()
             .expect("could not parse HTTP address/port"),
-        clnt_deploy_dir: PathBuf::from(matches.value_of("clnt_deploy_dir").unwrap()),
+        clnt_dir: PathBuf::from(matches.value_of("clnt_dir").unwrap()),
     };
 
     let config = Config {
@@ -55,7 +55,5 @@ async fn main() {
 
     let http_server = http_server::Server::new(config.http_server, runner.join_tx());
 
-    tokio::spawn(async move {
-        http_server.serve().await.expect("HTTP server died");
-    });
+    http_server.serve().await.expect("HTTP server died");
 }

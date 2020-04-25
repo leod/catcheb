@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use stdweb::web::Date;
+use wasm_bindgen::prelude::*;
+use js_sys::Date;
 
 use quicksilver::{
     geom::{Rectangle, Transform, Vector},
@@ -9,7 +10,13 @@ use quicksilver::{
     Result,
 };
 
-fn main() {
+#[wasm_bindgen(start)]
+pub fn main() {
+    #[cfg(feature = "console_error_panic_hook")]
+    console_error_panic_hook::set_once();
+
+    log::info!("Starting up");
+
     run(
         Settings {
             size: Vector::new(1280.0, 720.0).into(),
@@ -25,7 +32,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     let mut pos = Vector::new(350.0, 100.0);
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
-    let mut last_time_ms = Date::new().get_time();
+    let mut last_time_ms = Date::new_0().get_time();
 
     loop {
         while let Some(event) = events.next_event().await {
@@ -41,7 +48,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             }
         }
 
-        let now_time_ms = Date::new().get_time();
+        let now_time_ms = Date::new_0().get_time();
         let delta_s = ((now_time_ms - last_time_ms) / 1000.0) as f32;
         last_time_ms = now_time_ms;
 

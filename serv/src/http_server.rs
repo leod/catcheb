@@ -15,7 +15,7 @@ static BAD_REQUEST: &[u8] = b"Bad Request";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Config {
     pub listen_addr: SocketAddr,
-    pub clnt_deploy_dir: PathBuf,
+    pub clnt_dir: PathBuf,
 }
 
 #[derive(Clone)]
@@ -36,7 +36,7 @@ impl Server {
         info!("Starting HTTP server at {:?}", self.config.listen_addr);
         info!(
             "Will serve client directory {:?}",
-            self.config.clnt_deploy_dir
+            self.config.clnt_dir
         );
 
         let make_service = hyper::service::make_service_fn(move |_: &AddrStream| {
@@ -65,7 +65,7 @@ async fn service(
             send_file(config, "index.html", "text/html").await
         }
         (&Method::GET, "/clnt.js") => send_file(config, "clnt.js", "text/javascript").await,
-        (&Method::GET, "/clnt.wasm") => send_file(config, "clnt.wasm", "application/wasm").await,
+        (&Method::GET, "/clnt_bg.wasm") => send_file(config, "clnt_bg.wasm", "application/wasm").await,
 
         // Join a game
         (&Method::POST, "/join") => {
@@ -124,7 +124,7 @@ async fn send_file(
     // Uses tokio_fs to open file asynchronously, then tokio::io::AsyncReadExt
     // to read into memory asynchronously.
 
-    let filename = config.clnt_deploy_dir.join(filename);
+    let filename = config.clnt_dir.join(filename);
 
     if let Ok(mut file) = File::open(&filename).await {
         let mut buf = Vec::new();
