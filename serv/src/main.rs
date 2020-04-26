@@ -9,9 +9,12 @@ use tokio::sync::mpsc;
 
 use clap::Arg;
 
+use runner::Runner;
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub http_server: http_server::Config,
+    pub runner: runner::Config,
 }
 
 #[tokio::main]
@@ -46,14 +49,21 @@ async fn main() {
 
     let config = Config {
         http_server: http_server_config,
+        runner: runner::Config::default(),
     };
 
     let (recv_msg_tx, recv_msg_rx) = mpsc::unbounded_channel();
     let (send_msg_tx, send_msg_rx) = mpsc::unbounded_channel();
 
     let runner = runner::Runner::new(recv_msg_rx, send_msg_tx);
+    let join_tx = runner.join_tx();
 
-    let http_server = http_server::Server::new(config.http_server, runner.join_tx());
+    let runner_thread = tokio::task::spawn_blocking(move || {
+        runner.run();
+    });
 
-    http_server.serve().await.expect("HTTP server died");
+    let http_server = http_server::Server::new(config.http_server, join_tx);
+
+    let (_, result) = futures::join!(runner_thread, http_server.serve());
+    result.expect("HTTP server died");
 }

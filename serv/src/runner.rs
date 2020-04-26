@@ -1,14 +1,20 @@
 use std::collections::HashMap;
 
-use tokio::sync::{mpsc, oneshot};
-
+use log::info;
+use tokio::sync::{
+    mpsc::{self, error::TryRecvError},
+    oneshot,
+};
 use uuid::Uuid;
 
 use crate::{
     game::Game,
     webrtc::{RecvMessageRx, SendMessageTx},
 };
-use comn::{JoinReply, JoinRequest};
+use comn::{game, JoinReply, JoinRequest, JoinSuccess};
+
+#[derive(Default, Debug, Clone)]
+pub struct Config {}
 
 pub struct JoinMessage {
     pub request: JoinRequest,
@@ -48,7 +54,33 @@ impl Runner {
         self.join_tx.clone()
     }
 
-    pub fn run(&self) {
-        loop {}
+    pub fn run(mut self) {
+        loop {
+            while let Some(join_message) = {
+                match self.join_rx.try_recv() {
+                    Ok(join_message) => Some(join_message),
+                    Err(TryRecvError::Empty) => None,
+                    Err(TryRecvError::Closed) => {
+                        info!("join_rx closed, terminating thread");
+                        return;
+                    }
+                }
+            } {
+                info!("Processing {:?}", join_message.request);
+
+                let reply = Ok(JoinSuccess {
+                    game_id: Uuid::new_v4(),
+                    your_token_id: Uuid::new_v4(),
+                    your_player_id: game::PlayerId(0),
+                });
+
+                if join_message.reply_tx.send(reply).is_err() {
+                    info!("reply_tx closed, terminating thread");
+                    return;
+                }
+            }
+
+            std::thread::sleep_ms(5);
+        }
     }
 }
