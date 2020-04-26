@@ -55,7 +55,7 @@ async fn main() {
     let (recv_msg_tx, recv_msg_rx) = mpsc::unbounded_channel();
     let (send_msg_tx, send_msg_rx) = mpsc::unbounded_channel();
 
-    let runner = runner::Runner::new(recv_msg_rx, send_msg_tx);
+    let runner = runner::Runner::new(config.runner, recv_msg_rx, send_msg_tx);
     let join_tx = runner.join_tx();
 
     let runner_thread = tokio::task::spawn_blocking(move || {
