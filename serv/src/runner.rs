@@ -134,14 +134,12 @@ impl Runner {
 
     pub fn run(mut self) {
         loop {
-            while let Some(join_message) = {
-                match self.join_rx.try_recv() {
-                    Ok(join_message) => Some(join_message),
-                    Err(TryRecvError::Empty) => None,
-                    Err(TryRecvError::Closed) => {
-                        info!("join_rx closed, terminating thread");
-                        return;
-                    }
+            while let Some(join_message) = match self.join_rx.try_recv() {
+                Ok(join_message) => Some(join_message),
+                Err(TryRecvError::Empty) => None,
+                Err(TryRecvError::Closed) => {
+                    info!("join_rx closed, terminating thread");
+                    return;
                 }
             } {
                 info!("Processing {:?}", join_message.request);
