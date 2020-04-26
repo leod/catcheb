@@ -75,11 +75,7 @@ async fn service(
                 .try_concat()
                 .await?;
 
-            let join_request = serde_json::from_slice(body.as_slice());
-
-            info!("Got {}", std::str::from_utf8(body.as_slice()).unwrap());
-
-            let join_request = match join_request {
+            let join_request = match serde_json::from_slice(body.as_slice()) {
                 Ok(x) => x,
                 Err(_) => return Ok(bad_request()),
             };
@@ -90,7 +86,7 @@ async fn service(
                 reply_tx,
             };
 
-            if !join_tx.send(join_message).is_ok() {
+            if join_tx.send(join_message).is_err() {
                 warn!("Receiver of join_tx was dropped, ignoring join request");
                 return Ok(internal_server_error());
             }
@@ -131,7 +127,7 @@ async fn send_file(
     if let Ok(mut file) = File::open(&filename).await {
         let mut buf = Vec::new();
 
-        if let Ok(_) = file.read_to_end(&mut buf).await {
+        if file.read_to_end(&mut buf).await.is_ok() {
             let response = Response::builder()
                 .header("Content-Type", content_type)
                 .body(buf.into())

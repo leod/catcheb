@@ -91,7 +91,7 @@ impl Runner {
             let non_full_games = self
                 .games
                 .iter_mut()
-                .filter(|(game_id, game)| !game.is_full());
+                .filter(|(_game_id, game)| !game.is_full());
 
             match non_full_games.choose(&mut rand::thread_rng()) {
                 Some((&game_id, game)) => (game_id, game),
@@ -123,7 +123,7 @@ impl Runner {
             }
         };
 
-        let (your_token_id, your_player_id) = game.join(request.player_name.clone());
+        let (your_token_id, your_player_id) = game.join(request.player_name);
 
         Ok(JoinSuccess {
             game_id,
@@ -154,7 +154,7 @@ impl Runner {
                 }
             }
 
-            std::thread::sleep_ms(5);
+            std::thread::sleep(std::time::Duration::from_millis(5));
         }
     }
 }
