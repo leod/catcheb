@@ -77,13 +77,11 @@ async fn service(
 
             let join_request = serde_json::from_slice(body.as_slice());
 
-            info!("Got join request {:?}", join_request);
-            info!("str: {}", std::str::from_utf8(body.as_slice()).unwrap());
+            info!("Got {}", std::str::from_utf8(body.as_slice()).unwrap());
 
-            let join_request = if let Ok(join_request) = join_request {
-                join_request
-            } else {
-                return Ok(bad_request());
+            let join_request = match join_request {
+                Ok(x) => x,
+                Err(_) => return Ok(bad_request()),
             };
 
             let (reply_tx, reply_rx) = oneshot::channel();

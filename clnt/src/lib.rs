@@ -18,8 +18,6 @@ pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
-    log::info!("Starting up");
-
     run(
         Settings {
             size: Vector::new(1280.0, 720.0).into(),
@@ -73,6 +71,8 @@ async fn app(
     mut gfx: Graphics,
     mut events: EventStream,
 ) -> quicksilver::Result<()> {
+    log::info!("Starting up");
+
     let join_reply = join(JoinRequest {
         game_id: None,
         player_name: "Pioneer".to_string(),
