@@ -7,13 +7,15 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hyper = "0.13"
-tokio = { version = "0.2", features = ["full"] }
-clap = "2.33"
-env_logger = "0.7"
 log = "0.4"
-uuid = { version = "0.8", features = ["v4", "serde"] }
-comn = { path = "../comn" }
-futures = "0.3.4"
 serde = "1.0"
 serde_json = "1.0"
+env_logger = "0.7"
+clap = "2.33"
+uuid = { version = "0.8", features = ["v4", "serde"] }
+
+futures = "0.3.4"
+tokio = { version = "0.2", features = ["full"] }
+
+hyper = "0.13"
+comn = { path = "../comn" }
