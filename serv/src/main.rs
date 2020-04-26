@@ -9,8 +9,6 @@ use tokio::sync::mpsc;
 
 use clap::Arg;
 
-use runner::Runner;
-
 #[derive(Clone, Debug)]
 pub struct Config {
     pub http_server: http_server::Config,

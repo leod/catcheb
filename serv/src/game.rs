@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use uuid::Uuid;
 
 use comn::{game, util::VecOption};
@@ -46,7 +44,7 @@ impl Game {
 
         let token_id = Uuid::new_v4();
         let player = Player {
-            token_id: token_id.clone(),
+            token_id,
             name: player_name,
         };
 
