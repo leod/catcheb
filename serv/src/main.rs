@@ -1,6 +1,11 @@
+mod game;
 mod http_server;
+mod runner;
+mod webrtc;
 
 use std::path::PathBuf;
+
+use tokio::sync::mpsc;
 
 use clap::Arg;
 
@@ -22,24 +27,33 @@ async fn main() {
                 .help("listen on the specified address/port for HTTP")
         )
         .arg(
-            Arg::with_name("clnt_deploy_dir")
-                .long("clnt_deploy_dir")
+            Arg::with_name("clnt_dir")
+                .long("clnt_dir")
                 .takes_value(true)
-                .required(true)
-                .help("Directory in which the clnt has been deployed (containing static files to be served over HTTP")
+                .default_value("clnt")
+                .help("Directory containing static files to be served over HTTP")
         )
         .get_matches();
-    
+
     let http_server_config = http_server::Config {
-        listen_addr: matches.value_of("http_address").unwrap().parse().expect("could not parse HTTP address/port"),
-        clnt_deploy_dir: PathBuf::from(matches.value_of("clnt_deploy_dir").unwrap())
+        listen_addr: matches
+            .value_of("http_address")
+            .unwrap()
+            .parse()
+            .expect("could not parse HTTP address/port"),
+        clnt_dir: PathBuf::from(matches.value_of("clnt_dir").unwrap()),
     };
 
     let config = Config {
         http_server: http_server_config,
     };
 
-    let http_server = http_server::Server::new(config.http_server);
+    let (recv_msg_tx, recv_msg_rx) = mpsc::unbounded_channel();
+    let (send_msg_tx, send_msg_rx) = mpsc::unbounded_channel();
+
+    let runner = runner::Runner::new(recv_msg_rx, send_msg_tx);
+
+    let http_server = http_server::Server::new(config.http_server, runner.join_tx());
 
     http_server.serve().await.expect("HTTP server died");
 }
