@@ -12,6 +12,7 @@ use clap::Arg;
 #[derive(Clone, Debug)]
 pub struct Config {
     pub http_server: http_server::Config,
+    pub runner: runner::Config,
 }
 
 #[tokio::main]
@@ -24,14 +25,14 @@ async fn main() {
                 .long("http_address")
                 .takes_value(true)
                 .required(true)
-                .help("listen on the specified address/port for HTTP")
+                .help("listen on the specified address/port for HTTP"),
         )
         .arg(
             Arg::with_name("clnt_dir")
                 .long("clnt_dir")
                 .takes_value(true)
                 .default_value("clnt")
-                .help("Directory containing static files to be served over HTTP")
+                .help("Directory containing static files to be served over HTTP"),
         )
         .get_matches();
 
@@ -46,14 +47,21 @@ async fn main() {
 
     let config = Config {
         http_server: http_server_config,
+        runner: runner::Config::default(),
     };
 
     let (recv_msg_tx, recv_msg_rx) = mpsc::unbounded_channel();
     let (send_msg_tx, send_msg_rx) = mpsc::unbounded_channel();
 
-    let runner = runner::Runner::new(recv_msg_rx, send_msg_tx);
+    let runner = runner::Runner::new(config.runner, recv_msg_rx, send_msg_tx);
+    let join_tx = runner.join_tx();
 
-    let http_server = http_server::Server::new(config.http_server, runner.join_tx());
+    let runner_thread = tokio::task::spawn_blocking(move || {
+        runner.run();
+    });
 
-    http_server.serve().await.expect("HTTP server died");
+    let http_server = http_server::Server::new(config.http_server, join_tx);
+
+    let (_, result) = futures::join!(runner_thread, http_server.serve());
+    result.expect("HTTP server died");
 }

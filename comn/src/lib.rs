@@ -1,4 +1,5 @@
 pub mod game;
+pub mod util;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

@@ -34,10 +34,7 @@ impl Server {
 
     pub fn serve(&self) -> impl Future<Output = Result<(), hyper::Error>> + '_ {
         info!("Starting HTTP server at {:?}", self.config.listen_addr);
-        info!(
-            "Will serve client directory {:?}",
-            self.config.clnt_dir
-        );
+        info!("Will serve client directory {:?}", self.config.clnt_dir);
 
         let make_service = hyper::service::make_service_fn(move |_: &AddrStream| {
             let config = self.config.clone();
@@ -65,7 +62,9 @@ async fn service(
             send_file(config, "index.html", "text/html").await
         }
         (&Method::GET, "/clnt.js") => send_file(config, "clnt.js", "text/javascript").await,
-        (&Method::GET, "/clnt_bg.wasm") => send_file(config, "clnt_bg.wasm", "application/wasm").await,
+        (&Method::GET, "/clnt_bg.wasm") => {
+            send_file(config, "clnt_bg.wasm", "application/wasm").await
+        }
 
         // Join a game
         (&Method::POST, "/join") => {
@@ -76,31 +75,30 @@ async fn service(
                 .try_concat()
                 .await?;
 
-            let join_request = serde_json::from_slice(body.as_slice());
+            let join_request = match serde_json::from_slice(body.as_slice()) {
+                Ok(x) => x,
+                Err(_) => return Ok(bad_request()),
+            };
 
-            if let Ok(join_request) = join_request {
-                let (reply_tx, reply_rx) = oneshot::channel();
-                let join_message = JoinMessage {
-                    request: join_request,
-                    reply_tx,
-                };
+            let (reply_tx, reply_rx) = oneshot::channel();
+            let join_message = JoinMessage {
+                request: join_request,
+                reply_tx,
+            };
 
-                if join_tx.send(join_message).is_ok() {
-                    if let Ok(join_reply) = reply_rx.await {
-                        Ok(Response::builder()
-                            .header("Content-Type", "application/json")
-                            .body(serde_json::to_string(&join_reply).unwrap().into())
-                            .unwrap())
-                    } else {
-                        warn!("Sender of reply_tx was dropped, ignoring join request");
-                        Ok(internal_server_error())
-                    }
-                } else {
-                    warn!("Receiver of join_tx was dropped, ignoring join request");
-                    Ok(internal_server_error())
-                }
+            if join_tx.send(join_message).is_err() {
+                warn!("Receiver of join_tx was dropped, ignoring join request");
+                return Ok(internal_server_error());
+            }
+
+            if let Ok(join_reply) = reply_rx.await {
+                Ok(Response::builder()
+                    .header("Content-Type", "application/json")
+                    .body(serde_json::to_string(&join_reply).unwrap().into())
+                    .unwrap())
             } else {
-                Ok(bad_request())
+                warn!("Sender of reply_tx was dropped, ignoring join request");
+                Ok(internal_server_error())
             }
         }
 
@@ -129,7 +127,7 @@ async fn send_file(
     if let Ok(mut file) = File::open(&filename).await {
         let mut buf = Vec::new();
 
-        if let Ok(_) = file.read_to_end(&mut buf).await {
+        if file.read_to_end(&mut buf).await.is_ok() {
             let response = Response::builder()
                 .header("Content-Type", content_type)
                 .body(buf.into())
