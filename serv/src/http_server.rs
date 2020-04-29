@@ -87,7 +87,7 @@ async fn service(
             };
 
             if join_tx.send(join_message).is_err() {
-                warn!("Receiver of join_tx was dropped, ignoring join request");
+                warn!("join_tx closed, ignoring join request");
                 return Ok(internal_server_error());
             }
 
@@ -97,7 +97,7 @@ async fn service(
                     .body(serde_json::to_string(&join_reply).unwrap().into())
                     .unwrap())
             } else {
-                warn!("Sender of reply_tx was dropped, ignoring join request");
+                warn!("reply_rx closed, ignoring join request");
                 Ok(internal_server_error())
             }
         }

@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     game::{self, Game},
-    webrtc::{RecvMessageRx, SendMessageTx},
+    webrtc_server::{RecvMessageRx, SendMessageTx},
 };
 use comn::{JoinError, JoinReply, JoinRequest, JoinSuccess};
 
@@ -32,6 +32,7 @@ pub struct JoinMessage {
     pub reply_tx: oneshot::Sender<JoinReply>,
 }
 
+// TODO: Check if we should make channels bounded
 pub type JoinTx = mpsc::UnboundedSender<JoinMessage>;
 pub type JoinRx = mpsc::UnboundedReceiver<JoinMessage>;
 
@@ -50,8 +51,8 @@ pub struct Runner {
 impl Runner {
     pub fn new(
         config: Config,
-        recv_message_rx: mpsc::UnboundedReceiver<Vec<u8>>,
-        send_message_tx: mpsc::UnboundedSender<Vec<u8>>,
+        recv_message_rx: RecvMessageRx,
+        send_message_tx: SendMessageTx,
     ) -> Self {
         let (join_tx, join_rx) = mpsc::unbounded_channel();
 

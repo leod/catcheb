@@ -1,7 +1,10 @@
+// Increase recursion_limit for `futures::select` macro
+#![recursion_limit="1024"]
+
 mod game;
 mod http_server;
 mod runner;
-mod webrtc;
+mod webrtc_server;
 
 use std::path::PathBuf;
 
@@ -50,10 +53,10 @@ async fn main() {
         runner: runner::Config::default(),
     };
 
-    let (recv_msg_tx, recv_msg_rx) = mpsc::unbounded_channel();
-    let (send_msg_tx, send_msg_rx) = mpsc::unbounded_channel();
+    let (recv_message_tx, recv_message_rx) = mpsc::unbounded_channel();
+    let (send_message_tx, send_message_rx) = mpsc::unbounded_channel();
 
-    let runner = runner::Runner::new(config.runner, recv_msg_rx, send_msg_tx);
+    let runner = runner::Runner::new(config.runner, recv_message_rx, send_message_tx);
     let join_tx = runner.join_tx();
 
     let runner_thread = tokio::task::spawn_blocking(move || {
