@@ -15,8 +15,9 @@ clap = "2.33"
 uuid = { version = "0.8", features = ["v4", "serde"] }
 rand = "0.7"
 
-futures = "0.3.4"
+futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
-
 hyper = "0.13"
+webrtc-unreliable = "0.4"
+
 comn = { path = "../comn" }
