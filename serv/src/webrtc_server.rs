@@ -30,7 +30,7 @@ pub struct Server {
     send_message_tx: SendMessageTx,
     send_message_rx: SendMessageRx,
 
-    rtc_server: webrtc_unreliable::Server,
+    webrtc_server: webrtc_unreliable::Server,
 }
 
 impl Server {
@@ -40,7 +40,7 @@ impl Server {
     ) -> Result<Self, std::io::Error> {
         let (send_message_tx, send_message_rx) = mpsc::unbounded_channel();
 
-        let mut rtc_server =
+        let webrtc_server =
             webrtc_unreliable::Server::new(config.listen_addr, config.public_addr).await?;
 
         Ok(Self {
@@ -48,7 +48,7 @@ impl Server {
             recv_message_tx,
             send_message_tx,
             send_message_rx,
-            rtc_server,
+            webrtc_server,
         })
     }
 
@@ -57,7 +57,7 @@ impl Server {
     }
 
     pub fn session_endpoint(&self) -> webrtc_unreliable::SessionEndpoint {
-        self.rtc_server.session_endpoint()
+        self.webrtc_server.session_endpoint()
     }
 
     pub async fn serve(mut self) {
@@ -69,7 +69,7 @@ impl Server {
                 send_message = self.send_message_rx.recv().fuse() => {
                     match send_message {
                         Some((remote_addr, message)) => {
-                            if let Err(err) = self.rtc_server.send(
+                            if let Err(err) = self.webrtc_server.send(
                                     &message,
                                     webrtc_unreliable::MessageType::Binary,
                                     &remote_addr,
@@ -89,7 +89,7 @@ impl Server {
                         }
                     }
                 }
-                message_result = self.rtc_server.recv(&mut message_buf).fuse() => {
+                message_result = self.webrtc_server.recv(&mut message_buf).fuse() => {
                     match message_result {
                         Ok(message_result) => {
                             let recv_message = (
