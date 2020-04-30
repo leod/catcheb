@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use log::warn;
 
-use futures::{select, pin_mut, FutureExt, StreamExt};
+use futures::{pin_mut, select, FutureExt, StreamExt};
 use tokio::sync::mpsc;
 
 type Message = (SocketAddr, Vec<u8>);
@@ -17,6 +17,7 @@ pub fn recv_message_channel() -> (RecvMessageTx, RecvMessageRx) {
     mpsc::unbounded_channel()
 }
 
+#[derive(Debug, Clone)]
 pub struct Config {
     pub listen_addr: SocketAddr,
     pub public_addr: SocketAddr,
@@ -76,7 +77,7 @@ impl Server {
                                 .await
                             {
                                 warn!(
-                                    "Failed to send message to {}: {}", 
+                                    "Failed to send message to {}: {}",
                                     remote_addr,
                                     err,
                                 );

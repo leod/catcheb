@@ -8,11 +8,12 @@ use tokio::sync::{
 };
 use uuid::Uuid;
 
+use comn::{JoinError, JoinReply, JoinRequest, JoinSuccess};
+
 use crate::{
     game::{self, Game},
     webrtc_server::{RecvMessageRx, SendMessageTx},
 };
-use comn::{JoinError, JoinReply, JoinRequest, JoinSuccess};
 
 #[derive(Debug, Clone)]
 pub struct Config {
