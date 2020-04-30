@@ -8,13 +8,13 @@
     curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
     sudo apt-get install -y nodejs
     ```
-- `wasm-bindgen` to generate JavaScript/Wasm bindings:
+- `wasm-bindgen` for generating JavaScript/Wasm bindings:
 
     ```
     rustup target add wasm32-unknown-unknown
     cargo install wasm-bindgen-cli
     ```
-- `rollup` to combine JavaScript files into a single file:
+- `rollup` for combining JavaScript files into a single file:
 
     ```
     sudo npm install --global rollup
@@ -32,7 +32,11 @@ This will generate the following files in `clnt/static/`:
 
 Build and run the server:
 ```
-cargo run -j8 --bin serv -- --clnt_dir clnt/static --http_address <your-ip>:8080
+cargo run -j8 --bin serv -- \
+    --clnt_dir clnt/static \
+    --http_address <your-ip>:8080 \
+    --webrtc_listen_address <your-ip>:9000 \
+    --webrtc_public_address <your-ip>:9001
 ```
 
 ## Useful resources
