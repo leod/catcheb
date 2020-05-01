@@ -1,4 +1,8 @@
+mod webrtc;
+
 use std::collections::HashSet;
+
+use log::info;
 
 use js_sys::Date;
 use wasm_bindgen::prelude::*;
@@ -12,6 +16,8 @@ use quicksilver::{
 };
 
 use comn::{JoinReply, JoinRequest};
+
+// TODO: Nice error handling everywhere in the client
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -45,22 +51,20 @@ async fn join(request: JoinRequest) -> Result<JoinReply, JsValue> {
     opts.mode(web_sys::RequestMode::SameOrigin);
     opts.body(Some(&JsValue::from_str(&request_json)));
 
-    log::info!("Joining... {}", request_json);
+    info!("Requesting to join game: {} ...", request_json);
 
     let request = web_sys::Request::new_with_str_and_init(&"/join", &opts)?;
     request.headers().set("Accept", "application/json")?;
 
     let window = web_sys::window().unwrap();
     let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-
-    // `resp_value` is a `Response` object.
     assert!(resp_value.is_instance_of::<web_sys::Response>());
     let resp: web_sys::Response = resp_value.dyn_into().unwrap();
 
     // Convert this other `Promise` into a rust `Future`.
     let reply = JsFuture::from(resp.json()?).await?;
 
-    log::info!("Join reply: {:?}", reply);
+    info!("Join reply: {:?}", reply);
 
     // Use serde to parse the JSON into a struct.
     Ok(reply.into_serde().unwrap())
@@ -71,7 +75,9 @@ async fn app(
     mut gfx: Graphics,
     mut events: EventStream,
 ) -> quicksilver::Result<()> {
-    log::info!("Starting up");
+    info!("Starting up");
+
+    let webrtc_client = webrtc::Client::connect(Default::default()).await.unwrap();
 
     let join_reply = join(JoinRequest {
         game_id: None,

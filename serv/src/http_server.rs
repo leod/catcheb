@@ -5,7 +5,9 @@ use log::{debug, info, warn};
 use futures::TryStreamExt;
 use tokio::{fs::File, io::AsyncReadExt, stream::StreamExt, sync::oneshot};
 
-use hyper::{server::conn::AddrStream, header::HeaderValue, Body, Method, Request, Response, StatusCode};
+use hyper::{
+    header::HeaderValue, server::conn::AddrStream, Body, Method, Request, Response, StatusCode,
+};
 use webrtc_unreliable::SessionEndpoint;
 
 use crate::runner::{JoinMessage, JoinTx};
@@ -48,7 +50,13 @@ impl Server {
 
             async move {
                 Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
-                    service(config.clone(), join_tx.clone(), session_endpoint.clone(), remote_addr, req)
+                    service(
+                        config.clone(),
+                        join_tx.clone(),
+                        session_endpoint.clone(),
+                        remote_addr,
+                        req,
+                    )
                 }))
             }
         });
@@ -71,9 +79,7 @@ async fn service(
         (&Method::GET, "/") | (&Method::GET, "/index.html") => {
             send_file(config, "index.html", "text/html").await
         }
-        (&Method::GET, "/clnt.js") => {
-            send_file(config, "clnt.js", "text/javascript").await
-        }
+        (&Method::GET, "/clnt.js") => send_file(config, "clnt.js", "text/javascript").await,
         (&Method::GET, "/clnt_bg.wasm") => {
             send_file(config, "clnt_bg.wasm", "application/wasm").await
         }
