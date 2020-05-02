@@ -2,11 +2,10 @@ mod webrtc;
 
 use std::collections::HashSet;
 
-use log::info;
+use log::{debug, info};
 
 use js_sys::Date;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
 use quicksilver::{
