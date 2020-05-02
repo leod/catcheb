@@ -3,11 +3,12 @@
 //! This is based on the `echo_server.html` example from `webrtc-unreliable`,
 //! but translated from JavaScript into Rust.
 
+use std::{cell::Cell, rc::Rc};
+
 use log::info;
 
 use js_sys::{Reflect, JSON};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit, RtcPeerConnection,
@@ -25,6 +26,13 @@ pub enum ConnectError {
     ResponseJson(JsValue),
     SetRemoteDescription(JsValue),
     AddIceCandidate(JsValue),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Status {
+    Connecting,
+    Connected,
+    Error,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +57,7 @@ impl Default for Config {
 }
 
 pub struct Client {
+    status: Rc<Cell<Status>>,
     _on_open: Closure<FnMut(&Event)>,
 }
 
@@ -59,7 +68,11 @@ impl Client {
         let peer: RtcPeerConnection = new_rtc_peer_connection(&config)?;
         let channel: RtcDataChannel = create_data_channel(&peer);
 
-        let on_open = Closure::wrap(Box::new(on_open) as Box<FnMut(&Event)>);
+        let status = Rc::new(Cell::new(Status::Connecting));
+        let on_open = Closure::wrap(Box::new({
+            let status = status.clone();
+            move |event: &Event| on_open(status.clone())
+        }) as Box<FnMut(&Event)>);
         channel.set_onopen(Some(on_open.as_ref().unchecked_ref()));
 
         let offer: RtcSessionDescriptionInit = JsFuture::from(peer.create_offer())
@@ -90,12 +103,21 @@ impl Client {
             .await
             .map_err(ConnectError::AddIceCandidate)?;
 
-        Ok(Client { _on_open: on_open })
+        Ok(Client {
+            status,
+            _on_open: on_open,
+        })
+    }
+
+    pub fn status(&self) -> Status {
+        self.status.get()
     }
 }
 
-pub fn on_open(_: &Event) {
+pub fn on_open(status: Rc<Cell<Status>>) {
     info!("Connection has been established");
+
+    status.set(Status::Connected);
 }
 
 fn new_rtc_peer_connection(config: &Config) -> Result<RtcPeerConnection, ConnectError> {
