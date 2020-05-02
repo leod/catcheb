@@ -39,6 +39,7 @@ features = [
   'Response',
   'Window',
   'Location',
+  'Event',
   'MessageEvent',
   'RtcConfiguration',
   'RtcPeerConnection',

@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit, RtcPeerConnection,
+    Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit, RtcPeerConnection,
     RtcSessionDescriptionInit,
 };
 
@@ -48,7 +48,9 @@ impl Default for Config {
     }
 }
 
-pub struct Client {}
+pub struct Client {
+    _on_open: Closure<FnMut(&Event)>,
+}
 
 impl Client {
     pub async fn connect(config: Config) -> Result<Self, ConnectError> {
@@ -56,6 +58,9 @@ impl Client {
 
         let peer: RtcPeerConnection = new_rtc_peer_connection(&config)?;
         let channel: RtcDataChannel = create_data_channel(&peer);
+
+        let on_open = Closure::wrap(Box::new(on_open) as Box<FnMut(&Event)>);
+        channel.set_onopen(Some(on_open.as_ref().unchecked_ref()));
 
         let offer: RtcSessionDescriptionInit = JsFuture::from(peer.create_offer())
             .await
@@ -85,12 +90,12 @@ impl Client {
             .await
             .map_err(ConnectError::AddIceCandidate)?;
 
-        Ok(Client {})
+        Ok(Client { _on_open: on_open })
     }
+}
 
-    fn on_open(event: &MessageEvent) {
-        info!("Connection has been established");
-    }
+pub fn on_open(_: &Event) {
+    info!("Connection has been established");
 }
 
 fn new_rtc_peer_connection(config: &Config) -> Result<RtcPeerConnection, ConnectError> {
