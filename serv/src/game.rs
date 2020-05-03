@@ -1,10 +1,17 @@
+use std::net::SocketAddr;
+
 use uuid::Uuid;
 
-use comn::{game, util::VecOption};
+use comn::{
+    game,
+    util::{PingEstimation, VecOption},
+};
 
 pub struct Player {
     pub token_id: Uuid,
     pub name: String,
+    pub peer: Option<SocketAddr>,
+    pub ping_estimation: PingEstimation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +53,8 @@ impl Game {
         let player = Player {
             token_id,
             name: player_name,
+            peer: None,
+            ping_estimation: PingEstimation::default(),
         };
 
         let player_id = self.players.add(player);
