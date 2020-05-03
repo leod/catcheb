@@ -35,3 +35,23 @@ pub enum ServerMessage {
 pub enum ClientMessage {
     Pong,
 }
+
+impl ServerMessage {
+    pub fn serialize(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        bincode::deserialize(data).ok()
+    }
+}
+
+impl ClientMessage {
+    pub fn serialize(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+
+    pub fn deserialize(data: &[u8]) -> Option<Self> {
+        bincode::deserialize(data).ok()
+    }
+}
