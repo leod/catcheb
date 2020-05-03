@@ -2,9 +2,9 @@
 #![recursion_limit = "1024"]
 
 mod game;
-mod http_server;
+mod http;
 mod runner;
-mod webrtc_server;
+mod webrtc;
 
 use std::path::PathBuf;
 
@@ -12,8 +12,8 @@ use clap::Arg;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub http_server: http_server::Config,
-    pub webrtc_server: webrtc_server::Config,
+    pub http_server: http::Config,
+    pub webrtc_server: webrtc::Config,
     pub runner: runner::Config,
 }
 
@@ -52,7 +52,7 @@ async fn main() {
         )
         .get_matches();
 
-    let http_server_config = http_server::Config {
+    let http_server_config = http::Config {
         listen_addr: matches
             .value_of("http_address")
             .unwrap()
@@ -60,7 +60,7 @@ async fn main() {
             .expect("could not parse HTTP address/port"),
         clnt_dir: PathBuf::from(matches.value_of("clnt_dir").unwrap()),
     };
-    let webrtc_server_config = webrtc_server::Config {
+    let webrtc_server_config = webrtc::Config {
         listen_addr: matches
             .value_of("webrtc_listen_address")
             .unwrap()
@@ -78,8 +78,8 @@ async fn main() {
         runner: runner::Config::default(),
     };
 
-    let (recv_message_tx, recv_message_rx) = webrtc_server::recv_message_channel();
-    let webrtc_server = webrtc_server::Server::new(config.webrtc_server, recv_message_tx)
+    let (recv_message_tx, recv_message_rx) = webrtc::recv_message_channel();
+    let webrtc_server = webrtc::Server::new(config.webrtc_server, recv_message_tx)
         .await
         .unwrap();
     let send_message_tx = webrtc_server.send_message_tx();
@@ -91,7 +91,7 @@ async fn main() {
         runner.run();
     });
 
-    let http_server = http_server::Server::new(config.http_server, join_tx, session_endpoint);
+    let http_server = http::Server::new(config.http_server, join_tx, session_endpoint);
 
     let (_, http_server_result, _) =
         futures::join!(runner_thread, http_server.serve(), webrtc_server.serve(),);

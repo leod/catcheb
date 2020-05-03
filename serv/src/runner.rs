@@ -12,7 +12,7 @@ use comn::{JoinError, JoinReply, JoinRequest, JoinSuccess};
 
 use crate::{
     game::{self, Game},
-    webrtc_server::{RecvMessageRx, SendMessageTx},
+    webrtc::{RecvMessageRx, SendMessageTx},
 };
 
 #[derive(Debug, Clone)]
