@@ -30,18 +30,11 @@ async fn main() {
                 .help("listen on the specified address/port for HTTP"),
         )
         .arg(
-            Arg::with_name("webrtc_listen_address")
-                .long("webrtc_listen_address")
+            Arg::with_name("webrtc_address")
+                .long("webrtc_address")
                 .takes_value(true)
                 .required(true)
                 .help("listen on the specified address/port for WebRTC"),
-        )
-        .arg(
-            Arg::with_name("webrtc_public_address")
-                .long("webrtc_public_address")
-                .takes_value(true)
-                .required(true)
-                .help("public address/port for WebRTC"),
         )
         .arg(
             Arg::with_name("clnt_dir")
@@ -62,15 +55,10 @@ async fn main() {
     };
     let webrtc_server_config = webrtc::Config {
         listen_addr: matches
-            .value_of("webrtc_listen_address")
+            .value_of("webrtc_address")
             .unwrap()
             .parse()
-            .expect("could not parse WebRTC listen address/port"),
-        public_addr: matches
-            .value_of("webrtc_public_address")
-            .unwrap()
-            .parse()
-            .expect("could not parse WebRTC public address/port"),
+            .expect("could not parse WebRTC address/port"),
     };
     let config = Config {
         http_server: http_server_config,
