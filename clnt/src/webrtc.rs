@@ -59,9 +59,9 @@ impl Default for Config {
 
 pub struct Client {
     status: Rc<Cell<Status>>,
-    _on_open: Closure<FnMut(&Event)>,
-    _on_close: Closure<FnMut(&Event)>,
-    _on_error: Closure<FnMut(&ErrorEvent)>,
+    _on_open: Closure<dyn FnMut(&Event)>,
+    _on_close: Closure<dyn FnMut(&Event)>,
+    _on_error: Closure<dyn FnMut(&ErrorEvent)>,
 }
 
 impl Client {
@@ -76,20 +76,20 @@ impl Client {
         let on_open = Closure::wrap(Box::new({
             let status = status.clone();
             move |_: &Event| on_open(status.clone())
-        }) as Box<FnMut(&Event)>);
+        }) as Box<dyn FnMut(&Event)>);
         channel.set_onopen(Some(on_open.as_ref().unchecked_ref()));
 
         // TODO: We'll also want to handle close events caused by the peer
         let on_close = Closure::wrap(Box::new({
             let status = status.clone();
             move |_: &Event| on_close(status.clone())
-        }) as Box<FnMut(&Event)>);
+        }) as Box<dyn FnMut(&Event)>);
         channel.set_onclose(Some(on_close.as_ref().unchecked_ref()));
 
         let on_error = Closure::wrap(Box::new({
             let status = status.clone();
             move |event: &ErrorEvent| on_error(status.clone(), event)
-        }) as Box<FnMut(&ErrorEvent)>);
+        }) as Box<dyn FnMut(&ErrorEvent)>);
         channel.set_onerror(Some(on_error.as_ref().unchecked_ref()));
 
         let offer: RtcSessionDescriptionInit = JsFuture::from(peer.create_offer())

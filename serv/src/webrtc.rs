@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use log::warn;
 
-use futures::{pin_mut, select, FutureExt, StreamExt};
+use futures::{select, FutureExt, StreamExt};
 use tokio::sync::mpsc;
 
 pub struct MessageIn {
