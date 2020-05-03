@@ -5,13 +5,21 @@ use log::warn;
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use tokio::sync::mpsc;
 
-type Message = (SocketAddr, Vec<u8>);
+pub struct MessageIn {
+    pub peer: SocketAddr,
+    pub data: Vec<u8>,
+}
+
+pub struct MessageOut {
+    pub peer: SocketAddr,
+    pub data: Vec<u8>,
+}
 
 // TODO: Check if we should make channels bounded
-pub type RecvMessageTx = mpsc::UnboundedSender<Message>;
-pub type RecvMessageRx = mpsc::UnboundedReceiver<Message>;
-pub type SendMessageTx = mpsc::UnboundedSender<Message>;
-pub type SendMessageRx = mpsc::UnboundedReceiver<Message>;
+pub type RecvMessageTx = mpsc::UnboundedSender<MessageIn>;
+pub type RecvMessageRx = mpsc::UnboundedReceiver<MessageIn>;
+pub type SendMessageTx = mpsc::UnboundedSender<MessageOut>;
+pub type SendMessageRx = mpsc::UnboundedReceiver<MessageOut>;
 
 pub fn recv_message_channel() -> (RecvMessageTx, RecvMessageRx) {
     mpsc::unbounded_channel()
@@ -72,19 +80,19 @@ impl Server {
 
         loop {
             select! {
-                send_message = self.send_message_rx.recv().fuse() => {
-                    match send_message {
-                        Some((remote_addr, message)) => {
+                message_out = self.send_message_rx.recv().fuse() => {
+                    match message_out {
+                        Some(message_out) => {
                             if let Err(err) = self.webrtc_server.send(
-                                    &message,
+                                    &message_out.data,
                                     webrtc_unreliable::MessageType::Binary,
-                                    &remote_addr,
+                                    &message_out.peer,
                                 )
                                 .await
                             {
                                 warn!(
                                     "Failed to send message to {}: {}",
-                                    remote_addr,
+                                    message_out.peer,
                                     err,
                                 );
                             }
@@ -98,11 +106,11 @@ impl Server {
                 message_result = self.webrtc_server.recv(&mut message_buf).fuse() => {
                     match message_result {
                         Ok(message_result) => {
-                            let recv_message = (
-                                message_result.remote_addr,
-                                message_buf[0..message_result.message_len].to_vec()
-                            );
-                            if self.recv_message_tx.send(recv_message).is_err() {
+                            let message_in = MessageIn {
+                                peer: message_result.remote_addr,
+                                data: message_buf[0..message_result.message_len].to_vec(),
+                            };
+                            if self.recv_message_tx.send(message_in).is_err() {
                                 warn!("recv_message_tx closed, terminating");
                             }
                         }

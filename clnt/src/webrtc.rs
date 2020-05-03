@@ -75,13 +75,14 @@ impl Client {
 
         let on_open = Closure::wrap(Box::new({
             let status = status.clone();
-            move |event: &Event| on_open(status.clone())
+            move |_: &Event| on_open(status.clone())
         }) as Box<FnMut(&Event)>);
         channel.set_onopen(Some(on_open.as_ref().unchecked_ref()));
 
+        // TODO: We'll also want to handle close events caused by the peer
         let on_close = Closure::wrap(Box::new({
             let status = status.clone();
-            move |event: &Event| on_close(status.clone())
+            move |_: &Event| on_close(status.clone())
         }) as Box<FnMut(&Event)>);
         channel.set_onclose(Some(on_close.as_ref().unchecked_ref()));
 
