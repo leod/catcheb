@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Instant};
 
 use log::warn;
 
@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 pub struct MessageIn {
     pub peer: SocketAddr,
     pub data: Vec<u8>,
+    pub recv_time: Instant,
 }
 
 pub struct MessageOut {
@@ -109,6 +110,7 @@ impl Server {
                             let message_in = MessageIn {
                                 peer: message_result.remote_addr,
                                 data: message_buf[0..message_result.message_len].to_vec(),
+                                recv_time: Instant::now(),
                             };
                             if self.recv_message_tx.send(message_in).is_err() {
                                 warn!("recv_message_tx closed, terminating");
