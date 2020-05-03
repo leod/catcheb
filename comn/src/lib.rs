@@ -25,3 +25,13 @@ pub enum JoinError {
 }
 
 pub type JoinReply = Result<JoinSuccess, JoinError>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ServerMessage {
+    Ping,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ClientMessage {
+    Pong,
+}

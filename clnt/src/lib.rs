@@ -16,8 +16,6 @@ use quicksilver::{
 
 use comn::{JoinReply, JoinRequest};
 
-// TODO: Nice error handling everywhere in the client
-
 #[wasm_bindgen(start)]
 pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
@@ -76,8 +74,22 @@ async fn app(
 ) -> quicksilver::Result<()> {
     info!("Starting up");
 
+    // TODO: Graceful error handling in client
     let webrtc_client = webrtc::Client::connect(Default::default()).await.unwrap();
 
+    while webrtc_client.status() == webrtc::Status::Connecting {
+        events.next_event().await;
+    }
+
+    if webrtc_client.status() != webrtc::Status::Open {
+        // TODO: Graceful error handling in client
+        panic!(
+            "Failed to establish WebRTC connection: {:?}",
+            webrtc_client.status()
+        );
+    }
+
+    // TODO: Graceful error handling in client
     let join_reply = join(JoinRequest {
         game_id: None,
         player_name: "Pioneer".to_string(),
@@ -102,6 +114,14 @@ async fn app(
                 }
                 _ => (),
             }
+        }
+
+        if webrtc_client.status() != webrtc::Status::Open {
+            // TODO: Graceful error handling in client
+            panic!(
+                "WebRTC connection no longer open: {:?}",
+                webrtc_client.status()
+            );
         }
 
         let now_time_ms = Date::new_0().get_time();

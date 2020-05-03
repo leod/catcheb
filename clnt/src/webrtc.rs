@@ -5,14 +5,14 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use log::info;
+use log::{info, warn};
 
 use js_sys::{Reflect, JSON};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit, RtcPeerConnection,
-    RtcSessionDescriptionInit,
+    ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit,
+    RtcPeerConnection, RtcSessionDescriptionInit,
 };
 
 #[derive(Debug, Clone)]
@@ -28,10 +28,11 @@ pub enum ConnectError {
     AddIceCandidate(JsValue),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
     Connecting,
-    Connected,
+    Open,
+    Closed,
     Error,
 }
 
@@ -59,6 +60,8 @@ impl Default for Config {
 pub struct Client {
     status: Rc<Cell<Status>>,
     _on_open: Closure<FnMut(&Event)>,
+    _on_close: Closure<FnMut(&Event)>,
+    _on_error: Closure<FnMut(&ErrorEvent)>,
 }
 
 impl Client {
@@ -69,11 +72,24 @@ impl Client {
         let channel: RtcDataChannel = create_data_channel(&peer);
 
         let status = Rc::new(Cell::new(Status::Connecting));
+
         let on_open = Closure::wrap(Box::new({
             let status = status.clone();
             move |event: &Event| on_open(status.clone())
         }) as Box<FnMut(&Event)>);
         channel.set_onopen(Some(on_open.as_ref().unchecked_ref()));
+
+        let on_close = Closure::wrap(Box::new({
+            let status = status.clone();
+            move |event: &Event| on_close(status.clone())
+        }) as Box<FnMut(&Event)>);
+        channel.set_onclose(Some(on_close.as_ref().unchecked_ref()));
+
+        let on_error = Closure::wrap(Box::new({
+            let status = status.clone();
+            move |event: &ErrorEvent| on_error(status.clone(), event)
+        }) as Box<FnMut(&ErrorEvent)>);
+        channel.set_onerror(Some(on_error.as_ref().unchecked_ref()));
 
         let offer: RtcSessionDescriptionInit = JsFuture::from(peer.create_offer())
             .await
@@ -106,6 +122,8 @@ impl Client {
         Ok(Client {
             status,
             _on_open: on_open,
+            _on_close: on_close,
+            _on_error: on_error,
         })
     }
 
@@ -117,7 +135,19 @@ impl Client {
 pub fn on_open(status: Rc<Cell<Status>>) {
     info!("Connection has been established");
 
-    status.set(Status::Connected);
+    status.set(Status::Open);
+}
+
+pub fn on_close(status: Rc<Cell<Status>>) {
+    info!("Connection has been closed");
+
+    status.set(Status::Closed);
+}
+
+pub fn on_error(status: Rc<Cell<Status>>, error: &ErrorEvent) {
+    warn!("Connection error: {:?}", error);
+
+    status.set(Status::Error);
 }
 
 fn new_rtc_peer_connection(config: &Config) -> Result<RtcPeerConnection, ConnectError> {
