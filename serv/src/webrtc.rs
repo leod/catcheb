@@ -20,7 +20,6 @@ pub fn recv_message_channel() -> (RecvMessageTx, RecvMessageRx) {
 #[derive(Debug, Clone)]
 pub struct Config {
     pub listen_addr: SocketAddr,
-    pub public_addr: SocketAddr,
 }
 
 pub struct Server {
@@ -40,8 +39,15 @@ impl Server {
     ) -> Result<Self, std::io::Error> {
         let (send_message_tx, send_message_rx) = mpsc::unbounded_channel();
 
+        // Note that the `webrtc_unreliable::Server` actually takes two
+        // addresses: the listen address and the public address. In practice,
+        // it seems that both addresses must listen on the same port:
+        // <https://github.com/kyren/webrtc-unreliable/issues/3#issuecomment-532905616>
+        //
+        // There might be some use in using a different IP for the two
+        // addresses, but for now we'll just use the exact same address.
         let webrtc_server =
-            webrtc_unreliable::Server::new(config.listen_addr, config.public_addr).await?;
+            webrtc_unreliable::Server::new(config.listen_addr, config.listen_addr).await?;
 
         Ok(Self {
             config,

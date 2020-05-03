@@ -35,8 +35,7 @@ Build and run the server:
 cargo run -j8 --bin serv -- \
     --clnt_dir clnt/static \
     --http_address <your-ip>:8080 \
-    --webrtc_listen_address <your-ip>:9000 \
-    --webrtc_public_address <your-ip>:9001
+    --webrtc_address <your-ip>:9000 \
 ```
 
 ## Useful resources
