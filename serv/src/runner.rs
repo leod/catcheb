@@ -56,7 +56,6 @@ impl Runner {
         send_message_tx: SendMessageTx,
     ) -> Self {
         let (join_tx, join_rx) = mpsc::unbounded_channel();
-
         Runner {
             config,
             games: HashMap::new(),
@@ -152,6 +151,17 @@ impl Runner {
                     info!("reply_tx closed, terminating thread");
                     return;
                 }
+            }
+
+            while let Some(message_in) = match self.recv_message_rx.try_recv() {
+                Ok(message_in) => Some(message_in),
+                Err(TryRecvError::Empty) => None,
+                Err(TryRecvError::Closed) => {
+                    info!("recv_message_rx closed, terminating thread");
+                    return;
+                }
+            } {
+                info!("Received message from {:?}", message_in.peer);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(5));
