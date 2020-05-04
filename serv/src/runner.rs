@@ -189,15 +189,15 @@ impl Runner {
 
                 match signed_message {
                     Some(signed_message) => {
-                        debug!(
+                        /*debug!(
                             "Received message from {:?}: {:?}",
                             message_in.peer, signed_message
-                        );
+                        );*/
                         self.handle_message(message_in.peer, signed_message);
                     }
                     None => {
                         warn!(
-                            "Failed to serialize message from {:?}, ignoring",
+                            "Failed to deserialize message from {:?}, ignoring",
                             message_in.peer,
                         );
                     }

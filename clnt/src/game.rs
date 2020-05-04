@@ -1,4 +1,4 @@
-use log::warn;
+use log::{info, warn};
 
 use crate::webrtc;
 
@@ -23,8 +23,12 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
-    pub fn update(&mut self) {
+    pub async fn update(&mut self) {
         self.send(comn::ClientMessage::Ping(comn::SequenceNum(0)));
+
+        while let Some(message) = self.webrtc_client.take_message().await {
+            info!("Received: {:?}", message);
+        }
     }
 
     fn send(&self, message: comn::ClientMessage) {

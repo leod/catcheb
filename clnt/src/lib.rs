@@ -90,7 +90,7 @@ async fn app(
             panic!("Game lost connection");
         }
 
-        game.update();
+        game.update().await;
 
         let now_time_ms = Date::new_0().get_time();
         let delta_s = ((now_time_ms - last_time_ms) / 1000.0) as f32;
