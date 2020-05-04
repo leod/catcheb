@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub use crate::{
-    game::{Entity, EntityId, Game, Input, Item, Player, PlayerId, Tick, TickNum, Time},
+    game::{Entity, EntityId, Game, Input, Item, Player, PlayerId, Settings, Tick, TickNum, Time},
     util::ping::SequenceNum,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GameId(pub Uuid);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PlayerToken(pub Uuid);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +24,7 @@ pub struct JoinRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoinSuccess {
     pub game_id: GameId,
+    pub game_settings: Settings,
     pub your_token: PlayerToken,
     pub your_player_id: game::PlayerId,
 }
