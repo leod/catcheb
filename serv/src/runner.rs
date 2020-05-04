@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::SocketAddr};
 
 use log::{info, warn};
 use rand::seq::IteratorRandom;
@@ -8,10 +8,19 @@ use tokio::sync::{
 };
 use uuid::Uuid;
 
+use comn::util::PingEstimation;
+
 use crate::{
     game::{self, Game},
     webrtc::{RecvMessageRx, SendMessageTx},
 };
+
+pub struct Player {
+    pub game_id: comn::GameId,
+    pub player_id: comn::PlayerId,
+    pub ping_estimation: PingEstimation,
+    pub peer: Option<SocketAddr>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -39,6 +48,7 @@ pub struct Runner {
     config: Config,
 
     games: HashMap<comn::GameId, Game>,
+    players: HashMap<comn::PlayerToken, Player>,
 
     join_tx: JoinTx,
     join_rx: JoinRx,
@@ -57,6 +67,7 @@ impl Runner {
         Runner {
             config,
             games: HashMap::new(),
+            players: HashMap::new(),
             join_tx,
             join_rx,
             recv_message_rx,
@@ -107,7 +118,7 @@ impl Runner {
                     } else {
                         // Create a new game.
                         let game_id = comn::GameId(Uuid::new_v4());
-                        let game = Game::new(game::Settings::default());
+                        let game = Game::new(comn::Settings::default());
 
                         self.games.insert(game_id, game);
 
@@ -122,12 +133,24 @@ impl Runner {
             }
         };
 
-        let (your_token, your_player_id) = game.join(request.player_name);
+        let player_token = comn::PlayerToken(Uuid::new_v4());
+        let player_id = game.join(request.player_name);
+
+        let player = Player {
+            game_id,
+            player_id,
+            ping_estimation: PingEstimation::default(),
+            peer: None,
+        };
+
+        assert!(!self.players.contains_key(&player_token));
+        self.players.insert(player_token, player);
 
         Ok(comn::JoinSuccess {
             game_id,
-            your_token,
-            your_player_id,
+            game_settings: game.settings().clone(),
+            your_token: player_token,
+            your_player_id: player_id,
         })
     }
 

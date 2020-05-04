@@ -7,6 +7,19 @@ use nalgebra as na;
 pub type Vector = na::Vector2<f32>;
 pub type Point = na::Point2<f32>;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Settings {
+    pub max_num_players: usize,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            max_num_players: 16,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Time(pub f32);
 
@@ -83,6 +96,16 @@ pub struct Game {
     pub tick_num: TickNum,
     pub players: BTreeMap<PlayerId, Player>,
     pub entities: BTreeMap<EntityId, Entity>,
+}
+
+impl Game {
+    pub fn new(_: &Settings) -> Self {
+        Self {
+            tick_num: TickNum(0),
+            players: BTreeMap::new(),
+            entities: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
