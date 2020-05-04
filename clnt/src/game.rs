@@ -1,5 +1,7 @@
 use log::{debug, info, warn};
 
+use comn::util::PingEstimation;
+
 use crate::webrtc;
 
 pub struct Game {
@@ -7,6 +9,7 @@ pub struct Game {
     my_token: comn::PlayerToken,
     my_player_id: comn::PlayerId,
     webrtc_client: webrtc::Client,
+    ping_estimation: PingEstimation,
 }
 
 impl Game {
@@ -16,6 +19,7 @@ impl Game {
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
+            ping_estimation: PingEstimation::default(),
         }
     }
 
@@ -24,16 +28,27 @@ impl Game {
     }
 
     pub async fn update(&mut self) {
-        self.send(comn::ClientMessage::Ping(comn::SequenceNum(0)));
-
         while let Some(message) = self.webrtc_client.take_message().await {
             match message {
                 comn::ServerMessage::Ping(sequence_num) => {
                     self.send(comn::ClientMessage::Pong(sequence_num));
                 }
-                comn::ServerMessage::Pong(sequence_num) => {}
+                comn::ServerMessage::Pong(sequence_num) => {
+                    if self.ping_estimation.received_pong(sequence_num).is_err() {
+                        warn!("Ignoring out-of-order pong {:?}", sequence_num);
+                    } else {
+                        debug!(
+                            "Received pong -> estimation {:?}",
+                            self.ping_estimation.estimate()
+                        );
+                    }
+                }
                 _ => panic!("TODO"),
             }
+        }
+
+        if let Some(sequence_num) = self.ping_estimation.next_ping_sequence_num() {
+            self.send(comn::ClientMessage::Ping(sequence_num));
         }
     }
 
