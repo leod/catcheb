@@ -14,8 +14,6 @@ use quicksilver::{
     lifecycle::{run, Event, EventStream, Key, Settings, Window},
 };
 
-use comn::{JoinReply, JoinRequest};
-
 #[wasm_bindgen(start)]
 pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
@@ -32,13 +30,13 @@ pub fn main() {
     );
 }
 
-async fn join(request: JoinRequest) -> Result<JoinReply, JsValue> {
+async fn join(request: comn::JoinRequest) -> Result<comn::JoinReply, JsValue> {
     let request_json = format!(
         "{{\"game_id\":{},\"player_name\":\"{}\"}}",
         request
             .game_id
-            .map_or("null".to_owned(), |name| "\"".to_owned()
-                + &name.to_string()
+            .map_or("null".to_owned(), |comn::GameId(id)| "\"".to_owned()
+                + &id.to_string()
                 + "\""),
         request.player_name,
     );
@@ -90,7 +88,7 @@ async fn app(
     }
 
     // TODO: Graceful error handling in client
-    let join_reply = join(JoinRequest {
+    let join_reply = join(comn::JoinRequest {
         game_id: None,
         player_name: "Pioneer".to_string(),
     })
