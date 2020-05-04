@@ -1,6 +1,6 @@
 use std::{collections::HashMap, net::SocketAddr};
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use rand::seq::IteratorRandom;
 use tokio::sync::{
     mpsc::{self, error::TryRecvError},
@@ -12,7 +12,7 @@ use comn::util::PingEstimation;
 
 use crate::{
     game::{self, Game},
-    webrtc::{RecvMessageRx, SendMessageTx},
+    webrtc::{self, RecvMessageRx, SendMessageTx},
 };
 
 pub struct Player {
@@ -55,6 +55,8 @@ pub struct Runner {
 
     recv_message_rx: RecvMessageRx,
     send_message_tx: SendMessageTx,
+
+    shutdown: bool,
 }
 
 impl Runner {
@@ -72,6 +74,7 @@ impl Runner {
             join_rx,
             recv_message_rx,
             send_message_tx,
+            shutdown: false,
         }
     }
 
@@ -155,7 +158,7 @@ impl Runner {
     }
 
     pub fn run(mut self) {
-        loop {
+        while !self.shutdown {
             while let Some(join_message) = match self.join_rx.try_recv() {
                 Ok(join_message) => Some(join_message),
                 Err(TryRecvError::Empty) => None,
@@ -182,10 +185,53 @@ impl Runner {
                     return;
                 }
             } {
-                info!("Received message from {:?}", message_in.peer);
+                let signed_message = comn::SignedClientMessage::deserialize(&message_in.data);
+
+                match signed_message {
+                    Some(signed_message) => {
+                        debug!(
+                            "Received message from {:?}: {:?}",
+                            message_in.peer, signed_message
+                        );
+                        self.handle_message(message_in.peer, signed_message);
+                    }
+                    None => {
+                        warn!(
+                            "Failed to serialize message from {:?}, ignoring",
+                            message_in.peer,
+                        );
+                    }
+                }
             }
 
             std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    pub fn handle_message(&mut self, peer: SocketAddr, message: comn::SignedClientMessage) {
+        if let Some(player) = self.players.get_mut(&message.0) {
+            if Some(peer) != player.peer {
+                debug!("Changing peer from {:?} to {:?}", player.peer, peer);
+                player.peer = Some(peer);
+            }
+
+            match message.1 {
+                comn::ClientMessage::Ping(sequence_num) => {
+                    self.send(peer, comn::ServerMessage::Pong(sequence_num));
+                }
+                _ => panic!("TODO"),
+            }
+        } else {
+            warn!("Received message with unknown token, ignoring");
+        }
+    }
+
+    pub fn send(&mut self, peer: SocketAddr, message: comn::ServerMessage) {
+        let data = message.serialize();
+        let message_out = webrtc::MessageOut { peer, data };
+
+        if self.send_message_tx.send(message_out).is_err() {
+            info!("send_message_tx closed, will terminate thread");
         }
     }
 }
