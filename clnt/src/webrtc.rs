@@ -3,7 +3,11 @@
 //! This is based on the `echo_server.html` example from `webrtc-unreliable`,
 //! but translated from JavaScript into Rust.
 
-use std::{cell::Cell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::VecDeque,
+    rc::Rc,
+};
 
 use log::{info, warn};
 
@@ -11,7 +15,7 @@ use js_sys::{Reflect, JSON};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit,
+    Blob, ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit,
     RtcPeerConnection, RtcSessionDescriptionInit,
 };
 
@@ -58,10 +62,14 @@ impl Default for Config {
 }
 
 pub struct Client {
+    peer: RtcPeerConnection,
+    channel: RtcDataChannel,
     status: Rc<Cell<Status>>,
+    received: Rc<RefCell<VecDeque<Blob>>>,
     _on_open: Closure<dyn FnMut(&Event)>,
     _on_close: Closure<dyn FnMut(&Event)>,
     _on_error: Closure<dyn FnMut(&ErrorEvent)>,
+    _on_message: Closure<dyn FnMut(&MessageEvent)>,
 }
 
 impl Client {
@@ -72,6 +80,7 @@ impl Client {
         let channel: RtcDataChannel = create_data_channel(&peer);
 
         let status = Rc::new(Cell::new(Status::Connecting));
+        let received = Rc::new(RefCell::new(VecDeque::new()));
 
         let on_open = Closure::wrap(Box::new({
             let status = status.clone();
@@ -91,6 +100,12 @@ impl Client {
             move |event: &ErrorEvent| on_error(status.clone(), event)
         }) as Box<dyn FnMut(&ErrorEvent)>);
         channel.set_onerror(Some(on_error.as_ref().unchecked_ref()));
+
+        let on_message = Closure::wrap(Box::new({
+            let received = received.clone();
+            move |event: &MessageEvent| on_message(received.clone(), event)
+        }) as Box<dyn FnMut(&MessageEvent)>);
+        channel.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
 
         let offer: RtcSessionDescriptionInit = JsFuture::from(peer.create_offer())
             .await
@@ -121,11 +136,44 @@ impl Client {
             .map_err(ConnectError::AddIceCandidate)?;
 
         Ok(Client {
+            peer,
+            channel,
             status,
+            received,
             _on_open: on_open,
             _on_close: on_close,
             _on_error: on_error,
+            _on_message: on_message,
         })
+    }
+
+    pub async fn take_message(&mut self) -> Option<comn::ServerMessage> {
+        while let Some(blob) = {
+            // Note: It is important to release the borrow before entering the
+            // loop, so that we do not hold a borrow when doing await.
+            let mut received = self.received.borrow_mut();
+            received.pop_front()
+        } {
+            let abuf = JsFuture::from(blob.array_buffer())
+                .await
+                .unwrap()
+                .dyn_into::<js_sys::ArrayBuffer>()
+                .unwrap();
+            let array = js_sys::Uint8Array::new(&abuf);
+
+            if let Some(message) = comn::ServerMessage::deserialize(&array.to_vec()) {
+                return Some(message);
+            } else {
+                warn!("Failed to deserialize message, ignoring");
+                continue;
+            }
+        }
+
+        None
+    }
+
+    pub fn send(&self, data: &[u8]) -> Result<(), JsValue> {
+        self.channel.send_with_u8_array(data)
     }
 
     pub fn status(&self) -> Status {
@@ -149,6 +197,12 @@ pub fn on_error(status: Rc<Cell<Status>>, error: &ErrorEvent) {
     warn!("Connection error: {:?}", error);
 
     status.set(Status::Error);
+}
+
+pub fn on_message(received: Rc<RefCell<VecDeque<Blob>>>, message: &MessageEvent) {
+    received
+        .borrow_mut()
+        .push_back(message.data().dyn_into::<Blob>().unwrap());
 }
 
 fn new_rtc_peer_connection(config: &Config) -> Result<RtcPeerConnection, ConnectError> {

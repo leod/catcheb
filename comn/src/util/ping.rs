@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
+use instant::Instant;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
@@ -67,10 +68,11 @@ impl PingEstimation {
             let now = Instant::now();
             assert!(now >= *send_time);
 
-            self.last_durations.push_back(*send_time - now);
+            self.last_durations.push_back(now - *send_time);
             while self.last_durations.len() > NUM_KEEP_DURATIONS {
                 self.last_durations.pop_front();
             }
+            self.estimate = self.calculate_estimate();
 
             // Due to the unreliable connection, it is possible that earlier
             // waiting pings have not been answered.
