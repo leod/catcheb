@@ -5,14 +5,14 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub use crate::{
-    game::{Entity, EntityId, Game, Input, Item, Player, PlayerId, Tick, TickNum, Time},
+    game::{Entity, EntityId, Game, Input, Item, Player, PlayerId, Settings, Tick, TickNum, Time},
     util::ping::SequenceNum,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GameId(pub Uuid);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PlayerToken(pub Uuid);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,8 +24,9 @@ pub struct JoinRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoinSuccess {
     pub game_id: GameId,
+    pub game_settings: Settings,
     pub your_token: PlayerToken,
-    pub your_player_id: game::PlayerId,
+    pub your_player_id: PlayerId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +52,9 @@ pub enum ClientMessage {
     Input(Input),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedClientMessage(pub PlayerToken, pub ClientMessage);
+
 impl ServerMessage {
     pub fn serialize(&self) -> Vec<u8> {
         bincode::serialize(self).unwrap()
@@ -61,7 +65,7 @@ impl ServerMessage {
     }
 }
 
-impl ClientMessage {
+impl SignedClientMessage {
     pub fn serialize(&self) -> Vec<u8> {
         bincode::serialize(self).unwrap()
     }

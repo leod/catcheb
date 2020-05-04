@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, net::SocketAddr};
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use rand::seq::IteratorRandom;
 use tokio::sync::{
     mpsc::{self, error::TryRecvError},
@@ -8,10 +8,19 @@ use tokio::sync::{
 };
 use uuid::Uuid;
 
+use comn::util::PingEstimation;
+
 use crate::{
-    game::{self, Game},
-    webrtc::{RecvMessageRx, SendMessageTx},
+    game::Game,
+    webrtc::{self, RecvMessageRx, SendMessageTx},
 };
+
+pub struct Player {
+    pub game_id: comn::GameId,
+    pub player_id: comn::PlayerId,
+    pub ping_estimation: PingEstimation,
+    pub peer: Option<SocketAddr>,
+}
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -39,12 +48,15 @@ pub struct Runner {
     config: Config,
 
     games: HashMap<comn::GameId, Game>,
+    players: HashMap<comn::PlayerToken, Player>,
 
     join_tx: JoinTx,
     join_rx: JoinRx,
 
     recv_message_rx: RecvMessageRx,
     send_message_tx: SendMessageTx,
+
+    shutdown: bool,
 }
 
 impl Runner {
@@ -57,10 +69,12 @@ impl Runner {
         Runner {
             config,
             games: HashMap::new(),
+            players: HashMap::new(),
             join_tx,
             join_rx,
             recv_message_rx,
             send_message_tx,
+            shutdown: false,
         }
     }
 
@@ -107,7 +121,7 @@ impl Runner {
                     } else {
                         // Create a new game.
                         let game_id = comn::GameId(Uuid::new_v4());
-                        let game = Game::new(game::Settings::default());
+                        let game = Game::new(comn::Settings::default());
 
                         self.games.insert(game_id, game);
 
@@ -122,17 +136,29 @@ impl Runner {
             }
         };
 
-        let (your_token, your_player_id) = game.join(request.player_name);
+        let player_token = comn::PlayerToken(Uuid::new_v4());
+        let player_id = game.join(request.player_name);
+
+        let player = Player {
+            game_id,
+            player_id,
+            ping_estimation: PingEstimation::default(),
+            peer: None,
+        };
+
+        assert!(!self.players.contains_key(&player_token));
+        self.players.insert(player_token, player);
 
         Ok(comn::JoinSuccess {
             game_id,
-            your_token,
-            your_player_id,
+            game_settings: game.settings().clone(),
+            your_token: player_token,
+            your_player_id: player_id,
         })
     }
 
     pub fn run(mut self) {
-        loop {
+        while !self.shutdown {
             while let Some(join_message) = match self.join_rx.try_recv() {
                 Ok(join_message) => Some(join_message),
                 Err(TryRecvError::Empty) => None,
@@ -159,10 +185,78 @@ impl Runner {
                     return;
                 }
             } {
-                info!("Received message from {:?}", message_in.peer);
+                let signed_message = comn::SignedClientMessage::deserialize(&message_in.data);
+
+                match signed_message {
+                    Some(signed_message) => {
+                        /*debug!(
+                            "Received message from {:?}: {:?}",
+                            message_in.peer, signed_message
+                        );*/
+                        self.handle_message(message_in.peer, signed_message);
+                    }
+                    None => {
+                        warn!(
+                            "Failed to deserialize message from {:?}, ignoring",
+                            message_in.peer,
+                        );
+                    }
+                }
+            }
+
+            let mut messages = Vec::new();
+
+            for player in self.players.values_mut() {
+                if let Some(sequence_num) = player.ping_estimation.next_ping_sequence_num() {
+                    if let Some(peer) = player.peer {
+                        messages.push((peer, comn::ServerMessage::Ping(sequence_num)));
+                    }
+                }
+            }
+
+            for (peer, message) in messages {
+                self.send(peer, message);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    pub fn handle_message(&mut self, peer: SocketAddr, message: comn::SignedClientMessage) {
+        if let Some(player) = self.players.get_mut(&message.0) {
+            if Some(peer) != player.peer {
+                debug!("Changing peer from {:?} to {:?}", player.peer, peer);
+                player.peer = Some(peer);
+            }
+
+            match message.1 {
+                comn::ClientMessage::Ping(sequence_num) => {
+                    self.send(peer, comn::ServerMessage::Pong(sequence_num));
+                }
+                comn::ClientMessage::Pong(sequence_num) => {
+                    if player.ping_estimation.received_pong(sequence_num).is_err() {
+                        warn!("Ignoring out-of-order pong from {:?}", peer);
+                    } else {
+                        debug!(
+                            "Received pong from {:?} -> estimation {:?}",
+                            peer,
+                            player.ping_estimation.estimate()
+                        );
+                    }
+                }
+                _ => panic!("TODO"),
+            }
+        } else {
+            warn!("Received message with unknown token, ignoring");
+        }
+    }
+
+    pub fn send(&mut self, peer: SocketAddr, message: comn::ServerMessage) {
+        let data = message.serialize();
+        let message_out = webrtc::MessageOut { peer, data };
+
+        if self.send_message_tx.send(message_out).is_err() {
+            info!("send_message_tx closed, will terminate thread");
         }
     }
 }

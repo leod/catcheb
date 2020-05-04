@@ -305,6 +305,7 @@ name = "comn"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "instant",
  "nalgebra",
  "serde",
  "serde_json",

@@ -1,3 +1,4 @@
+mod game;
 mod webrtc;
 
 use std::collections::HashSet;
@@ -30,47 +31,23 @@ pub fn main() {
     );
 }
 
-async fn join(request: comn::JoinRequest) -> Result<comn::JoinReply, JsValue> {
-    let request_json = format!(
-        "{{\"game_id\":{},\"player_name\":\"{}\"}}",
-        request
-            .game_id
-            .map_or("null".to_owned(), |comn::GameId(id)| "\"".to_owned()
-                + &id.to_string()
-                + "\""),
-        request.player_name,
-    );
-
-    let mut opts = web_sys::RequestInit::new();
-    opts.method("POST");
-    opts.mode(web_sys::RequestMode::SameOrigin);
-    opts.body(Some(&JsValue::from_str(&request_json)));
-
-    info!("Requesting to join game: {} ...", request_json);
-
-    let request = web_sys::Request::new_with_str_and_init(&"/join", &opts)?;
-    request.headers().set("Accept", "application/json")?;
-
-    let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    assert!(resp_value.is_instance_of::<web_sys::Response>());
-    let resp: web_sys::Response = resp_value.dyn_into().unwrap();
-
-    // Convert this other `Promise` into a rust `Future`.
-    let reply = JsFuture::from(resp.json()?).await?;
-
-    info!("Join reply: {:?}", reply);
-
-    // Use serde to parse the JSON into a struct.
-    Ok(reply.into_serde().unwrap())
-}
-
 async fn app(
     window: Window,
     mut gfx: Graphics,
     mut events: EventStream,
 ) -> quicksilver::Result<()> {
     info!("Starting up");
+
+    // TODO: Graceful error handling in client
+    let join_reply = join_request(comn::JoinRequest {
+        game_id: None,
+        player_name: "Pioneer".to_string(),
+    })
+    .await
+    .unwrap();
+
+    // TODO: Graceful error handling in client
+    let join_success = join_reply.expect("Failed to join game");
 
     // TODO: Graceful error handling in client
     let webrtc_client = webrtc::Client::connect(Default::default()).await.unwrap();
@@ -87,13 +64,7 @@ async fn app(
         );
     }
 
-    // TODO: Graceful error handling in client
-    let join_reply = join(comn::JoinRequest {
-        game_id: None,
-        player_name: "Pioneer".to_string(),
-    })
-    .await
-    .unwrap();
+    let mut game = game::Game::new(join_success, webrtc_client);
 
     let mut pos = Vector::new(350.0, 100.0);
 
@@ -114,13 +85,12 @@ async fn app(
             }
         }
 
-        if webrtc_client.status() != webrtc::Status::Open {
+        if !game.is_good() {
             // TODO: Graceful error handling in client
-            panic!(
-                "WebRTC connection no longer open: {:?}",
-                webrtc_client.status()
-            );
+            panic!("Game lost connection");
         }
+
+        game.update().await;
 
         let now_time_ms = Date::new_0().get_time();
         let delta_s = ((now_time_ms - last_time_ms) / 1000.0) as f32;
@@ -163,4 +133,39 @@ async fn app(
 
         gfx.present(&window)?;
     }
+}
+
+pub async fn join_request(request: comn::JoinRequest) -> Result<comn::JoinReply, JsValue> {
+    let request_json = format!(
+        "{{\"game_id\":{},\"player_name\":\"{}\"}}",
+        request
+            .game_id
+            .map_or("null".to_owned(), |comn::GameId(id)| "\"".to_owned()
+                + &id.to_string()
+                + "\""),
+        request.player_name,
+    );
+
+    let mut opts = web_sys::RequestInit::new();
+    opts.method("POST");
+    opts.mode(web_sys::RequestMode::SameOrigin);
+    opts.body(Some(&JsValue::from_str(&request_json)));
+
+    info!("Requesting to join game: {} ...", request_json);
+
+    let request = web_sys::Request::new_with_str_and_init(&"/join", &opts)?;
+    request.headers().set("Accept", "application/json")?;
+
+    let window = web_sys::window().unwrap();
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+    assert!(resp_value.is_instance_of::<web_sys::Response>());
+    let resp: web_sys::Response = resp_value.dyn_into().unwrap();
+
+    // Convert this other `Promise` into a rust `Future`.
+    let reply = JsFuture::from(resp.json()?).await?;
+
+    info!("Join reply: {:?}", reply);
+
+    // Use serde to parse the JSON into a struct.
+    Ok(reply.into_serde().unwrap())
 }

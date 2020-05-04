@@ -41,6 +41,7 @@ features = [
   'Location',
   'Event',
   'ErrorEvent',
+  'Blob',
   'MessageEvent',
   'RtcConfiguration',
   'RtcPeerConnection',
