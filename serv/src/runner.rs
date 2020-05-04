@@ -11,7 +11,7 @@ use uuid::Uuid;
 use comn::util::PingEstimation;
 
 use crate::{
-    game::{self, Game},
+    game::Game,
     webrtc::{self, RecvMessageRx, SendMessageTx},
 };
 
@@ -204,6 +204,20 @@ impl Runner {
                 }
             }
 
+            let mut messages = Vec::new();
+
+            for player in self.players.values_mut() {
+                if let Some(sequence_num) = player.ping_estimation.next_ping_sequence_num() {
+                    if let Some(peer) = player.peer {
+                        messages.push((peer, comn::ServerMessage::Ping(sequence_num)));
+                    }
+                }
+            }
+
+            for (peer, message) in messages {
+                self.send(peer, message);
+            }
+
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
     }
@@ -218,6 +232,17 @@ impl Runner {
             match message.1 {
                 comn::ClientMessage::Ping(sequence_num) => {
                     self.send(peer, comn::ServerMessage::Pong(sequence_num));
+                }
+                comn::ClientMessage::Pong(sequence_num) => {
+                    if player.ping_estimation.received_pong(sequence_num).is_err() {
+                        warn!("Ignoring out-of-order pong from {:?}", peer);
+                    } else {
+                        debug!(
+                            "Received pong from {:?} -> estimation {:?}",
+                            peer,
+                            player.ping_estimation.estimate()
+                        );
+                    }
                 }
                 _ => panic!("TODO"),
             }
