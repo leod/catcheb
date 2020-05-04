@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
@@ -5,19 +7,20 @@ use nalgebra as na;
 pub type Vector = na::Vector2<f32>;
 pub type Point = na::Point2<f32>;
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Time(pub f32);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlayerId(pub u16);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct PlayerId(pub u32);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct EntityId(pub u32);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TickNum(pub u32);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlayerInput {
+pub struct Input {
     pub move_left: bool,
     pub move_right: bool,
     pub move_up: bool,
@@ -33,29 +36,23 @@ pub enum Item {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Position(Point);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Angle(f32);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EntityData {
+pub enum Entity {
     Player {
         owner: PlayerId,
-        pos: Position,
-        angle: Angle,
+        pos: Point,
+        angle: f32,
     },
     Bullet {
         owner: PlayerId,
-        pos: Position,
-        angle: Angle,
+        pos: Point,
+        angle: f32,
     },
     Item {
         item: Item,
-        pos: Position,
+        pos: Point,
     },
     ItemSpawn {
-        pos: Position,
+        pos: Point,
     },
     Wall {
         pos: Point,
@@ -76,11 +73,20 @@ pub enum Event {
     PlayerSpawned { pos: Point },
 }
 
-pub struct Tick {
-    num: TickNum,
-    events: Vec<Event>,
-    entities: Vec<(EntityId, EntityData)>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Player {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ServerMsg {}
+pub struct Game {
+    pub tick_num: TickNum,
+    pub players: BTreeMap<PlayerId, Player>,
+    pub entities: BTreeMap<EntityId, Entity>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tick {
+    pub game: Game,
+    pub events: Vec<Event>,
+}
