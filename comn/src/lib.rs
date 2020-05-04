@@ -26,7 +26,7 @@ pub struct JoinSuccess {
     pub game_id: GameId,
     pub game_settings: Settings,
     pub your_token: PlayerToken,
-    pub your_player_id: game::PlayerId,
+    pub your_player_id: PlayerId,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +52,9 @@ pub enum ClientMessage {
     Input(Input),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignedClientMessage(pub PlayerToken, pub ClientMessage);
+
 impl ServerMessage {
     pub fn serialize(&self) -> Vec<u8> {
         bincode::serialize(self).unwrap()
@@ -62,7 +65,7 @@ impl ServerMessage {
     }
 }
 
-impl ClientMessage {
+impl SignedClientMessage {
     pub fn serialize(&self) -> Vec<u8> {
         bincode::serialize(self).unwrap()
     }
