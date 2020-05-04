@@ -12,7 +12,6 @@ use crate::{
     game::{self, Game},
     webrtc::{RecvMessageRx, SendMessageTx},
 };
-use comn::{JoinError, JoinReply, JoinRequest, JoinSuccess};
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -28,17 +27,18 @@ impl Default for Config {
 }
 
 pub struct JoinMessage {
-    pub request: JoinRequest,
-    pub reply_tx: oneshot::Sender<JoinReply>,
+    pub request: comn::JoinRequest,
+    pub reply_tx: oneshot::Sender<comn::JoinReply>,
 }
 
+// TODO: Check if we should make channels bounded
 pub type JoinTx = mpsc::UnboundedSender<JoinMessage>;
 pub type JoinRx = mpsc::UnboundedReceiver<JoinMessage>;
 
 pub struct Runner {
     config: Config,
 
-    games: HashMap<Uuid, Game>,
+    games: HashMap<comn::GameId, Game>,
 
     join_tx: JoinTx,
     join_rx: JoinRx,
@@ -50,11 +50,10 @@ pub struct Runner {
 impl Runner {
     pub fn new(
         config: Config,
-        recv_message_rx: mpsc::UnboundedReceiver<Vec<u8>>,
-        send_message_tx: mpsc::UnboundedSender<Vec<u8>>,
+        recv_message_rx: RecvMessageRx,
+        send_message_tx: SendMessageTx,
     ) -> Self {
         let (join_tx, join_rx) = mpsc::unbounded_channel();
-
         Runner {
             config,
             games: HashMap::new(),
@@ -69,21 +68,21 @@ impl Runner {
         self.join_tx.clone()
     }
 
-    pub fn try_join_game(&mut self, request: JoinRequest) -> JoinReply {
+    pub fn try_join_game(&mut self, request: comn::JoinRequest) -> comn::JoinReply {
         let (game_id, game) = if let Some(game_id) = request.game_id {
             // The player requested to join a specific game.
             match self.games.get_mut(&game_id) {
                 Some(game) => {
                     if game.is_full() {
                         info!("Game is full");
-                        return Err(JoinError::FullGame);
+                        return Err(comn::JoinError::FullGame);
                     } else {
                         (game_id, game)
                     }
                 }
                 None => {
                     info!("game_id is invalid");
-                    return Err(JoinError::InvalidGameId);
+                    return Err(comn::JoinError::InvalidGameId);
                 }
             }
         } else {
@@ -104,10 +103,10 @@ impl Runner {
                             "All games are full and we have reached the game limit of {}",
                             self.config.max_num_games
                         );
-                        return Err(JoinError::FullGame);
+                        return Err(comn::JoinError::FullGame);
                     } else {
                         // Create a new game.
-                        let game_id = Uuid::new_v4();
+                        let game_id = comn::GameId(Uuid::new_v4());
                         let game = Game::new(game::Settings::default());
 
                         self.games.insert(game_id, game);
@@ -123,25 +122,23 @@ impl Runner {
             }
         };
 
-        let (your_token_id, your_player_id) = game.join(request.player_name);
+        let (your_token, your_player_id) = game.join(request.player_name);
 
-        Ok(JoinSuccess {
+        Ok(comn::JoinSuccess {
             game_id,
-            your_token_id,
+            your_token,
             your_player_id,
         })
     }
 
     pub fn run(mut self) {
         loop {
-            while let Some(join_message) = {
-                match self.join_rx.try_recv() {
-                    Ok(join_message) => Some(join_message),
-                    Err(TryRecvError::Empty) => None,
-                    Err(TryRecvError::Closed) => {
-                        info!("join_rx closed, terminating thread");
-                        return;
-                    }
+            while let Some(join_message) = match self.join_rx.try_recv() {
+                Ok(join_message) => Some(join_message),
+                Err(TryRecvError::Empty) => None,
+                Err(TryRecvError::Closed) => {
+                    info!("join_rx closed, terminating thread");
+                    return;
                 }
             } {
                 info!("Processing {:?}", join_message.request);
@@ -152,6 +149,17 @@ impl Runner {
                     info!("reply_tx closed, terminating thread");
                     return;
                 }
+            }
+
+            while let Some(message_in) = match self.recv_message_rx.try_recv() {
+                Ok(message_in) => Some(message_in),
+                Err(TryRecvError::Empty) => None,
+                Err(TryRecvError::Closed) => {
+                    info!("recv_message_rx closed, terminating thread");
+                    return;
+                }
+            } {
+                info!("Received message from {:?}", message_in.peer);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(5));

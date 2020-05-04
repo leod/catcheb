@@ -1,23 +1,25 @@
+// Increase recursion_limit for `futures::select` macro
+#![recursion_limit = "1024"]
+
 mod game;
-mod http_server;
+mod http;
 mod runner;
 mod webrtc;
 
 use std::path::PathBuf;
 
-use tokio::sync::mpsc;
-
 use clap::Arg;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub http_server: http_server::Config,
+    pub http_server: http::Config,
+    pub webrtc_server: webrtc::Config,
     pub runner: runner::Config,
 }
 
 #[tokio::main]
 async fn main() {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("serv=debug"));
 
     let matches = clap::App::new("serv")
         .arg(
@@ -28,6 +30,13 @@ async fn main() {
                 .help("listen on the specified address/port for HTTP"),
         )
         .arg(
+            Arg::with_name("webrtc_address")
+                .long("webrtc_address")
+                .takes_value(true)
+                .required(true)
+                .help("listen on the specified address/port for WebRTC"),
+        )
+        .arg(
             Arg::with_name("clnt_dir")
                 .long("clnt_dir")
                 .takes_value(true)
@@ -36,7 +45,7 @@ async fn main() {
         )
         .get_matches();
 
-    let http_server_config = http_server::Config {
+    let http_server_config = http::Config {
         listen_addr: matches
             .value_of("http_address")
             .unwrap()
@@ -44,24 +53,35 @@ async fn main() {
             .expect("could not parse HTTP address/port"),
         clnt_dir: PathBuf::from(matches.value_of("clnt_dir").unwrap()),
     };
-
+    let webrtc_server_config = webrtc::Config {
+        listen_addr: matches
+            .value_of("webrtc_address")
+            .unwrap()
+            .parse()
+            .expect("could not parse WebRTC address/port"),
+    };
     let config = Config {
         http_server: http_server_config,
+        webrtc_server: webrtc_server_config,
         runner: runner::Config::default(),
     };
 
-    let (recv_msg_tx, recv_msg_rx) = mpsc::unbounded_channel();
-    let (send_msg_tx, send_msg_rx) = mpsc::unbounded_channel();
+    let (recv_message_tx, recv_message_rx) = webrtc::recv_message_channel();
+    let webrtc_server = webrtc::Server::new(config.webrtc_server, recv_message_tx)
+        .await
+        .unwrap();
+    let send_message_tx = webrtc_server.send_message_tx();
+    let session_endpoint = webrtc_server.session_endpoint();
 
-    let runner = runner::Runner::new(config.runner, recv_msg_rx, send_msg_tx);
+    let runner = runner::Runner::new(config.runner, recv_message_rx, send_message_tx);
     let join_tx = runner.join_tx();
-
     let runner_thread = tokio::task::spawn_blocking(move || {
         runner.run();
     });
 
-    let http_server = http_server::Server::new(config.http_server, join_tx);
+    let http_server = http::Server::new(config.http_server, join_tx, session_endpoint);
 
-    let (_, result) = futures::join!(runner_thread, http_server.serve());
-    result.expect("HTTP server died");
+    let (_, http_server_result, _) =
+        futures::join!(runner_thread, http_server.serve(), webrtc_server.serve(),);
+    http_server_result.expect("HTTP server died");
 }
