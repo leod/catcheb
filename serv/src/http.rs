@@ -1,10 +1,14 @@
 use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
+use log::{debug, info, warn};
+
 use futures::TryStreamExt;
-use log::{info, warn};
 use tokio::{fs::File, io::AsyncReadExt, stream::StreamExt, sync::oneshot};
 
-use hyper::{server::conn::AddrStream, Body, Method, Request, Response, StatusCode};
+use hyper::{
+    header::HeaderValue, server::conn::AddrStream, Body, Method, Request, Response, StatusCode,
+};
+use webrtc_unreliable::SessionEndpoint;
 
 use crate::runner::{JoinMessage, JoinTx};
 
@@ -22,13 +26,15 @@ pub struct Config {
 pub struct Server {
     config: Arc<Config>,
     join_tx: JoinTx,
+    session_endpoint: SessionEndpoint,
 }
 
 impl Server {
-    pub fn new(config: Config, join_tx: JoinTx) -> Self {
+    pub fn new(config: Config, join_tx: JoinTx, session_endpoint: SessionEndpoint) -> Self {
         Self {
             config: Arc::new(config),
             join_tx,
+            session_endpoint,
         }
     }
 
@@ -36,13 +42,21 @@ impl Server {
         info!("Starting HTTP server at {:?}", self.config.listen_addr);
         info!("Will serve client directory {:?}", self.config.clnt_dir);
 
-        let make_service = hyper::service::make_service_fn(move |_: &AddrStream| {
+        let make_service = hyper::service::make_service_fn(move |addr_stream: &AddrStream| {
             let config = self.config.clone();
             let join_tx = self.join_tx.clone();
+            let session_endpoint = self.session_endpoint.clone();
+            let remote_addr = addr_stream.remote_addr();
 
             async move {
                 Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
-                    service(config.clone(), join_tx.clone(), req)
+                    service(
+                        config.clone(),
+                        join_tx.clone(),
+                        session_endpoint.clone(),
+                        remote_addr,
+                        req,
+                    )
                 }))
             }
         });
@@ -54,8 +68,12 @@ impl Server {
 async fn service(
     config: Arc<Config>,
     join_tx: JoinTx,
+    mut session_endpoint: SessionEndpoint,
+    remote_addr: SocketAddr,
     req: Request<Body>,
 ) -> Result<Response<Body>, hyper::Error> {
+    debug!("{}: {} {}", remote_addr, req.method(), req.uri().path());
+
     match (req.method(), req.uri().path()) {
         // Serve static files
         (&Method::GET, "/") | (&Method::GET, "/index.html") => {
@@ -64,6 +82,22 @@ async fn service(
         (&Method::GET, "/clnt.js") => send_file(config, "clnt.js", "text/javascript").await,
         (&Method::GET, "/clnt_bg.wasm") => {
             send_file(config, "clnt_bg.wasm", "application/wasm").await
+        }
+
+        // Establish a WebRTC connection
+        (&Method::POST, "/connect_webrtc") => {
+            debug!("WebRTC session request from {}", remote_addr);
+
+            match session_endpoint.http_session_request(req.into_body()).await {
+                Ok(mut resp) => {
+                    resp.headers_mut().insert(
+                        hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                        HeaderValue::from_static("*"),
+                    );
+                    Ok(resp.map(Body::from))
+                }
+                Err(_) => Ok(bad_request()),
+            }
         }
 
         // Join a game
@@ -87,7 +121,7 @@ async fn service(
             };
 
             if join_tx.send(join_message).is_err() {
-                warn!("Receiver of join_tx was dropped, ignoring join request");
+                warn!("join_tx closed, ignoring join request");
                 return Ok(internal_server_error());
             }
 
@@ -97,7 +131,7 @@ async fn service(
                     .body(serde_json::to_string(&join_reply).unwrap().into())
                     .unwrap())
             } else {
-                warn!("Sender of reply_tx was dropped, ignoring join request");
+                warn!("reply_rx closed, ignoring join request");
                 Ok(internal_server_error())
             }
         }
