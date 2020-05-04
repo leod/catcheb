@@ -58,6 +58,8 @@ impl Default for Config {
 }
 
 pub struct Client {
+    peer: RtcPeerConnection,
+    channel: RtcDataChannel,
     status: Rc<Cell<Status>>,
     _on_open: Closure<dyn FnMut(&Event)>,
     _on_close: Closure<dyn FnMut(&Event)>,
@@ -121,11 +123,17 @@ impl Client {
             .map_err(ConnectError::AddIceCandidate)?;
 
         Ok(Client {
+            peer,
+            channel,
             status,
             _on_open: on_open,
             _on_close: on_close,
             _on_error: on_error,
         })
+    }
+
+    pub fn send(&self, data: &[u8]) -> Result<(), JsValue> {
+        self.channel.send_with_u8_array(data)
     }
 
     pub fn status(&self) -> Status {
