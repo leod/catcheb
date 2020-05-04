@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::{debug, info, warn};
 
 use crate::webrtc;
 
@@ -27,7 +27,13 @@ impl Game {
         self.send(comn::ClientMessage::Ping(comn::SequenceNum(0)));
 
         while let Some(message) = self.webrtc_client.take_message().await {
-            info!("Received: {:?}", message);
+            match message {
+                comn::ServerMessage::Ping(sequence_num) => {
+                    self.send(comn::ClientMessage::Pong(sequence_num));
+                }
+                comn::ServerMessage::Pong(sequence_num) => {}
+                _ => panic!("TODO"),
+            }
         }
     }
 

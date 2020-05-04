@@ -2,7 +2,7 @@ use std::{net::SocketAddr, time::Instant};
 
 use log::warn;
 
-use futures::{select, FutureExt, StreamExt};
+use futures::{select, FutureExt};
 use tokio::sync::mpsc;
 
 pub struct MessageIn {
@@ -114,6 +114,7 @@ impl Server {
                             };
                             if self.recv_message_tx.send(message_in).is_err() {
                                 warn!("recv_message_tx closed, terminating");
+                                return;
                             }
                         }
                         Err(err) => {

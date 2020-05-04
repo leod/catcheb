@@ -1,5 +1,3 @@
-use uuid::Uuid;
-
 pub struct Game {
     pub settings: comn::Settings,
     pub state: comn::Game,
