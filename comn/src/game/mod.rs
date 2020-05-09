@@ -1,3 +1,5 @@
+pub mod run;
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -10,13 +12,21 @@ pub type Point = na::Point2<f32>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub max_num_players: usize,
+    pub ticks_per_second: usize,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             max_num_players: 16,
+            ticks_per_second: 20,
         }
+    }
+}
+
+impl Settings {
+    pub fn tick_delta_s(&self) -> f32 {
+        1.0 / (self.ticks_per_second as f32)
     }
 }
 
@@ -49,15 +59,19 @@ pub enum Item {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlayerEntity {
+    pub owner: PlayerId,
+    pub pos: Point,
+    pub angle: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Entity {
-    Player {
-        owner: PlayerId,
-        pos: Point,
-        angle: f32,
-    },
+    Player(PlayerEntity),
     Bullet {
         owner: PlayerId,
         pos: Point,
+        dir: Vector,
         angle: f32,
     },
     Item {
@@ -93,14 +107,16 @@ pub struct Player {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
+    pub settings: Settings,
     pub tick_num: TickNum,
     pub players: BTreeMap<PlayerId, Player>,
     pub entities: BTreeMap<EntityId, Entity>,
 }
 
 impl Game {
-    pub fn new(_: &Settings) -> Self {
+    pub fn new(settings: Settings) -> Self {
         Self {
+            settings,
             tick_num: TickNum(0),
             players: BTreeMap::new(),
             entities: BTreeMap::new(),
@@ -110,6 +126,6 @@ impl Game {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tick {
-    pub game: Game,
+    pub entities: BTreeMap<EntityId, Entity>,
     pub events: Vec<Event>,
 }
