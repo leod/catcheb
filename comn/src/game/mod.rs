@@ -53,12 +53,6 @@ pub struct Input {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlayerInput {
-    pub player_id: PlayerId,
-    pub input: Input,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Item {
     Gun { shots: u32 },
     StunGun,
@@ -68,7 +62,7 @@ pub enum Item {
 pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
-    pub angle: f32,
+    pub angle: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +71,7 @@ pub enum Entity {
     Bullet {
         owner: PlayerId,
         pos: Point,
+        dir: Vector,
         angle: f32,
     },
     Item {

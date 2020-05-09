@@ -19,7 +19,8 @@ js-sys = "0.3.37"
 wasm-bindgen = { version = "0.2.60", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.10"
 
-quicksilver = { version = "=0.4.0-alpha0.2", features = ["web-sys"] }
+quicksilver = { version = "=0.4.0-alpha0.3", features = ["web-sys"] }
+mint = "0.5"
 
 comn = { path = "../comn" }
 
