@@ -96,6 +96,8 @@ async fn app(
         let delta_s = ((now_time_ms - last_time_ms) / 1000.0) as f32;
         last_time_ms = now_time_ms;
 
+        //debug!("Delta ms: {}", (delta_s * 1000.0) as usize);
+
         let mut delta = Vector::new(0.0, 0.0);
 
         if pressed_keys.contains(&Key::W) {
