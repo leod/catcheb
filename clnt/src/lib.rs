@@ -13,6 +13,7 @@ use quicksilver::{
     geom::{Rectangle, Transform, Vector},
     graphics::{Color, Graphics},
     lifecycle::{run, Event, EventStream, Key, Settings, Window},
+    Timer,
 };
 
 #[wasm_bindgen(start)]
@@ -29,6 +30,45 @@ pub fn main() {
         },
         app,
     );
+}
+
+pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
+    comn::Input {
+        move_left: pressed_keys.contains(&Key::A),
+        move_right: pressed_keys.contains(&Key::D),
+        move_up: pressed_keys.contains(&Key::W),
+        move_down: pressed_keys.contains(&Key::S),
+        use_item: false,
+        use_action: false,
+    }
+}
+
+pub fn render_game(gfx: &mut Graphics, state: &comn::Game) -> quicksilver::Result<()> {
+    gfx.clear(Color::WHITE);
+
+    for entity in state.entities.values() {
+        match entity {
+            comn::Entity::Player(player) => {
+                let pos: mint::Vector2<f32> = player.pos.coords.into();
+                let size = if let Some(angle) = player.angle {
+                    gfx.set_transform(
+                        Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
+                    );
+                    Vector::new(70.0, 35.714)
+                } else {
+                    gfx.set_transform(Transform::translate(pos));
+                    Vector::new(50.0, 50.0)
+                };
+                let rect = Rectangle::new(-size / 2.0, size);
+
+                gfx.fill_rect(&rect, Color::BLUE);
+                gfx.stroke_rect(&rect, Color::RED);
+            }
+            e => panic!("unhandled entity rendering: {:?}", e),
+        }
+    }
+
+    Ok(())
 }
 
 async fn app(
@@ -65,8 +105,7 @@ async fn app(
     }
 
     let mut game = game::Game::new(join_success, webrtc_client);
-
-    let mut pos = Vector::new(350.0, 100.0);
+    let mut input_timer = Timer::time_per_second(game.settings().ticks_per_second as f32);
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time_ms = Date::new_0().get_time();
@@ -92,48 +131,16 @@ async fn app(
 
         game.update().await;
 
+        while input_timer.tick() {
+            game.player_input(&current_input(&pressed_keys));
+        }
+
         let now_time_ms = Date::new_0().get_time();
         let delta_s = ((now_time_ms - last_time_ms) / 1000.0) as f32;
         last_time_ms = now_time_ms;
 
-        //debug!("Delta ms: {}", (delta_s * 1000.0) as usize);
-
-        let mut delta = Vector::new(0.0, 0.0);
-
-        if pressed_keys.contains(&Key::W) {
-            delta.y -= 1.0;
-        }
-        if pressed_keys.contains(&Key::S) {
-            delta.y += 1.0;
-        }
-        if pressed_keys.contains(&Key::A) {
-            delta.x -= 1.0;
-        }
-        if pressed_keys.contains(&Key::D) {
-            delta.x += 1.0;
-        }
-
-        if delta.len2() > 0.0 {
-            pos += delta.normalize() * 300.0 * delta_s;
-        }
-
-        let size = if delta.len2() > 0.0 {
-            let angle = delta.y.atan2(delta.x).to_degrees();
-            gfx.set_transform(Transform::rotate(angle).then(Transform::translate(pos)));
-            Vector::new(70.0, 35.714)
-        } else {
-            gfx.set_transform(Transform::translate(pos));
-            Vector::new(50.0, 50.0)
-        };
-
-        gfx.clear(Color::WHITE);
-
-        let rect = Rectangle::new(-size / 2.0, size);
-
-        gfx.fill_rect(&rect, Color::BLUE);
-        gfx.stroke_rect(&rect, Color::RED);
-
         gfx.present(&window)?;
+        render_game(&mut gfx, &game.state())?;
     }
 }
 

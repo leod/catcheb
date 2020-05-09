@@ -11,5 +11,5 @@ serde = "1.0"
 serde_json = "1.0"
 bincode = "1.2"
 uuid = { version = "0.8", features = ["serde"] }
-nalgebra = { version = "0.21", features = ["serde-serialize"] }
+nalgebra = { version = "0.21", features = ["serde-serialize", "mint"] }
 instant = "0.1"
