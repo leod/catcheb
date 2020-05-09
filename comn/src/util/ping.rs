@@ -21,7 +21,7 @@ pub struct PingEstimation {
     next_sequence_num: SequenceNum,
     waiting_pings: Vec<(SequenceNum, Instant)>,
     last_send_time: Option<Instant>,
-    last_durations: VecDeque<Duration>,
+    last_rtts: VecDeque<Duration>,
     estimate: Duration,
 }
 
@@ -31,7 +31,7 @@ impl Default for PingEstimation {
             next_sequence_num: SequenceNum(0),
             waiting_pings: Vec::new(),
             last_send_time: None,
-            last_durations: VecDeque::new(),
+            last_rtts: VecDeque::new(),
             estimate: Duration::from_millis(INITIAL_ESTIMATE_MS),
         }
     }
@@ -68,9 +68,9 @@ impl PingEstimation {
             let now = Instant::now();
             assert!(now >= *send_time);
 
-            self.last_durations.push_back(now - *send_time);
-            while self.last_durations.len() > NUM_KEEP_DURATIONS {
-                self.last_durations.pop_front();
+            self.last_rtts.push_back(now - *send_time);
+            while self.last_rtts.len() > NUM_KEEP_DURATIONS {
+                self.last_rtts.pop_front();
             }
             self.estimate = self.calculate_estimate();
 
@@ -97,11 +97,11 @@ impl PingEstimation {
     fn calculate_estimate(&self) -> Duration {
         // TODO: Do some statistical thingy other than average for estimating
         // ping
-        if self.last_durations.is_empty() {
+        if self.last_rtts.is_empty() {
             Duration::from_millis(INITIAL_ESTIMATE_MS)
         } else {
-            let sum: f32 = self.last_durations.iter().map(Duration::as_secs_f32).sum();
-            Duration::from_secs_f32(sum / self.last_durations.len() as f32)
+            let sum: f32 = self.last_rtts.iter().map(Duration::as_secs_f32).sum();
+            Duration::from_secs_f32(sum / self.last_rtts.len() as f32)
         }
     }
 }

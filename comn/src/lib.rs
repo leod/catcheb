@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub use crate::{
-    game::{Entity, EntityId, Game, Input, Item, Player, PlayerId, Settings, Tick, TickNum, Time},
+    game::{
+        Entity, EntityId, Game, Input, Item, Player, PlayerEntity, PlayerId, PlayerInput, Point,
+        Settings, Tick, TickNum, Time, Vector,
+    },
     util::ping::SequenceNum,
 };
 
