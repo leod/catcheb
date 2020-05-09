@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub use crate::{
-    game::{Entity, EntityId, Game, Input, Item, Player, PlayerId, Settings, Tick, TickNum, Time},
+    game::{
+        Entity, EntityId, Game, Input, Item, Player, PlayerEntity, PlayerId, Point, Settings, Tick,
+        TickNum, Time, Vector,
+    },
     util::ping::SequenceNum,
 };
 
@@ -49,7 +52,7 @@ pub enum ServerMessage {
 pub enum ClientMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
-    Input(Input),
+    Input { tick_num: TickNum, input: Input },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

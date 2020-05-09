@@ -5,7 +5,7 @@ use comn::util::PingEstimation;
 use crate::webrtc;
 
 pub struct Game {
-    game_settings: comn::Settings,
+    state: comn::Game,
     my_token: comn::PlayerToken,
     my_player_id: comn::PlayerId,
     webrtc_client: webrtc::Client,
@@ -15,7 +15,7 @@ pub struct Game {
 impl Game {
     pub fn new(join: comn::JoinSuccess, webrtc_client: webrtc::Client) -> Self {
         Self {
-            game_settings: join.game_settings.clone(),
+            state: comn::Game::new(join.game_settings.clone()),
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
@@ -43,6 +43,9 @@ impl Game {
                         );
                     }
                 }
+                comn::ServerMessage::Tick(tick) => {
+                    self.state.entities = tick.entities;
+                }
                 _ => panic!("TODO"),
             }
         }
@@ -50,6 +53,24 @@ impl Game {
         if let Some(sequence_num) = self.ping_estimation.next_ping_sequence_num() {
             self.send(comn::ClientMessage::Ping(sequence_num));
         }
+    }
+
+    pub fn player_input(&mut self, input: &comn::Input) {
+        // TODO: player_input tick_num
+        let tick_num = comn::TickNum(0);
+
+        self.send(comn::ClientMessage::Input {
+            tick_num,
+            input: input.clone(),
+        });
+    }
+
+    pub fn state(&self) -> &comn::Game {
+        &self.state
+    }
+
+    pub fn settings(&self) -> &comn::Settings {
+        &self.state.settings
     }
 
     fn send(&self, message: comn::ClientMessage) {

@@ -20,17 +20,32 @@ pub struct Player {
     pub player_id: comn::PlayerId,
     pub ping_estimation: PingEstimation,
     pub peer: Option<SocketAddr>,
+    pub inputs: Vec<(comn::TickNum, comn::Input)>,
+}
+
+impl Player {
+    pub fn new(game_id: comn::GameId, player_id: comn::PlayerId) -> Self {
+        Self {
+            game_id,
+            player_id,
+            ping_estimation: PingEstimation::default(),
+            peer: None,
+            inputs: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Config {
     pub max_num_games: usize,
+    pub game_settings: comn::Settings,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             max_num_games: 1000,
+            game_settings: comn::Settings::default(),
         }
     }
 }
@@ -57,6 +72,7 @@ pub struct Runner {
     send_message_tx: SendMessageTx,
 
     shutdown: bool,
+    tick_timer: comn::util::Timer,
 }
 
 impl Runner {
@@ -66,6 +82,8 @@ impl Runner {
         send_message_tx: SendMessageTx,
     ) -> Self {
         let (join_tx, join_rx) = mpsc::unbounded_channel();
+        let tick_timer =
+            comn::util::Timer::time_per_second(config.game_settings.ticks_per_second as f32);
         Runner {
             config,
             games: HashMap::new(),
@@ -75,6 +93,7 @@ impl Runner {
             recv_message_rx,
             send_message_tx,
             shutdown: false,
+            tick_timer,
         }
     }
 
@@ -121,7 +140,7 @@ impl Runner {
                     } else {
                         // Create a new game.
                         let game_id = comn::GameId(Uuid::new_v4());
-                        let game = Game::new(comn::Settings::default());
+                        let game = Game::new(self.config.game_settings.clone());
 
                         self.games.insert(game_id, game);
 
@@ -139,12 +158,7 @@ impl Runner {
         let player_token = comn::PlayerToken(Uuid::new_v4());
         let player_id = game.join(request.player_name);
 
-        let player = Player {
-            game_id,
-            player_id,
-            ping_estimation: PingEstimation::default(),
-            peer: None,
-        };
+        let player = Player::new(game_id, player_id);
 
         assert!(!self.players.contains_key(&player_token));
         self.players.insert(player_token, player);
@@ -218,7 +232,11 @@ impl Runner {
                 self.send(peer, message);
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(5));
+            while self.tick_timer.tick() {
+                self.run_tick();
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(1));
         }
     }
 
@@ -244,10 +262,53 @@ impl Runner {
                         );
                     }
                 }
+                comn::ClientMessage::Input { tick_num, input } => {
+                    player.inputs.push((tick_num, input));
+                }
                 _ => panic!("TODO"),
             }
         } else {
             warn!("Received message with unknown token, ignoring");
+        }
+    }
+
+    fn run_tick(&mut self) {
+        let mut inputs = HashMap::new();
+
+        for &game_id in self.games.keys() {
+            inputs.insert(game_id, Vec::new());
+        }
+
+        for player in self.players.values_mut() {
+            // TODO: Consider player input timing
+            for (_tick_num, input) in player.inputs.iter() {
+                inputs
+                    .get_mut(&player.game_id)
+                    .unwrap()
+                    .push((player.player_id, input.clone()));
+            }
+            player.inputs.clear();
+        }
+
+        for (game_id, game) in self.games.iter_mut() {
+            game.run_tick(inputs[game_id].as_slice());
+        }
+
+        let mut messages = Vec::new();
+        for player in self.players.values() {
+            if let Some(peer) = player.peer {
+                // TODO: Sending state properly
+                let tick = comn::Tick {
+                    entities: self.games[&player.game_id].state().entities.clone(),
+                    events: Vec::new(),
+                };
+
+                messages.push((peer, comn::ServerMessage::Tick(tick)));
+            }
+        }
+
+        for (peer, message) in messages {
+            self.send(peer, message);
         }
     }
 
