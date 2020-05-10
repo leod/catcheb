@@ -15,6 +15,7 @@ use crate::{
     webrtc::{self, RecvMessageRx, SendMessageTx},
 };
 
+#[derive(Debug, Clone)]
 pub struct Player {
     pub game_id: comn::GameId,
     pub player_id: comn::PlayerId,
@@ -173,6 +174,7 @@ impl Runner {
 
     pub fn run(mut self) {
         while !self.shutdown {
+            // Handle incoming join requests via HTTP channel
             while let Some(join_message) = match self.join_rx.try_recv() {
                 Ok(join_message) => Some(join_message),
                 Err(TryRecvError::Empty) => None,
@@ -191,6 +193,7 @@ impl Runner {
                 }
             }
 
+            // Handle incoming messages via WebRTC channel
             while let Some(message_in) = match self.recv_message_rx.try_recv() {
                 Ok(message_in) => Some(message_in),
                 Err(TryRecvError::Empty) => None,
@@ -218,6 +221,32 @@ impl Runner {
                 }
             }
 
+            // Disconnect players
+            let remove_player_tokens: Vec<comn::PlayerToken> = self
+                .players
+                .iter()
+                .filter_map(|(player_token, player)| {
+                    if player.ping_estimation.is_timeout() {
+                        Some(*player_token)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            for player_token in remove_player_tokens {
+                let player = self.players.remove(&player_token).unwrap();
+                info!(
+                    "Player {:?} with token {:?} timed out",
+                    player, player_token
+                );
+                self.games
+                    .get_mut(&player.game_id)
+                    .unwrap()
+                    .remove_player(player.player_id);
+            }
+
+            // Ping players
             let mut messages = Vec::new();
 
             for player in self.players.values_mut() {
@@ -232,6 +261,7 @@ impl Runner {
                 self.send(peer, message);
             }
 
+            // Run the game
             while self.tick_timer.tick() {
                 self.run_tick();
             }

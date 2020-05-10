@@ -1,4 +1,4 @@
-use log::info;
+use log::{debug, info};
 
 pub struct Game {
     pub state: comn::Game,
@@ -64,11 +64,42 @@ impl Game {
         }
     }
 
+    pub fn remove_player(&mut self, player_id: comn::PlayerId) {
+        debug!("Removing player {:?}", player_id);
+        self.state.players.remove(&player_id).unwrap();
+
+        let remove_ids: Vec<comn::EntityId> = self
+            .state
+            .entities
+            .iter()
+            .filter_map(|(entity_id, entity)| {
+                if let comn::Entity::Player(entity) = entity {
+                    if entity.owner == player_id {
+                        Some(*entity_id)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for entity_id in remove_ids {
+            self.remove_entity(entity_id);
+        }
+    }
+
     fn add_entity(&mut self, entity: comn::Entity) {
         let entity_id = self.next_entity_id;
         self.next_entity_id = comn::EntityId(self.next_entity_id.0 + 1);
         assert!(!self.state.entities.contains_key(&entity_id));
 
         self.state.entities.insert(entity_id, entity);
+    }
+
+    fn remove_entity(&mut self, entity_id: comn::EntityId) {
+        debug!("Removing entity {:?}", entity_id);
+        self.state.entities.remove(&entity_id).unwrap();
     }
 }
