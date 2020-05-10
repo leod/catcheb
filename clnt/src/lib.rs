@@ -3,7 +3,7 @@ mod webrtc;
 
 use std::collections::HashSet;
 
-use log::{debug, info};
+use log::{debug, info, warn};
 //use instant::Instant;
 
 use js_sys::Date;
@@ -130,7 +130,12 @@ async fn app(
     let join_success = join_reply.expect("Failed to join game");
 
     // TODO: Graceful error handling in client
-    let on_message = Box::new(on_message);
+    let my_token = join_success.your_token;
+    let on_message = Box::new(
+        move |client_data: &webrtc::Data, message: &comn::ServerMessage| {
+            on_message(my_token, client_data, message)
+        },
+    );
     let webrtc_client = webrtc::Client::connect(Default::default(), on_message)
         .await
         .unwrap();
@@ -255,4 +260,17 @@ pub async fn join_request(request: comn::JoinRequest) -> Result<comn::JoinReply,
     Ok(reply.into_serde().unwrap())
 }
 
-pub fn on_message(client_data: &webrtc::Data, message: &[u8]) {}
+pub fn on_message(
+    my_token: comn::PlayerToken,
+    client_data: &webrtc::Data,
+    message: &comn::ServerMessage,
+) {
+    if let comn::ServerMessage::Ping(sequence_num) = message {
+        let reply = comn::ClientMessage::Pong(*sequence_num);
+        let signed_message = comn::SignedClientMessage(my_token, reply);
+        let data = signed_message.serialize();
+        if let Err(err) = client_data.send(&data) {
+            warn!("Failed to send message: {:?}", err);
+        }
+    }
+}

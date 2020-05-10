@@ -30,8 +30,9 @@ impl Game {
     pub fn update(&mut self) {
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             match message {
-                comn::ServerMessage::Ping(sequence_num) => {
-                    self.send(comn::ClientMessage::Pong(sequence_num));
+                comn::ServerMessage::Ping(_) => {
+                    // Handled in on_message callback to get better ping
+                    // estimates.
                 }
                 comn::ServerMessage::Pong(sequence_num) => {
                     if self
