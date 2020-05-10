@@ -13,6 +13,7 @@ pub type Point = na::Point2<f32>;
 pub struct Settings {
     pub max_num_players: usize,
     pub ticks_per_second: usize,
+    pub size: Vector,
 }
 
 impl Default for Settings {
@@ -20,6 +21,7 @@ impl Default for Settings {
         Self {
             max_num_players: 16,
             ticks_per_second: 20,
+            size: Vector::new(1280.0, 720.0),
         }
     }
 }
