@@ -3,11 +3,7 @@
 //! This is based on the `echo_server.html` example from `webrtc-unreliable`,
 //! but translated from JavaScript into Rust.
 
-use std::{
-    cell::{Cell, RefCell},
-    collections::VecDeque,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use instant::Instant;
 use log::{info, warn};
@@ -16,7 +12,7 @@ use js_sys::{Reflect, JSON};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    Blob, ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit,
+    ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit,
     RtcDataChannelType, RtcPeerConnection, RtcSessionDescriptionInit,
 };
 
@@ -63,7 +59,7 @@ impl Default for Config {
 }
 
 pub struct Data {
-    on_message: Box<dyn FnMut(&Data, &[u8])>,
+    on_message: Box<dyn Fn(&Data, &comn::ServerMessage)>,
     peer: RtcPeerConnection,
     channel: RtcDataChannel,
     status: Status,
@@ -81,7 +77,7 @@ pub struct Client {
 impl Client {
     pub async fn connect(
         config: Config,
-        on_message: Box<dyn FnMut(&Data, &[u8])>,
+        on_message: Box<dyn Fn(&Data, &comn::ServerMessage)>,
     ) -> Result<Self, ConnectError> {
         info!("Establishing WebRTC connection");
 
@@ -170,7 +166,7 @@ impl Client {
     }
 
     pub fn send(&self, data: &[u8]) -> Result<(), JsValue> {
-        self.data.borrow().channel.send_with_u8_array(data)
+        self.data.borrow().send(data)
     }
 
     pub fn status(&self) -> Status {
@@ -197,10 +193,10 @@ impl Data {
         self.status = Status::Error;
     }
 
-    pub fn on_message(&mut self, message: &MessageEvent) {
+    pub fn on_message(&mut self, event: &MessageEvent) {
         let recv_time = Instant::now();
-        let message = if message.data().is_instance_of::<js_sys::ArrayBuffer>() {
-            let abuf = message.data().dyn_into::<js_sys::ArrayBuffer>().unwrap();
+        let message = if event.data().is_instance_of::<js_sys::ArrayBuffer>() {
+            let abuf = event.data().dyn_into::<js_sys::ArrayBuffer>().unwrap();
             let array = js_sys::Uint8Array::new(&abuf);
 
             if let Some(message) = comn::ServerMessage::deserialize(&array.to_vec()) {
@@ -210,14 +206,17 @@ impl Data {
                 return;
             }
         } else {
-            warn!(
-                "Received data {:?}, don't know how to handle",
-                message.data()
-            );
+            warn!("Received data {:?}, don't know how to handle", event.data());
             return;
         };
 
+        (self.on_message)(self, &message);
+
         self.received.push_back((recv_time, message));
+    }
+
+    pub fn send(&self, data: &[u8]) -> Result<(), JsValue> {
+        self.channel.send_with_u8_array(data)
     }
 }
 
