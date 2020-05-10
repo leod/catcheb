@@ -71,6 +71,7 @@ pub enum ReceivedData {
 }
 
 pub struct Data {
+    on_message: Box<dyn FnMut(&Data, &[u8])>,
     peer: RtcPeerConnection,
     channel: RtcDataChannel,
     status: Status,
@@ -86,13 +87,17 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn connect(config: Config) -> Result<Self, ConnectError> {
+    pub async fn connect(
+        config: Config,
+        on_message: Box<dyn FnMut(&Data, &[u8])>,
+    ) -> Result<Self, ConnectError> {
         info!("Establishing WebRTC connection");
 
         let peer: RtcPeerConnection = new_rtc_peer_connection(&config)?;
         let channel: RtcDataChannel = create_data_channel(&peer);
 
         let data = Rc::new(RefCell::new(Data {
+            on_message,
             peer: peer.clone(),
             channel,
             status: Status::Connecting,
