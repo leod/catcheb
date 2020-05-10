@@ -7,7 +7,7 @@ pub struct Game {
 
 impl Game {
     pub fn new(settings: comn::Settings) -> Self {
-        let state = comn::Game::new(settings.clone());
+        let state = comn::Game::new(settings);
 
         Self {
             state,
