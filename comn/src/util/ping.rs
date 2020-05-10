@@ -62,18 +62,21 @@ impl PingEstimation {
         }
     }
 
-    pub fn received_pong(&mut self, num: SequenceNum) -> Result<(), ReceivedPongError> {
+    pub fn received_pong(
+        &mut self,
+        recv_time: Instant,
+        num: SequenceNum,
+    ) -> Result<(), ReceivedPongError> {
         if let Some((_, send_time)) = self
             .waiting_pings
             .iter()
             .find(|(send_num, _)| num == *send_num)
         {
-            let now = Instant::now();
-            assert!(now >= *send_time);
+            assert!(recv_time >= *send_time);
 
-            self.last_received_pong_time = now;
+            self.last_received_pong_time = recv_time;
 
-            self.last_rtts.push_back(now - *send_time);
+            self.last_rtts.push_back(recv_time - *send_time);
             while self.last_rtts.len() > NUM_KEEP_DURATIONS {
                 self.last_rtts.pop_front();
             }

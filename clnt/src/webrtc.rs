@@ -9,6 +9,7 @@ use std::{
     rc::Rc,
 };
 
+use instant::Instant;
 use log::{info, warn};
 
 use js_sys::{Reflect, JSON};
@@ -75,7 +76,7 @@ pub struct Data {
     peer: RtcPeerConnection,
     channel: RtcDataChannel,
     status: Status,
-    received: VecDeque<ReceivedData>,
+    received: VecDeque<(Instant, ReceivedData)>,
 }
 
 pub struct Client {
@@ -171,8 +172,8 @@ impl Client {
         })
     }
 
-    pub async fn take_message(&mut self) -> Option<comn::ServerMessage> {
-        while let Some(received_data) = {
+    pub async fn take_message(&mut self) -> Option<(Instant, comn::ServerMessage)> {
+        while let Some((recv_time, received_data)) = {
             // Note: It is important to release the borrow before entering the
             // loop, so that we do not hold a borrow when doing await.
             let mut data = self.data.borrow_mut();
@@ -189,7 +190,7 @@ impl Client {
             let array = js_sys::Uint8Array::new(&abuf);
 
             if let Some(message) = comn::ServerMessage::deserialize(&array.to_vec()) {
-                return Some(message);
+                return Some((recv_time, message));
             } else {
                 warn!("Failed to deserialize message, ignoring");
                 continue;
@@ -228,6 +229,7 @@ impl Data {
     }
 
     pub fn on_message(&mut self, message: &MessageEvent) {
+        let recv_time = Instant::now();
         let data = if message.data().is_instance_of::<Blob>() {
             ReceivedData::Blob(message.data().dyn_into::<Blob>().unwrap())
         } else if message.data().is_instance_of::<js_sys::ArrayBuffer>() {
@@ -240,7 +242,7 @@ impl Data {
             return;
         };
 
-        self.received.push_back(data);
+        self.received.push_back((recv_time, data));
     }
 }
 
