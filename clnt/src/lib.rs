@@ -4,6 +4,7 @@ mod webrtc;
 use std::collections::HashSet;
 
 use log::{debug, info};
+//use instant::Instant;
 
 use js_sys::Date;
 use wasm_bindgen::{prelude::*, JsCast};
@@ -147,6 +148,7 @@ async fn app(
     let mut last_time_ms = Date::new_0().get_time();
 
     let mut delta_ms_var = stats::Var::default();
+    let mut frame_ms_var = stats::Var::default();
 
     loop {
         while let Some(event) = events.next_event().await {
@@ -167,16 +169,16 @@ async fn app(
             panic!("Game lost connection");
         }
 
+        let now_time_ms = Date::new_0().get_time();
+        let delta_ms = now_time_ms - last_time_ms;
+        let delta_s = (delta_ms / 1000.0) as f32;
+        last_time_ms = now_time_ms;
+
         game.update().await;
 
         while input_timer.tick() {
             game.player_input(&current_input(&pressed_keys));
         }
-
-        let now_time_ms = Date::new_0().get_time();
-        let delta_ms = now_time_ms - last_time_ms;
-        let delta_s = (delta_ms / 1000.0) as f32;
-        last_time_ms = now_time_ms;
 
         render_game(&mut gfx, &mut resources, &game.state())?;
 
@@ -184,12 +186,21 @@ async fn app(
 
         resources.font.draw(
             &mut gfx,
-            &format!("delta ms: {}", delta_ms_var.mean().unwrap_or(-1.0)),
+            &format!("delta ms: {:.1}", delta_ms_var.mean().unwrap_or(-1.0)),
             Color::BLACK,
             Vector::new(10.0, 30.0),
         )?;
+        resources.font.draw(
+            &mut gfx,
+            &format!("frame ms: {:.1}", frame_ms_var.mean().unwrap_or(-1.0)),
+            Color::BLACK,
+            Vector::new(10.0, 60.0),
+        )?;
 
         gfx.present(&window)?;
+
+        let end_time_ms = Date::new_0().get_time();
+        frame_ms_var.record((end_time_ms - now_time_ms) as f32);
     }
 }
 
