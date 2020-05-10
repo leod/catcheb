@@ -17,10 +17,12 @@ pub enum ReceivedPongError {
     InvalidSequenceNum,
 }
 
+#[derive(Debug, Clone)]
 pub struct PingEstimation {
     next_sequence_num: SequenceNum,
     waiting_pings: Vec<(SequenceNum, Instant)>,
     last_send_time: Option<Instant>,
+    last_received_pong_time: Instant,
     last_rtts: VecDeque<Duration>,
     estimate: Duration,
 }
@@ -31,6 +33,7 @@ impl Default for PingEstimation {
             next_sequence_num: SequenceNum(0),
             waiting_pings: Vec::new(),
             last_send_time: None,
+            last_received_pong_time: Instant::now(),
             last_rtts: VecDeque::new(),
             estimate: Duration::from_millis(INITIAL_ESTIMATE_MS),
         }
@@ -68,6 +71,8 @@ impl PingEstimation {
             let now = Instant::now();
             assert!(now >= *send_time);
 
+            self.last_received_pong_time = now;
+
             self.last_rtts.push_back(now - *send_time);
             while self.last_rtts.len() > NUM_KEEP_DURATIONS {
                 self.last_rtts.pop_front();
@@ -85,13 +90,7 @@ impl PingEstimation {
     }
 
     pub fn is_timeout(&self) -> bool {
-        if let Some((_, send_time)) = self.waiting_pings.last() {
-            (Instant::now() - *send_time) >= Duration::from_millis(TIMEOUT_MS)
-        } else {
-            // All our recent pings have been ponged, all good
-            // (assuming that the user regularly calls next_ping_sequence_num)
-            false
-        }
+        Instant::now() - self.last_received_pong_time >= Duration::from_millis(TIMEOUT_MS)
     }
 
     fn calculate_estimate(&self) -> Duration {
