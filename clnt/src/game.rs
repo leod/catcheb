@@ -27,8 +27,8 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
-    pub async fn update(&mut self) {
-        while let Some((recv_time, message)) = self.webrtc_client.take_message().await {
+    pub fn update(&mut self) {
+        while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             match message {
                 comn::ServerMessage::Ping(sequence_num) => {
                     self.send(comn::ClientMessage::Pong(sequence_num));

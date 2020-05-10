@@ -17,7 +17,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Blob, ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit,
-    RtcPeerConnection, RtcSessionDescriptionInit,
+    RtcDataChannelType, RtcPeerConnection, RtcSessionDescriptionInit,
 };
 
 #[derive(Debug, Clone)]
@@ -62,21 +62,12 @@ impl Default for Config {
     }
 }
 
-/// In the callback for received messages, Firefox gives us a `Blob`, while
-/// Chrome directly gives us the `ArrayBuffer` instead. I'm not sure why.
-/// AFAIK, a `Blob` can be extracted only using `await`, so we have this
-/// enum for storing the different kinds of values.
-pub enum ReceivedData {
-    Blob(Blob),
-    ArrayBuffer(js_sys::ArrayBuffer),
-}
-
 pub struct Data {
     on_message: Box<dyn FnMut(&Data, &[u8])>,
     peer: RtcPeerConnection,
     channel: RtcDataChannel,
     status: Status,
-    received: VecDeque<(Instant, ReceivedData)>,
+    received: VecDeque<(Instant, comn::ServerMessage)>,
 }
 
 pub struct Client {
@@ -95,7 +86,9 @@ impl Client {
         info!("Establishing WebRTC connection");
 
         let peer: RtcPeerConnection = new_rtc_peer_connection(&config)?;
+
         let channel: RtcDataChannel = create_data_channel(&peer);
+        channel.set_binary_type(RtcDataChannelType::Arraybuffer);
 
         let data = Rc::new(RefCell::new(Data {
             on_message,
@@ -172,32 +165,8 @@ impl Client {
         })
     }
 
-    pub async fn take_message(&mut self) -> Option<(Instant, comn::ServerMessage)> {
-        while let Some((recv_time, received_data)) = {
-            // Note: It is important to release the borrow before entering the
-            // loop, so that we do not hold a borrow when doing await.
-            let mut data = self.data.borrow_mut();
-            data.received.pop_front()
-        } {
-            let abuf = match received_data {
-                ReceivedData::Blob(blob) => JsFuture::from(blob.array_buffer())
-                    .await
-                    .unwrap()
-                    .dyn_into::<js_sys::ArrayBuffer>()
-                    .unwrap(),
-                ReceivedData::ArrayBuffer(abuf) => abuf,
-            };
-            let array = js_sys::Uint8Array::new(&abuf);
-
-            if let Some(message) = comn::ServerMessage::deserialize(&array.to_vec()) {
-                return Some((recv_time, message));
-            } else {
-                warn!("Failed to deserialize message, ignoring");
-                continue;
-            }
-        }
-
-        None
+    pub fn take_message(&mut self) -> Option<(Instant, comn::ServerMessage)> {
+        self.data.borrow_mut().received.pop_front()
     }
 
     pub fn send(&self, data: &[u8]) -> Result<(), JsValue> {
@@ -230,10 +199,16 @@ impl Data {
 
     pub fn on_message(&mut self, message: &MessageEvent) {
         let recv_time = Instant::now();
-        let data = if message.data().is_instance_of::<Blob>() {
-            ReceivedData::Blob(message.data().dyn_into::<Blob>().unwrap())
-        } else if message.data().is_instance_of::<js_sys::ArrayBuffer>() {
-            ReceivedData::ArrayBuffer(message.data().dyn_into::<js_sys::ArrayBuffer>().unwrap())
+        let message = if message.data().is_instance_of::<js_sys::ArrayBuffer>() {
+            let abuf = message.data().dyn_into::<js_sys::ArrayBuffer>().unwrap();
+            let array = js_sys::Uint8Array::new(&abuf);
+
+            if let Some(message) = comn::ServerMessage::deserialize(&array.to_vec()) {
+                message
+            } else {
+                warn!("Failed to deserialize message, ignoring");
+                return;
+            }
         } else {
             warn!(
                 "Received data {:?}, don't know how to handle",
@@ -242,7 +217,7 @@ impl Data {
             return;
         };
 
-        self.received.push_back((recv_time, data));
+        self.received.push_back((recv_time, message));
     }
 }
 

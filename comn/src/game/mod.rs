@@ -20,7 +20,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             max_num_players: 16,
-            ticks_per_second: 20,
+            ticks_per_second: 60,
             size: Vector::new(1280.0, 720.0),
         }
     }
