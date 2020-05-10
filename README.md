@@ -40,3 +40,6 @@ cargo run -j8 --bin serv -- \
 
 ## Useful resources
 - https://dev.to/dandyvica/wasm-in-rust-without-nodejs-2e0c
+
+## Credits
+- `clnt/static/Munro-2LYe.ttf`: Munro font: http://www.tenbytwenty.com/

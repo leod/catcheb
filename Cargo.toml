@@ -4,3 +4,8 @@ members = [
     "serv",
     "clnt"
 ]
+
+[patch.crates-io]
+# Fix for <https://github.com/ryanisaacg/platter/pull/5> which we encounter in 
+# the client, causing font loading to fail
+platter = { git = "https://github.com/TannerRogalsky/platter.git", branch = "leak_closure" }
