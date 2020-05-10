@@ -180,9 +180,10 @@ async fn app(
         let delta_s = (delta_ms / 1000.0) as f32;
         last_time_ms = now_time_ms;
 
-        game.update().await;
+        game.update();
 
-        while input_timer.tick() {
+        //while input_timer.tick() {
+        if input_timer.tick() {
             game.player_input(&current_input(&pressed_keys));
         }
 
