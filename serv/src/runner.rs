@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, time::Instant};
 
 use log::{debug, info, warn};
 use rand::seq::IteratorRandom;
@@ -210,7 +210,7 @@ impl Runner {
                             "Received message from {:?}: {:?}",
                             message_in.peer, signed_message
                         );*/
-                        self.handle_message(message_in.peer, signed_message);
+                        self.handle_message(message_in.peer, message_in.recv_time, signed_message);
                     }
                     None => {
                         warn!(
@@ -270,7 +270,12 @@ impl Runner {
         }
     }
 
-    pub fn handle_message(&mut self, peer: SocketAddr, message: comn::SignedClientMessage) {
+    pub fn handle_message(
+        &mut self,
+        peer: SocketAddr,
+        recv_time: Instant,
+        message: comn::SignedClientMessage,
+    ) {
         if let Some(player) = self.players.get_mut(&message.0) {
             if Some(peer) != player.peer {
                 debug!("Changing peer from {:?} to {:?}", player.peer, peer);
@@ -282,7 +287,11 @@ impl Runner {
                     self.send(peer, comn::ServerMessage::Pong(sequence_num));
                 }
                 comn::ClientMessage::Pong(sequence_num) => {
-                    if player.ping_estimation.received_pong(sequence_num).is_err() {
+                    if player
+                        .ping_estimation
+                        .received_pong(recv_time, sequence_num)
+                        .is_err()
+                    {
                         warn!("Ignoring out-of-order pong from {:?}", peer);
                     } else {
                         debug!(

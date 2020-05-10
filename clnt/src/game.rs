@@ -28,13 +28,17 @@ impl Game {
     }
 
     pub async fn update(&mut self) {
-        while let Some(message) = self.webrtc_client.take_message().await {
+        while let Some((recv_time, message)) = self.webrtc_client.take_message().await {
             match message {
                 comn::ServerMessage::Ping(sequence_num) => {
                     self.send(comn::ClientMessage::Pong(sequence_num));
                 }
                 comn::ServerMessage::Pong(sequence_num) => {
-                    if self.ping_estimation.received_pong(sequence_num).is_err() {
+                    if self
+                        .ping_estimation
+                        .received_pong(recv_time, sequence_num)
+                        .is_err()
+                    {
                         warn!("Ignoring out-of-order pong {:?}", sequence_num);
                     } else {
                         debug!(
