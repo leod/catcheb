@@ -70,11 +70,15 @@ pub enum ReceivedData {
     ArrayBuffer(js_sys::ArrayBuffer),
 }
 
-pub struct Client {
+pub struct Data {
     peer: RtcPeerConnection,
     channel: RtcDataChannel,
-    status: Rc<Cell<Status>>,
-    received: Rc<RefCell<VecDeque<ReceivedData>>>,
+    status: Status,
+    received: VecDeque<ReceivedData>,
+}
+
+pub struct Client {
+    data: Rc<RefCell<Data>>,
     _on_open: Closure<dyn FnMut(&Event)>,
     _on_close: Closure<dyn FnMut(&Event)>,
     _on_error: Closure<dyn FnMut(&ErrorEvent)>,
@@ -88,33 +92,42 @@ impl Client {
         let peer: RtcPeerConnection = new_rtc_peer_connection(&config)?;
         let channel: RtcDataChannel = create_data_channel(&peer);
 
-        let status = Rc::new(Cell::new(Status::Connecting));
-        let received = Rc::new(RefCell::new(VecDeque::new()));
+        let data = Rc::new(RefCell::new(Data {
+            peer: peer.clone(),
+            channel,
+            status: Status::Connecting,
+            received: VecDeque::new(),
+        }));
 
         let on_open = Closure::wrap(Box::new({
-            let status = status.clone();
-            move |_: &Event| on_open(status.clone())
+            let data = data.clone();
+            move |_: &Event| data.borrow_mut().on_open()
         }) as Box<dyn FnMut(&Event)>);
-        channel.set_onopen(Some(on_open.as_ref().unchecked_ref()));
-
         // TODO: We'll also want to handle close events caused by the peer
         let on_close = Closure::wrap(Box::new({
-            let status = status.clone();
-            move |_: &Event| on_close(status.clone())
+            let data = data.clone();
+            move |_: &Event| data.borrow_mut().on_close()
         }) as Box<dyn FnMut(&Event)>);
-        channel.set_onclose(Some(on_close.as_ref().unchecked_ref()));
-
         let on_error = Closure::wrap(Box::new({
-            let status = status.clone();
-            move |event: &ErrorEvent| on_error(status.clone(), event)
+            let data = data.clone();
+            move |event: &ErrorEvent| data.borrow_mut().on_error(event)
         }) as Box<dyn FnMut(&ErrorEvent)>);
-        channel.set_onerror(Some(on_error.as_ref().unchecked_ref()));
-
         let on_message = Closure::wrap(Box::new({
-            let received = received.clone();
-            move |event: &MessageEvent| on_message(received.clone(), event)
+            let data = data.clone();
+            move |event: &MessageEvent| data.borrow_mut().on_message(event)
         }) as Box<dyn FnMut(&MessageEvent)>);
-        channel.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
+
+        {
+            let data = data.borrow_mut();
+            data.channel
+                .set_onopen(Some(on_open.as_ref().unchecked_ref()));
+            data.channel
+                .set_onclose(Some(on_close.as_ref().unchecked_ref()));
+            data.channel
+                .set_onerror(Some(on_error.as_ref().unchecked_ref()));
+            data.channel
+                .set_onmessage(Some(on_message.as_ref().unchecked_ref()));
+        }
 
         let offer: RtcSessionDescriptionInit = JsFuture::from(peer.create_offer())
             .await
@@ -145,10 +158,7 @@ impl Client {
             .map_err(ConnectError::AddIceCandidate)?;
 
         Ok(Client {
-            peer,
-            channel,
-            status,
-            received,
+            data,
             _on_open: on_open,
             _on_close: on_close,
             _on_error: on_error,
@@ -157,13 +167,13 @@ impl Client {
     }
 
     pub async fn take_message(&mut self) -> Option<comn::ServerMessage> {
-        while let Some(data) = {
+        while let Some(received_data) = {
             // Note: It is important to release the borrow before entering the
             // loop, so that we do not hold a borrow when doing await.
-            let mut received = self.received.borrow_mut();
-            received.pop_front()
+            let mut data = self.data.borrow_mut();
+            data.received.pop_front()
         } {
-            let abuf = match data {
+            let abuf = match received_data {
                 ReceivedData::Blob(blob) => JsFuture::from(blob.array_buffer())
                     .await
                     .unwrap()
@@ -185,45 +195,48 @@ impl Client {
     }
 
     pub fn send(&self, data: &[u8]) -> Result<(), JsValue> {
-        self.channel.send_with_u8_array(data)
+        self.data.borrow().channel.send_with_u8_array(data)
     }
 
     pub fn status(&self) -> Status {
-        self.status.get()
+        self.data.borrow().status
     }
 }
 
-pub fn on_open(status: Rc<Cell<Status>>) {
-    info!("Connection has been established");
+impl Data {
+    pub fn on_open(&mut self) {
+        info!("Connection has been established");
 
-    status.set(Status::Open);
-}
+        self.status = Status::Open;
+    }
 
-pub fn on_close(status: Rc<Cell<Status>>) {
-    info!("Connection has been closed");
+    pub fn on_close(&mut self) {
+        info!("Connection has been closed");
 
-    status.set(Status::Closed);
-}
+        self.status = Status::Closed;
+    }
 
-pub fn on_error(status: Rc<Cell<Status>>, error: &ErrorEvent) {
-    warn!("Connection error: {:?}", error);
+    pub fn on_error(&mut self, error: &ErrorEvent) {
+        warn!("Connection error: {:?}", error);
 
-    status.set(Status::Error);
-}
+        self.status = Status::Error;
+    }
 
-pub fn on_message(received: Rc<RefCell<VecDeque<ReceivedData>>>, message: &MessageEvent) {
-    let data = if message.data().is_instance_of::<Blob>() {
-        ReceivedData::Blob(message.data().dyn_into::<Blob>().unwrap())
-    } else if message.data().is_instance_of::<js_sys::ArrayBuffer>() {
-        ReceivedData::ArrayBuffer(message.data().dyn_into::<js_sys::ArrayBuffer>().unwrap())
-    } else {
-        warn!(
-            "Received data {:?}, don't know how to handle",
-            message.data()
-        );
-        return;
-    };
-    received.borrow_mut().push_back(data);
+    pub fn on_message(&mut self, message: &MessageEvent) {
+        let data = if message.data().is_instance_of::<Blob>() {
+            ReceivedData::Blob(message.data().dyn_into::<Blob>().unwrap())
+        } else if message.data().is_instance_of::<js_sys::ArrayBuffer>() {
+            ReceivedData::ArrayBuffer(message.data().dyn_into::<js_sys::ArrayBuffer>().unwrap())
+        } else {
+            warn!(
+                "Received data {:?}, don't know how to handle",
+                message.data()
+            );
+            return;
+        };
+
+        self.received.push_back(data);
+    }
 }
 
 fn new_rtc_peer_connection(config: &Config) -> Result<RtcPeerConnection, ConnectError> {
