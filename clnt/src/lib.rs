@@ -51,6 +51,7 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
 
 pub struct Resources {
     pub ttf: VectorFont,
+    pub font_small: FontRenderer,
     pub font: FontRenderer,
     pub font_large: FontRenderer,
 }
@@ -58,11 +59,13 @@ pub struct Resources {
 impl Resources {
     pub async fn load(gfx: &mut Graphics) -> quicksilver::Result<Self> {
         let ttf = VectorFont::load("Munro-2LYe.ttf").await?;
+        let font_small = ttf.to_renderer(gfx, 18.0)?;
         let font = ttf.to_renderer(gfx, 36.0)?;
         let font_large = ttf.to_renderer(gfx, 58.0)?;
 
         Ok(Self {
             ttf,
+            font_small,
             font,
             font_large,
         })
@@ -187,17 +190,26 @@ async fn app(
 
         delta_ms_var.record(delta_ms as f32);
 
-        resources.font.draw(
+        resources.font_small.draw(
             &mut gfx,
-            &format!("delta ms: {:.1}", delta_ms_var.mean().unwrap_or(-1.0)),
+            &format!("delta: {:.1}ms", delta_ms_var.mean().unwrap_or(-1.0)),
             Color::BLACK,
-            Vector::new(10.0, 30.0),
+            Vector::new(10.0, 15.0),
         )?;
-        resources.font.draw(
+        resources.font_small.draw(
             &mut gfx,
-            &format!("frame ms: {:.1}", frame_ms_var.mean().unwrap_or(-1.0)),
+            &format!("frame: {:.1}ms", frame_ms_var.mean().unwrap_or(-1.0)),
             Color::BLACK,
-            Vector::new(10.0, 60.0),
+            Vector::new(10.0, 35.0),
+        )?;
+        resources.font_small.draw(
+            &mut gfx,
+            &format!(
+                "ping: {:.1}ms",
+                game.ping_estimation().estimate().as_secs_f32() * 1000.0
+            ),
+            Color::BLACK,
+            Vector::new(10.0, 55.0),
         )?;
 
         gfx.present(&window)?;

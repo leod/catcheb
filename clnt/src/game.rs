@@ -76,6 +76,10 @@ impl Game {
         &self.state.settings
     }
 
+    pub fn ping_estimation(&self) -> &PingEstimation {
+        &self.ping_estimation
+    }
+
     fn send(&self, message: comn::ClientMessage) {
         let signed_message = comn::SignedClientMessage(self.my_token, message);
 
