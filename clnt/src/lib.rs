@@ -127,7 +127,10 @@ async fn app(
     let join_success = join_reply.expect("Failed to join game");
 
     // TODO: Graceful error handling in client
-    let webrtc_client = webrtc::Client::connect(Default::default()).await.unwrap();
+    let on_message = Box::new(on_message);
+    let webrtc_client = webrtc::Client::connect(Default::default(), on_message)
+        .await
+        .unwrap();
 
     while webrtc_client.status() == webrtc::Status::Connecting {
         events.next_event().await;
@@ -238,3 +241,5 @@ pub async fn join_request(request: comn::JoinRequest) -> Result<comn::JoinReply,
     // Use serde to parse the JSON into a struct.
     Ok(reply.into_serde().unwrap())
 }
+
+pub fn on_message(client_data: &webrtc::Data, message: &[u8]) {}
