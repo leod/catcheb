@@ -11,7 +11,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use quicksilver::{
     geom::{Rectangle, Transform, Vector},
-    graphics::{Color, Graphics},
+    graphics::{Color, FontRenderer, Graphics, VectorFont},
     lifecycle::{run, Event, EventStream, Key, Settings, Window},
     Timer,
 };
@@ -43,7 +43,25 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
     }
 }
 
-pub fn render_game(gfx: &mut Graphics, state: &comn::Game) -> quicksilver::Result<()> {
+pub struct Resources {
+    pub ttf: VectorFont,
+    pub font: FontRenderer,
+}
+
+impl Resources {
+    pub async fn load(gfx: &mut Graphics) -> quicksilver::Result<Self> {
+        let ttf = VectorFont::load("Munro-2LYe.ttf").await?;
+        let font = ttf.to_renderer(gfx, 36.0)?;
+
+        Ok(Self { ttf, font })
+    }
+}
+
+pub fn render_game(
+    gfx: &mut Graphics,
+    resources: &mut Resources,
+    state: &comn::Game,
+) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
     for entity in state.entities.values() {
@@ -63,6 +81,11 @@ pub fn render_game(gfx: &mut Graphics, state: &comn::Game) -> quicksilver::Resul
 
                 gfx.fill_rect(&rect, Color::BLUE);
                 gfx.stroke_rect(&rect, Color::RED);
+
+                gfx.set_transform(Transform::IDENTITY);
+                resources
+                    .font
+                    .draw(gfx, &player.owner.0.to_string(), Color::BLACK, pos.into())?;
             }
             e => panic!("unhandled entity rendering: {:?}", e),
         }
@@ -77,6 +100,8 @@ async fn app(
     mut events: EventStream,
 ) -> quicksilver::Result<()> {
     info!("Starting up");
+
+    let mut resources = Resources::load(&mut gfx).await?;
 
     // TODO: Graceful error handling in client
     let join_reply = join_request(comn::JoinRequest {
@@ -139,8 +164,8 @@ async fn app(
         let delta_s = ((now_time_ms - last_time_ms) / 1000.0) as f32;
         last_time_ms = now_time_ms;
 
+        render_game(&mut gfx, &mut resources, &game.state())?;
         gfx.present(&window)?;
-        render_game(&mut gfx, &game.state())?;
     }
 }
 

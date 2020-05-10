@@ -1464,8 +1464,7 @@ checksum = "05da548ad6865900e60eaba7f589cc0783590a92e940c26953ff81ddbab2d677"
 [[package]]
 name = "platter"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3225653edff1ce73ee0ce933fb90dc589367f536b4e8a47fb27c1154f66a6d9"
+source = "git+https://github.com/TannerRogalsky/platter.git?branch=leak_closure#603492366d23f642aeba007355bf83b876378b61"
 dependencies = [
  "futures-util",
  "js-sys",
