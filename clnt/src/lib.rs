@@ -16,7 +16,10 @@ use quicksilver::{
     Timer,
 };
 
-use comn::game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W};
+use comn::{
+    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W},
+    util::stats,
+};
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -48,14 +51,20 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
 pub struct Resources {
     pub ttf: VectorFont,
     pub font: FontRenderer,
+    pub font_large: FontRenderer,
 }
 
 impl Resources {
     pub async fn load(gfx: &mut Graphics) -> quicksilver::Result<Self> {
         let ttf = VectorFont::load("Munro-2LYe.ttf").await?;
         let font = ttf.to_renderer(gfx, 36.0)?;
+        let font_large = ttf.to_renderer(gfx, 58.0)?;
 
-        Ok(Self { ttf, font })
+        Ok(Self {
+            ttf,
+            font,
+            font_large,
+        })
     }
 }
 
@@ -137,6 +146,8 @@ async fn app(
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time_ms = Date::new_0().get_time();
 
+    let mut delta_ms_var = stats::Var::default();
+
     loop {
         while let Some(event) = events.next_event().await {
             match event {
@@ -163,10 +174,21 @@ async fn app(
         }
 
         let now_time_ms = Date::new_0().get_time();
-        let delta_s = ((now_time_ms - last_time_ms) / 1000.0) as f32;
+        let delta_ms = now_time_ms - last_time_ms;
+        let delta_s = (delta_ms / 1000.0) as f32;
         last_time_ms = now_time_ms;
 
         render_game(&mut gfx, &mut resources, &game.state())?;
+
+        delta_ms_var.record(delta_ms as f32);
+
+        resources.font.draw(
+            &mut gfx,
+            &format!("delta ms: {}", delta_ms_var.mean().unwrap_or(-1.0)),
+            Color::BLACK,
+            Vector::new(10.0, 30.0),
+        )?;
+
         gfx.present(&window)?;
     }
 }
