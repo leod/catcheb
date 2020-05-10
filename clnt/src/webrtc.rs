@@ -61,11 +61,20 @@ impl Default for Config {
     }
 }
 
+/// In the callback for received messages, Firefox gives us a `Blob`, while
+/// Chrome directly gives us the `ArrayBuffer` instead. I'm not sure why.
+/// AFAIK, a `Blob` can be extracted only using `await`, so we have this
+/// enum for storing the different kinds of values.
+pub enum ReceivedData {
+    Blob(Blob),
+    ArrayBuffer(js_sys::ArrayBuffer),
+}
+
 pub struct Client {
     peer: RtcPeerConnection,
     channel: RtcDataChannel,
     status: Rc<Cell<Status>>,
-    received: Rc<RefCell<VecDeque<Blob>>>,
+    received: Rc<RefCell<VecDeque<ReceivedData>>>,
     _on_open: Closure<dyn FnMut(&Event)>,
     _on_close: Closure<dyn FnMut(&Event)>,
     _on_error: Closure<dyn FnMut(&ErrorEvent)>,
@@ -148,17 +157,20 @@ impl Client {
     }
 
     pub async fn take_message(&mut self) -> Option<comn::ServerMessage> {
-        while let Some(blob) = {
+        while let Some(data) = {
             // Note: It is important to release the borrow before entering the
             // loop, so that we do not hold a borrow when doing await.
             let mut received = self.received.borrow_mut();
             received.pop_front()
         } {
-            let abuf = JsFuture::from(blob.array_buffer())
-                .await
-                .unwrap()
-                .dyn_into::<js_sys::ArrayBuffer>()
-                .unwrap();
+            let abuf = match data {
+                ReceivedData::Blob(blob) => JsFuture::from(blob.array_buffer())
+                    .await
+                    .unwrap()
+                    .dyn_into::<js_sys::ArrayBuffer>()
+                    .unwrap(),
+                ReceivedData::ArrayBuffer(abuf) => abuf,
+            };
             let array = js_sys::Uint8Array::new(&abuf);
 
             if let Some(message) = comn::ServerMessage::deserialize(&array.to_vec()) {
@@ -199,10 +211,19 @@ pub fn on_error(status: Rc<Cell<Status>>, error: &ErrorEvent) {
     status.set(Status::Error);
 }
 
-pub fn on_message(received: Rc<RefCell<VecDeque<Blob>>>, message: &MessageEvent) {
-    received
-        .borrow_mut()
-        .push_back(message.data().dyn_into::<Blob>().unwrap());
+pub fn on_message(received: Rc<RefCell<VecDeque<ReceivedData>>>, message: &MessageEvent) {
+    let data = if message.data().is_instance_of::<Blob>() {
+        ReceivedData::Blob(message.data().dyn_into::<Blob>().unwrap())
+    } else if message.data().is_instance_of::<js_sys::ArrayBuffer>() {
+        ReceivedData::ArrayBuffer(message.data().dyn_into::<js_sys::ArrayBuffer>().unwrap())
+    } else {
+        warn!(
+            "Received data {:?}, don't know how to handle",
+            message.data()
+        );
+        return;
+    };
+    received.borrow_mut().push_back(data);
 }
 
 fn new_rtc_peer_connection(config: &Config) -> Result<RtcPeerConnection, ConnectError> {

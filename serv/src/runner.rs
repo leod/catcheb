@@ -265,7 +265,6 @@ impl Runner {
                 comn::ClientMessage::Input { tick_num, input } => {
                     player.inputs.push((tick_num, input));
                 }
-                _ => panic!("TODO"),
             }
         } else {
             warn!("Received message with unknown token, ignoring");
@@ -291,7 +290,10 @@ impl Runner {
         }
 
         for (game_id, game) in self.games.iter_mut() {
-            game.run_tick(inputs[game_id].as_slice());
+            let inputs = inputs[game_id].as_slice();
+            //debug!("Updating {:?} with {} inputs", game_id, inputs.len());
+
+            game.run_tick(inputs);
         }
 
         let mut messages = Vec::new();

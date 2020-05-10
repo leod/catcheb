@@ -1,4 +1,4 @@
-use crate::{Entity, EntityId, Game, Input, PlayerEntity, PlayerId, Point, Vector};
+use crate::{Entity, EntityId, Game, Input, PlayerEntity, PlayerId, Vector};
 
 #[derive(Debug, Clone)]
 pub enum Error {

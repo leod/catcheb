@@ -46,7 +46,6 @@ impl Game {
                 comn::ServerMessage::Tick(tick) => {
                     self.state.entities = tick.entities;
                 }
-                _ => panic!("TODO"),
             }
         }
 
