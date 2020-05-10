@@ -1,4 +1,5 @@
 pub mod ping;
+pub mod stats;
 pub mod timer;
 pub mod vec_option;
 //pub mod jitter;
