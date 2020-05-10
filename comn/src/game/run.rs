@@ -8,10 +8,15 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
+pub const PLAYER_SIT_W: f32 = 50.0;
+pub const PLAYER_SIT_L: f32 = 50.0;
+pub const PLAYER_MOVE_W: f32 = 70.0;
+pub const PLAYER_MOVE_L: f32 = 35.714;
 
 impl Game {
     pub fn run_player_input(&mut self, player_id: PlayerId, input: &Input) -> Result<()> {
         let delta_s = self.settings.tick_delta_s();
+        let map_size = self.settings.size;
 
         if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
             let mut delta = Vector::new(0.0, 0.0);
@@ -35,6 +40,17 @@ impl Game {
             } else {
                 player_entity.angle = None;
             }
+
+            player_entity.pos.x = player_entity
+                .pos
+                .x
+                .min(map_size.x - PLAYER_SIT_W / 2.0)
+                .max(PLAYER_SIT_W / 2.0);
+            player_entity.pos.y = player_entity
+                .pos
+                .y
+                .min(map_size.y - PLAYER_SIT_W / 2.0)
+                .max(PLAYER_SIT_W / 2.0);
         }
 
         Ok(())

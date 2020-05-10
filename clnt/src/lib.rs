@@ -16,6 +16,8 @@ use quicksilver::{
     Timer,
 };
 
+use comn::game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W};
+
 #[wasm_bindgen(start)]
 pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
@@ -72,10 +74,10 @@ pub fn render_game(
                     gfx.set_transform(
                         Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
                     );
-                    Vector::new(70.0, 35.714)
+                    Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L)
                 } else {
                     gfx.set_transform(Transform::translate(pos));
-                    Vector::new(50.0, 50.0)
+                    Vector::new(PLAYER_SIT_W, PLAYER_SIT_L)
                 };
                 let rect = Rectangle::new(-size / 2.0, size);
 
