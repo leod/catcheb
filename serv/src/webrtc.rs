@@ -39,7 +39,6 @@ pub struct Server {
     config: Config,
 
     recv_message_tx: RecvMessageTx,
-    send_message_tx: SendMessageTx,
     send_message_rx: SendMessageRx,
 
     webrtc_server: webrtc_unreliable::Server,
@@ -49,9 +48,8 @@ impl Server {
     pub async fn new(
         config: Config,
         recv_message_tx: RecvMessageTx,
+        send_message_rx: SendMessageRx,
     ) -> Result<Self, std::io::Error> {
-        let (send_message_tx, send_message_rx) = send_message_channel();
-
         // Note that the `webrtc_unreliable::Server` actually takes two
         // addresses: the listen address and the public address. In practice,
         // it seems that both addresses must listen on the same port:
@@ -65,14 +63,9 @@ impl Server {
         Ok(Self {
             config,
             recv_message_tx,
-            send_message_tx,
             send_message_rx,
             webrtc_server,
         })
-    }
-
-    pub fn send_message_tx(&self) -> SendMessageTx {
-        self.send_message_tx.clone()
     }
 
     pub fn session_endpoint(&self) -> webrtc_unreliable::SessionEndpoint {
