@@ -26,6 +26,10 @@ pub fn recv_message_channel() -> (RecvMessageTx, RecvMessageRx) {
     mpsc::unbounded_channel()
 }
 
+pub fn send_message_channel() -> (SendMessageTx, SendMessageRx) {
+    mpsc::unbounded_channel()
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub listen_addr: SocketAddr,
@@ -46,7 +50,7 @@ impl Server {
         config: Config,
         recv_message_tx: RecvMessageTx,
     ) -> Result<Self, std::io::Error> {
-        let (send_message_tx, send_message_rx) = mpsc::unbounded_channel();
+        let (send_message_tx, send_message_rx) = send_message_channel();
 
         // Note that the `webrtc_unreliable::Server` actually takes two
         // addresses: the listen address and the public address. In practice,

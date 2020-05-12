@@ -1,14 +1,17 @@
 // Increase recursion_limit for `futures::select` macro
 #![recursion_limit = "1024"]
 
+mod fake_bad_net;
 mod game;
 mod http;
 mod runner;
 mod webrtc;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use clap::Arg;
+
+use fake_bad_net::FakeBadNet;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -67,17 +70,30 @@ async fn main() {
     };
 
     let (recv_message_tx, recv_message_rx) = webrtc::recv_message_channel();
+
+    let fake_bad_net_config = fake_bad_net::Config {
+        lag_mean: Duration::from_millis(50),
+        lag_std_dev: 0.0,
+        loss: 0.1,
+    };
+    let (lag_recv_message_tx, lag_recv_message_rx) = webrtc::recv_message_channel();
+
+    let fake_bad_net_recv = FakeBadNet::new(
+        fake_bad_net_config.clone(),
+        recv_message_rx,
+        lag_recv_message_tx,
+    );
+    tokio::spawn(fake_bad_net_recv.run());
+
     let webrtc_server = webrtc::Server::new(config.webrtc_server, recv_message_tx)
         .await
         .unwrap();
     let send_message_tx = webrtc_server.send_message_tx();
     let session_endpoint = webrtc_server.session_endpoint();
 
-    let runner = runner::Runner::new(config.runner, recv_message_rx, send_message_tx);
+    let runner = runner::Runner::new(config.runner, lag_recv_message_rx, send_message_tx);
     let join_tx = runner.join_tx();
-    let runner_thread = tokio::task::spawn_blocking(move || {
-        runner.run();
-    });
+    let runner_thread = tokio::task::spawn_blocking(move || runner.run());
 
     let http_server = http::Server::new(config.http_server, join_tx, session_endpoint);
 
