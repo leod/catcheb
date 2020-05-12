@@ -70,28 +70,42 @@ async fn main() {
     };
 
     let (recv_message_tx, recv_message_rx) = webrtc::recv_message_channel();
+    let (send_message_tx, send_message_rx) = webrtc::send_message_channel();
 
-    let fake_bad_net_config = fake_bad_net::Config {
-        lag_mean: Duration::from_millis(50),
-        lag_std_dev: 0.0,
-        loss: 0.1,
+    let fake_bad_net_config = Some((
+        fake_bad_net::Config {
+            lag_mean: Duration::from_millis(100),
+            lag_std_dev: 2.0,
+            loss: 0.3,
+        },
+        fake_bad_net::Config {
+            lag_mean: Duration::from_millis(100),
+            lag_std_dev: 2.0,
+            loss: 0.3,
+        },
+    ));
+
+    let (recv_message_rx, send_message_rx) = if let Some((config_in, config_out)) =
+        fake_bad_net_config
+    {
+        let (lag_recv_message_tx, lag_recv_message_rx) = webrtc::recv_message_channel();
+        let (lag_send_message_tx, lag_send_message_rx) = webrtc::send_message_channel();
+        let fake_bad_net_recv = FakeBadNet::new(config_in, recv_message_rx, lag_recv_message_tx);
+        let fake_bad_net_send = FakeBadNet::new(config_out, send_message_rx, lag_send_message_tx);
+        tokio::spawn(fake_bad_net_recv.run());
+        tokio::spawn(fake_bad_net_send.run());
+
+        (lag_recv_message_rx, lag_send_message_rx)
+    } else {
+        (recv_message_rx, send_message_rx)
     };
-    let (lag_recv_message_tx, lag_recv_message_rx) = webrtc::recv_message_channel();
 
-    let fake_bad_net_recv = FakeBadNet::new(
-        fake_bad_net_config.clone(),
-        recv_message_rx,
-        lag_recv_message_tx,
-    );
-    tokio::spawn(fake_bad_net_recv.run());
-
-    let webrtc_server = webrtc::Server::new(config.webrtc_server, recv_message_tx)
+    let webrtc_server = webrtc::Server::new(config.webrtc_server, recv_message_tx, send_message_rx)
         .await
         .unwrap();
-    let send_message_tx = webrtc_server.send_message_tx();
     let session_endpoint = webrtc_server.session_endpoint();
 
-    let runner = runner::Runner::new(config.runner, lag_recv_message_rx, send_message_tx);
+    let runner = runner::Runner::new(config.runner, recv_message_rx, send_message_tx);
     let join_tx = runner.join_tx();
     let runner_thread = tokio::task::spawn_blocking(move || runner.run());
 
