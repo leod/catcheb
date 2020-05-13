@@ -13,6 +13,9 @@ pub use crate::{
     util::ping::SequenceNum,
 };
 
+pub use crate::game::Error as GameError;
+pub use crate::game::Result as GameResult;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GameId(pub Uuid);
 

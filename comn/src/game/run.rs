@@ -1,11 +1,4 @@
-use crate::{Entity, EntityId, Game, Input, PlayerEntity, PlayerId, Vector};
-
-#[derive(Debug, Clone)]
-pub enum Error {
-    InvalidEntityId(EntityId),
-}
-
-pub type Result<T> = std::result::Result<T, Error>;
+use crate::{Entity, EntityId, Game, GameError, GameResult, Input, PlayerEntity, PlayerId, Vector};
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
 pub const PLAYER_SIT_W: f32 = 50.0;
@@ -14,7 +7,7 @@ pub const PLAYER_MOVE_W: f32 = 70.0;
 pub const PLAYER_MOVE_L: f32 = 35.714;
 
 impl Game {
-    pub fn run_player_input(&mut self, player_id: PlayerId, input: &Input) -> Result<()> {
+    pub fn run_player_input(&mut self, player_id: PlayerId, input: &Input) -> GameResult<()> {
         let delta_s = self.settings.tick_delta_s();
         let map_size = self.settings.size;
 
@@ -56,16 +49,16 @@ impl Game {
         Ok(())
     }
 
-    pub fn get_entity(&mut self, entity_id: EntityId) -> Result<&Entity> {
+    pub fn get_entity(&mut self, entity_id: EntityId) -> GameResult<&Entity> {
         self.entities
             .get(&entity_id)
-            .ok_or_else(|| Error::InvalidEntityId(entity_id))
+            .ok_or_else(|| GameError::InvalidEntityId(entity_id))
     }
 
     pub fn get_player_entity(
         &mut self,
         player_id: PlayerId,
-    ) -> Result<Option<(EntityId, &PlayerEntity)>> {
+    ) -> GameResult<Option<(EntityId, &PlayerEntity)>> {
         Ok(self
             .entities
             .iter()
@@ -86,7 +79,7 @@ impl Game {
     pub fn get_player_entity_mut(
         &mut self,
         player_id: PlayerId,
-    ) -> Result<Option<(EntityId, &mut PlayerEntity)>> {
+    ) -> GameResult<Option<(EntityId, &mut PlayerEntity)>> {
         Ok(self
             .entities
             .iter_mut()

@@ -10,6 +10,13 @@ use nalgebra as na;
 pub type Vector = na::Vector2<f32>;
 pub type Point = na::Point2<f32>;
 
+#[derive(Debug, Clone)]
+pub enum Error {
+    InvalidEntityId(EntityId),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub max_num_players: usize,
