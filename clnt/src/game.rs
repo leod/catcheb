@@ -48,7 +48,8 @@ impl Game {
                         );
                     }
                 }
-                comn::ServerMessage::Tick(tick) => {
+                comn::ServerMessage::Tick { tick_num, tick } => {
+                    self.state.tick_num = tick_num;
                     self.state.entities = tick.entities;
                 }
             }

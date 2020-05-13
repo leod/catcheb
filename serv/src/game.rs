@@ -8,10 +8,17 @@ pub struct Game {
 impl Game {
     pub fn new(settings: comn::Settings) -> Self {
         let state = comn::Game::new(settings);
+        let next_entity_id = state
+            .entities
+            .keys()
+            .copied()
+            .map(|id| comn::EntityId(id.0 + 1))
+            .max()
+            .unwrap_or(comn::EntityId(0));
 
         Self {
             state,
-            next_entity_id: comn::EntityId(0),
+            next_entity_id,
         }
     }
 
@@ -61,6 +68,7 @@ impl Game {
     pub fn run_tick(&mut self, inputs: &[(comn::PlayerId, comn::Input)]) {
         for (player_id, input) in inputs {
             self.state.run_player_input(*player_id, input).unwrap();
+            self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1)
         }
     }
 
