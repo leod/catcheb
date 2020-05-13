@@ -14,3 +14,9 @@ pub struct DangerGuy {
     pub start_pos: Point,
     pub end_pos: Point,
 }
+
+impl DangerGuy {
+    pub fn pos(&self, t: f32) -> Point {
+        Point::new(0.0, 0.0)
+    }
+}
