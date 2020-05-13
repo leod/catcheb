@@ -6,8 +6,9 @@ use uuid::Uuid;
 
 pub use crate::{
     game::{
-        Entity, EntityId, Game, Input, Item, Player, PlayerEntity, PlayerId, Point, Settings, Tick,
-        TickNum, Time, Vector,
+        entities::{DangerGuy, PlayerEntity},
+        Entity, EntityId, Game, Input, Item, Player, PlayerId, Point, Settings, Tick, TickNum,
+        Time, Vector,
     },
     util::ping::SequenceNum,
 };
