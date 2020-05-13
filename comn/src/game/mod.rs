@@ -1,3 +1,4 @@
+pub mod entities;
 pub mod run;
 
 use std::collections::BTreeMap;
@@ -61,15 +62,8 @@ pub enum Item {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlayerEntity {
-    pub owner: PlayerId,
-    pub pos: Point,
-    pub angle: Option<f32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Entity {
-    Player(PlayerEntity),
+    Player(entities::PlayerEntity),
     Bullet {
         owner: PlayerId,
         pos: Point,
@@ -87,10 +81,7 @@ pub enum Entity {
         pos: Point,
         size: Vector,
     },
-    DangerGuy {
-        start_pos: Point,
-        end_pos: Point,
-    },
+    DangerGuy(entities::DangerGuy),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
