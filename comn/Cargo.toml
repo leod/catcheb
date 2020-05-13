@@ -13,3 +13,4 @@ bincode = "1.2"
 uuid = { version = "0.8", features = ["serde"] }
 nalgebra = { version = "0.21", features = ["serde-serialize", "mint"] }
 instant = "0.1"
+log = "0.4"

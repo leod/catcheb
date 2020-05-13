@@ -7,12 +7,15 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
+use entities::{DangerGuy, PlayerEntity};
+
 pub type Vector = na::Vector2<f32>;
 pub type Point = na::Point2<f32>;
 
 #[derive(Debug, Clone)]
 pub enum Error {
     InvalidEntityId(EntityId),
+    UnexpectedEntityType,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -70,7 +73,7 @@ pub enum Item {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Entity {
-    Player(entities::PlayerEntity),
+    Player(PlayerEntity),
     Bullet {
         owner: PlayerId,
         pos: Point,
@@ -88,7 +91,17 @@ pub enum Entity {
         pos: Point,
         size: Vector,
     },
-    DangerGuy(entities::DangerGuy),
+    DangerGuy(DangerGuy),
+}
+
+impl Entity {
+    pub fn danger_guy(&self) -> Result<DangerGuy> {
+        if let Entity::DangerGuy(e) = self {
+            Ok(e.clone())
+        } else {
+            Err(Error::UnexpectedEntityType)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,12 +128,35 @@ pub struct Game {
 
 impl Game {
     pub fn new(settings: Settings) -> Self {
+        let entities = Self::initial_entities(&settings);
+
         Self {
             settings,
             tick_num: TickNum(0),
             players: BTreeMap::new(),
-            entities: BTreeMap::new(),
+            entities: entities
+                .into_iter()
+                .enumerate()
+                .map(|(id, entity)| (EntityId(id as u32), entity))
+                .collect(),
         }
+    }
+
+    pub fn initial_entities(settings: &Settings) -> Vec<Entity> {
+        vec![
+            Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(200.0, 200.0),
+                end_pos: Point::new(500.0, 200.0),
+                size: Vector::new(100.0, 100.0),
+                speed: 200.0,
+            }),
+            Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(700.0, 600.0),
+                end_pos: Point::new(700.0, 100.0),
+                size: Vector::new(50.0, 100.0),
+                speed: 400.0,
+            }),
+        ]
     }
 }
 

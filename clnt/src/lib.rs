@@ -79,6 +79,8 @@ pub fn render_game(
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
+    let time = state.tick_num.0 as f32 * state.settings.tick_delta_s();
+
     for entity in state.entities.values() {
         match entity {
             comn::Entity::Player(player) => {
@@ -95,12 +97,19 @@ pub fn render_game(
                 let rect = Rectangle::new(-size / 2.0, size);
 
                 gfx.fill_rect(&rect, Color::BLUE);
-                gfx.stroke_rect(&rect, Color::RED);
+                gfx.stroke_rect(&rect, Color::GREEN);
 
                 gfx.set_transform(Transform::IDENTITY);
                 resources
                     .font
                     .draw(gfx, &player.owner.0.to_string(), Color::BLACK, pos.into())?;
+            }
+            comn::Entity::DangerGuy(danger_guy) => {
+                let origin: mint::Vector2<f32> =
+                    (danger_guy.pos(time) - danger_guy.size / 2.0).coords.into();
+                let size: mint::Vector2<f32> = danger_guy.size.into();
+                let rect = Rectangle::new(origin, size);
+                gfx.fill_rect(&rect, Color::RED);
             }
             e => panic!("unhandled entity rendering: {:?}", e),
         }
