@@ -1,32 +1,62 @@
-use std::{
-    collections::VecDeque,
-    time::{Duration, Instant},
-};
+use std::{collections::VecDeque, time::Duration};
 
+use instant::Instant;
 use log::{debug, info, warn};
 
 use comn::util::PingEstimation;
 
 use crate::webrtc;
 
-struct ServerTimeEstimation {
-    tick_duration: Duration,
+pub struct ServerGameTimeEstimation {
+    ticks_per_second: usize,
     recv_tick_times: VecDeque<(Instant, comn::TickNum)>,
 }
 
-impl ServerTimeEstimation {
-    fn new(tick_duration: Duration) -> Self {
+impl ServerGameTimeEstimation {
+    pub fn new(ticks_per_second: usize) -> Self {
         Self {
-            tick_duration,
+            ticks_per_second,
             recv_tick_times: VecDeque::new(),
         }
     }
 
-    fn record_tick(&mut self, recv_time: Instant, num: comn::TickNum) {
+    pub fn record_tick(&mut self, recv_time: Instant, num: comn::TickNum) {
+        if let Some((_, last_num)) = self.recv_tick_times.back() {
+            if num < *last_num {
+                // Received packages out of order, just ignore
+                return;
+            }
+        }
+
         self.recv_tick_times.push_back((recv_time, num));
 
-        if self.recv_tick_times.len() > 10 {
+        if self.recv_tick_times.len() > self.ticks_per_second * 2 {
             self.recv_tick_times.pop_front();
+        }
+    }
+
+    pub fn estimate(&self, ping: &PingEstimation, now: Instant) -> Option<f32> {
+        if let Some((first_time, _)) = self.recv_tick_times.front() {
+            let delay_avg = self
+                .recv_tick_times
+                .iter()
+                .map(|(time, _)| time.duration_since(*first_time).as_secs_f32())
+                .sum::<f32>()
+                / self.recv_tick_times.len() as f32;
+            let tick_num_avg = self
+                .recv_tick_times
+                .iter()
+                .map(|(_, num)| num.0 as f32)
+                .sum::<f32>()
+                / self.recv_tick_times.len() as f32;
+            let alpha = tick_num_avg - self.ticks_per_second as f32 * delay_avg;
+
+            Some(
+                alpha / self.ticks_per_second as f32
+                    + now.duration_since(*first_time).as_secs_f32(),
+            )
+        } else {
+            None
         }
     }
 }
@@ -37,7 +67,7 @@ pub struct Game {
     my_player_id: comn::PlayerId,
     webrtc_client: webrtc::Client,
     ping: PingEstimation,
-    server_time: ServerTimeEstimation,
+    server_game_time: ServerGameTimeEstimation,
 }
 
 impl Game {
@@ -48,7 +78,7 @@ impl Game {
             my_player_id: join.your_player_id,
             webrtc_client,
             ping: PingEstimation::default(),
-            server_time: ServerTimeEstimation::new(join.game_settings.tick_duration()),
+            server_game_time: ServerGameTimeEstimation::new(join.game_settings.ticks_per_second),
         }
     }
 
@@ -71,6 +101,7 @@ impl Game {
                     }
                 }
                 comn::ServerMessage::Tick { tick_num, tick } => {
+                    self.server_game_time.record_tick(recv_time, tick_num);
                     self.state.tick_num = tick_num;
                     self.state.entities = tick.entities;
                 }
@@ -102,6 +133,10 @@ impl Game {
 
     pub fn ping(&self) -> &PingEstimation {
         &self.ping
+    }
+
+    pub fn server_game_time(&self) -> &ServerGameTimeEstimation {
+        &self.server_game_time
     }
 
     fn send(&self, message: comn::ClientMessage) {

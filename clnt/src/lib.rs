@@ -3,8 +3,8 @@ mod webrtc;
 
 use std::collections::HashSet;
 
+use instant::Instant;
 use log::{debug, info, warn};
-//use instant::Instant;
 
 use js_sys::Date;
 use wasm_bindgen::{prelude::*, JsCast};
@@ -169,6 +169,7 @@ async fn app(
 
     let mut delta_ms_var = stats::Var::default();
     let mut frame_ms_var = stats::Var::default();
+    let mut delta_game_time_ms_var = stats::Var::default();
 
     loop {
         while let Some(event) = events.next_event().await {
@@ -205,27 +206,42 @@ async fn app(
 
         delta_ms_var.record(delta_ms as f32);
 
-        resources.font_small.draw(
-            &mut gfx,
-            &format!("delta: {:.1}ms", delta_ms_var.mean().unwrap_or(-1.0)),
-            Color::BLACK,
-            Vector::new(10.0, 15.0),
-        )?;
-        resources.font_small.draw(
-            &mut gfx,
-            &format!("frame: {:.1}ms", frame_ms_var.mean().unwrap_or(-1.0)),
-            Color::BLACK,
-            Vector::new(10.0, 35.0),
-        )?;
-        resources.font_small.draw(
-            &mut gfx,
-            &format!(
-                "ping: {:.1}ms",
-                game.ping().estimate().as_secs_f32() * 1000.0
-            ),
-            Color::BLACK,
-            Vector::new(10.0, 55.0),
-        )?;
+        let server_game_time = game
+            .server_game_time()
+            .estimate(&game.ping(), Instant::now())
+            .unwrap_or(-1.0);
+        let our_game_time =
+            game.state().tick_num.0 as f32 * game.state().settings.tick_duration().as_secs_f32();
+
+        delta_game_time_ms_var.record((our_game_time - server_game_time) * 1000.0);
+
+        let mut debug_y: f32 = 15.0;
+        let mut debug = |s: &str| -> quicksilver::Result<()> {
+            resources
+                .font_small
+                .draw(&mut gfx, s, Color::BLACK, Vector::new(10.0, debug_y))?;
+            debug_y += 20.0;
+            Ok(())
+        };
+
+        debug(&format!(
+            "delta: {:.1}ms",
+            delta_ms_var.mean().unwrap_or(-1.0)
+        ))?;
+        debug(&format!(
+            "frame: {:.1}ms",
+            frame_ms_var.mean().unwrap_or(-1.0)
+        ))?;
+        debug(&format!(
+            "ping: {:.1}ms",
+            game.ping().estimate().as_secs_f32() * 1000.0
+        ))?;
+        debug(&format!("server game time: {:.2}s", server_game_time,))?;
+        debug(&format!("our game time: {:.2}s", our_game_time,))?;
+        debug(&format!(
+            "delta game time: {:.2}ms",
+            delta_game_time_ms_var.mean().unwrap_or(-1.0),
+        ))?;
 
         gfx.present(&window)?;
 

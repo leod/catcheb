@@ -75,13 +75,13 @@ async fn main() {
     let fake_bad_net_config = Some((
         fake_bad_net::Config {
             lag_mean: Duration::from_millis(100),
-            lag_std_dev: 2.0,
-            loss: 0.3,
+            lag_std_dev: 0.0,
+            loss: 0.0,
         },
         fake_bad_net::Config {
             lag_mean: Duration::from_millis(100),
-            lag_std_dev: 2.0,
-            loss: 0.3,
+            lag_std_dev: 0.0,
+            loss: 0.0,
         },
     ));
 
