@@ -19,7 +19,7 @@ use crate::{
 pub struct Player {
     pub game_id: comn::GameId,
     pub player_id: comn::PlayerId,
-    pub ping_estimation: PingEstimation,
+    pub ping: PingEstimation,
     pub peer: Option<SocketAddr>,
     pub inputs: Vec<(comn::TickNum, comn::Input)>,
 }
@@ -29,7 +29,7 @@ impl Player {
         Self {
             game_id,
             player_id,
-            ping_estimation: PingEstimation::default(),
+            ping: PingEstimation::default(),
             peer: None,
             inputs: Vec::new(),
         }
@@ -226,7 +226,7 @@ impl Runner {
                 .players
                 .iter()
                 .filter_map(|(player_token, player)| {
-                    if player.ping_estimation.is_timeout() {
+                    if player.ping.is_timeout() {
                         Some(*player_token)
                     } else {
                         None
@@ -250,7 +250,7 @@ impl Runner {
             let mut messages = Vec::new();
 
             for player in self.players.values_mut() {
-                if let Some(sequence_num) = player.ping_estimation.next_ping_sequence_num() {
+                if let Some(sequence_num) = player.ping.next_ping_sequence_num() {
                     if let Some(peer) = player.peer {
                         messages.push((peer, comn::ServerMessage::Ping(sequence_num)));
                     }
@@ -287,17 +287,13 @@ impl Runner {
                     self.send(peer, comn::ServerMessage::Pong(sequence_num));
                 }
                 comn::ClientMessage::Pong(sequence_num) => {
-                    if player
-                        .ping_estimation
-                        .received_pong(recv_time, sequence_num)
-                        .is_err()
-                    {
+                    if player.ping.record_pong(recv_time, sequence_num).is_err() {
                         warn!("Ignoring out-of-order pong from {:?}", peer);
                     } else {
                         debug!(
                             "Received pong from {:?} -> estimation {:?}",
                             peer,
-                            player.ping_estimation.estimate()
+                            player.ping.estimate()
                         );
                     }
                 }

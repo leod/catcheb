@@ -1,7 +1,7 @@
 pub mod entities;
 pub mod run;
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
@@ -38,8 +38,8 @@ impl Default for Settings {
 }
 
 impl Settings {
-    pub fn tick_delta_s(&self) -> f32 {
-        1.0 / (self.ticks_per_second as f32)
+    pub fn tick_duration(&self) -> Duration {
+        Duration::from_secs_f32(1.0 / (self.ticks_per_second as f32))
     }
 }
 

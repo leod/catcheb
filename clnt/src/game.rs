@@ -1,15 +1,43 @@
+use std::{
+    collections::VecDeque,
+    time::{Duration, Instant},
+};
+
 use log::{debug, info, warn};
 
 use comn::util::PingEstimation;
 
 use crate::webrtc;
 
+struct ServerTimeEstimation {
+    tick_duration: Duration,
+    recv_tick_times: VecDeque<(Instant, comn::TickNum)>,
+}
+
+impl ServerTimeEstimation {
+    fn new(tick_duration: Duration) -> Self {
+        Self {
+            tick_duration,
+            recv_tick_times: VecDeque::new(),
+        }
+    }
+
+    fn record_tick(&mut self, recv_time: Instant, num: comn::TickNum) {
+        self.recv_tick_times.push_back((recv_time, num));
+
+        if self.recv_tick_times.len() > 10 {
+            self.recv_tick_times.pop_front();
+        }
+    }
+}
+
 pub struct Game {
     state: comn::Game,
     my_token: comn::PlayerToken,
     my_player_id: comn::PlayerId,
     webrtc_client: webrtc::Client,
-    ping_estimation: PingEstimation,
+    ping: PingEstimation,
+    server_time: ServerTimeEstimation,
 }
 
 impl Game {
@@ -19,7 +47,8 @@ impl Game {
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
-            ping_estimation: PingEstimation::default(),
+            ping: PingEstimation::default(),
+            server_time: ServerTimeEstimation::new(join.game_settings.tick_duration()),
         }
     }
 
@@ -35,17 +64,10 @@ impl Game {
                     // estimates.
                 }
                 comn::ServerMessage::Pong(sequence_num) => {
-                    if self
-                        .ping_estimation
-                        .received_pong(recv_time, sequence_num)
-                        .is_err()
-                    {
+                    if self.ping.record_pong(recv_time, sequence_num).is_err() {
                         warn!("Ignoring out-of-order pong {:?}", sequence_num);
                     } else {
-                        debug!(
-                            "Received pong -> estimation {:?}",
-                            self.ping_estimation.estimate()
-                        );
+                        debug!("Received pong -> estimation {:?}", self.ping.estimate());
                     }
                 }
                 comn::ServerMessage::Tick { tick_num, tick } => {
@@ -55,7 +77,7 @@ impl Game {
             }
         }
 
-        if let Some(sequence_num) = self.ping_estimation.next_ping_sequence_num() {
+        if let Some(sequence_num) = self.ping.next_ping_sequence_num() {
             self.send(comn::ClientMessage::Ping(sequence_num));
         }
     }
@@ -78,8 +100,8 @@ impl Game {
         &self.state.settings
     }
 
-    pub fn ping_estimation(&self) -> &PingEstimation {
-        &self.ping_estimation
+    pub fn ping(&self) -> &PingEstimation {
+        &self.ping
     }
 
     fn send(&self, message: comn::ClientMessage) {
