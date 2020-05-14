@@ -1,5 +1,5 @@
 clnt:
-	cd clnt && cargo build --release --target wasm32-unknown-unknown
+	cd clnt && cargo build -j2 --release --target wasm32-unknown-unknown
 	wasm-bindgen \
 		--target web \
 		--no-typescript \

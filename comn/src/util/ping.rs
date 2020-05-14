@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 pub struct SequenceNum(pub usize);
 
 const INITIAL_ESTIMATE_MS: u64 = 100;
-const PING_PERIOD_MS: u64 = 1_000;
+const PING_PERIOD_MS: u64 = 500;
 const TIMEOUT_MS: u64 = 30_000;
-const NUM_KEEP_DURATIONS: usize = 10;
+const NUM_KEEP_DURATIONS: usize = 100;
 
 #[derive(Debug, Clone)]
 pub enum ReceivedPongError {
