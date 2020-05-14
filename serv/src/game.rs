@@ -68,8 +68,9 @@ impl Game {
     pub fn run_tick(&mut self, inputs: &[(comn::PlayerId, comn::Input)]) {
         for (player_id, input) in inputs {
             self.state.run_player_input(*player_id, input).unwrap();
-            self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1)
         }
+
+        self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1)
     }
 
     pub fn remove_player(&mut self, player_id: comn::PlayerId) {

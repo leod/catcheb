@@ -79,7 +79,7 @@ pub fn render_game(
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
-    let time = state.tick_num.0 as f32 * state.settings.tick_delta_s();
+    let time = state.tick_num.0 as f32 * state.settings.tick_duration().as_secs_f32();
 
     for entity in state.entities.values() {
         match entity {
@@ -221,7 +221,7 @@ async fn app(
             &mut gfx,
             &format!(
                 "ping: {:.1}ms",
-                game.ping_estimation().estimate().as_secs_f32() * 1000.0
+                game.ping().estimate().as_secs_f32() * 1000.0
             ),
             Color::BLACK,
             Vector::new(10.0, 55.0),

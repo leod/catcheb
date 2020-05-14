@@ -62,7 +62,7 @@ impl PingEstimation {
         }
     }
 
-    pub fn received_pong(
+    pub fn record_pong(
         &mut self,
         recv_time: Instant,
         num: SequenceNum,
