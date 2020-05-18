@@ -3,61 +3,84 @@ use std::{collections::VecDeque, time::Duration};
 use instant::Instant;
 use log::{debug, info, warn};
 
-use comn::util::PingEstimation;
+use comn::util::{stats, PingEstimation};
 
 use crate::webrtc;
 
 pub struct GameTimeEstimation {
-    ticks_per_second: usize,
+    tick_duration: f32,
     recv_tick_times: VecDeque<(Instant, comn::TickNum)>,
 }
 
 impl GameTimeEstimation {
     pub fn new(ticks_per_second: usize) -> Self {
         Self {
-            ticks_per_second,
+            tick_duration: 1.0 / ticks_per_second as f32,
             recv_tick_times: VecDeque::new(),
         }
     }
 
     pub fn record_tick(&mut self, recv_time: Instant, num: comn::TickNum) {
-        if let Some((_, last_num)) = self.recv_tick_times.back() {
+        if let Some((last_time, last_num)) = self.recv_tick_times.back() {
             if num < *last_num {
                 // Received packages out of order, just ignore
                 return;
             }
+
+            assert!(recv_time >= *last_time);
         }
 
         self.recv_tick_times.push_back((recv_time, num));
 
-        if self.recv_tick_times.len() > self.ticks_per_second * 2 {
+        if self.recv_tick_times.len() > 128 {
             self.recv_tick_times.pop_front();
         }
     }
 
-    pub fn estimate(&self, ping: &PingEstimation, now: Instant) -> Option<f32> {
-        if let Some((first_time, _)) = self.recv_tick_times.front() {
-            let delay_avg = self
-                .recv_tick_times
-                .iter()
-                .map(|(time, _)| time.duration_since(*first_time).as_secs_f32())
-                .sum::<f32>()
-                / self.recv_tick_times.len() as f32;
-            let tick_num_avg = self
-                .recv_tick_times
-                .iter()
-                .map(|(_, num)| num.0 as f32)
-                .sum::<f32>()
-                / self.recv_tick_times.len() as f32;
-            let alpha = tick_num_avg - self.ticks_per_second as f32 * delay_avg;
+    pub fn shifted_recv_tick_times(&self) -> Option<impl Iterator<Item = (f32, f32)> + '_> {
+        self.recv_tick_times
+            .front()
+            .copied()
+            .map(|(first_time, first_num)| {
+                self.recv_tick_times.iter().map(move |(time, num)| {
+                    let delta_time = time.duration_since(first_time).as_secs_f32();
+                    let delta_game_time = self.tick_duration * (num.0 - first_num.0) as f32;
 
-            Some(
-                alpha / self.ticks_per_second as f32
-                    + now.duration_since(*first_time).as_secs_f32(),
-            )
-        } else {
-            None
-        }
+                    (delta_time, delta_game_time)
+                })
+            })
+    }
+
+    pub fn linear_regression(&self) -> Option<stats::LinearRegression> {
+        self.shifted_recv_tick_times()
+            .map(|samples| stats::linear_regression_with_beta(1.0, samples))
+    }
+
+    pub fn recv_delay_std_dev(&self) -> Option<f32> {
+        self.shifted_recv_tick_times().map(|samples| {
+            let samples: Vec<(f32, f32)> = samples.collect();
+            let line = stats::linear_regression_with_beta(1.0, samples.iter().copied());
+
+            let recv_delay = samples
+                .iter()
+                .map(|(delta_time, delta_game_time)| line.eval(*delta_time) - delta_game_time);
+
+            stats::std_dev(recv_delay)
+        })
+    }
+
+    pub fn estimate(&self, ping: &PingEstimation, now: Instant) -> Option<f32> {
+        self.recv_tick_times
+            .front()
+            .and_then(|(first_time, first_num)| {
+                self.shifted_recv_tick_times().map(|samples| {
+                    let line = stats::linear_regression_with_beta(1.0, samples);
+                    let delta_time = now.duration_since(*first_time).as_secs_f32();
+                    let delta_game_time = line.eval(delta_time);
+
+                    delta_game_time + self.tick_duration * first_num.0 as f32
+                })
+            })
     }
 }
 
