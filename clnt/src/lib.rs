@@ -76,10 +76,9 @@ pub fn render_game(
     gfx: &mut Graphics,
     resources: &mut Resources,
     state: &comn::Game,
+    time: f32,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
-
-    let time = state.tick_num.0 as f32 * state.settings.tick_duration().as_secs_f32();
 
     for entity in state.entities.values() {
         match entity {
@@ -165,11 +164,11 @@ async fn app(
     let mut input_timer = Timer::time_per_second(game.settings().ticks_per_second as f32);
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
-    let mut last_time_ms = Date::new_0().get_time();
+    let mut last_time = Instant::now();
 
-    let mut delta_ms_var = stats::Var::default();
+    let mut dt_ms_var = stats::Var::default();
     let mut frame_ms_var = stats::Var::default();
-    let mut delta_game_time_ms_var = stats::Var::default();
+    let mut time_lag_ms_var = stats::Var::default();
 
     loop {
         while let Some(event) = events.next_event().await {
@@ -190,30 +189,30 @@ async fn app(
             panic!("Game lost connection");
         }
 
-        let now_time_ms = Date::new_0().get_time();
-        let delta_ms = now_time_ms - last_time_ms;
-        let delta_s = (delta_ms / 1000.0) as f32;
-        last_time_ms = now_time_ms;
+        let start_time = Instant::now();
+        let dt = start_time.duration_since(last_time);
+        last_time = start_time;
 
-        game.update();
+        game.update(dt);
 
         //while input_timer.tick() {
         if input_timer.tick() {
             game.player_input(&current_input(&pressed_keys));
         }
 
-        render_game(&mut gfx, &mut resources, &game.state())?;
+        render_game(
+            &mut gfx,
+            &mut resources,
+            &game.state(),
+            game.interp_game_time(),
+        )?;
 
-        delta_ms_var.record(delta_ms as f32);
-
-        let recv_tick_time = game
+        let recv_game_time = game
             .recv_tick_time()
             .estimate(&game.ping(), Instant::now())
             .unwrap_or(-1.0);
         let our_game_time =
             game.state().tick_num.0 as f32 * game.state().settings.tick_duration().as_secs_f32();
-
-        delta_game_time_ms_var.record((our_game_time - recv_tick_time) * 1000.0);
 
         let mut debug_y: f32 = 15.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {
@@ -224,10 +223,7 @@ async fn app(
             Ok(())
         };
 
-        debug(&format!(
-            "delta: {:.1}ms",
-            delta_ms_var.mean().unwrap_or(-1.0)
-        ))?;
+        debug(&format!("dt: {:.1}ms", dt_ms_var.mean().unwrap_or(-1.0)))?;
         debug(&format!(
             "frame: {:.1}ms",
             frame_ms_var.mean().unwrap_or(-1.0)
@@ -236,11 +232,14 @@ async fn app(
             "ping: {:.1}ms",
             game.ping().estimate().as_secs_f32() * 1000.0
         ))?;
-        debug(&format!("recv tick time: {:.2}s", recv_tick_time,))?;
-        debug(&format!("our game time: {:.2}s", our_game_time,))?;
+        debug(&format!("recv game time: {:.2}s", recv_game_time))?;
         debug(&format!(
-            "delta game time: {:.2}ms",
-            delta_game_time_ms_var.mean().unwrap_or(-1.0),
+            "interp game time: {:.2}s",
+            game.interp_game_time()
+        ))?;
+        debug(&format!(
+            "game lag: {:.2}ms",
+            time_lag_ms_var.mean().unwrap_or(-1.0),
         ))?;
         debug(&format!(
             "recv delay std dev: {:.4}",
@@ -249,8 +248,11 @@ async fn app(
 
         gfx.present(&window)?;
 
-        let end_time_ms = Date::new_0().get_time();
-        frame_ms_var.record((end_time_ms - now_time_ms) as f32);
+        let end_time = Instant::now();
+
+        dt_ms_var.record(dt.as_secs_f32() * 1000.0);
+        frame_ms_var.record(end_time.duration_since(start_time).as_secs_f32() * 1000.0);
+        time_lag_ms_var.record((recv_game_time - game.interp_game_time()) * 1000.0);
     }
 }
 

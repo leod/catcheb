@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, time::Duration};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    time::Duration,
+};
 
 use instant::Instant;
 use log::{debug, info, warn};
@@ -101,18 +104,26 @@ pub struct Game {
     my_player_id: comn::PlayerId,
     webrtc_client: webrtc::Client,
     ping: PingEstimation,
+    received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
     recv_tick_time: GameTimeEstimation,
+    interp_game_time: f32,
+    target_time_lag: f32,
 }
 
 impl Game {
     pub fn new(join: comn::JoinSuccess, webrtc_client: webrtc::Client) -> Self {
+        let target_time_lag = join.game_settings.tick_duration().as_secs_f32() * 3.0;
+
         Self {
             state: comn::Game::new(join.game_settings.clone()),
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
             ping: PingEstimation::default(),
+            received_ticks: BTreeMap::new(),
             recv_tick_time: GameTimeEstimation::new(join.game_settings.ticks_per_second),
+            interp_game_time: 0.0,
+            target_time_lag,
         }
     }
 
@@ -120,7 +131,7 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, dt: std::time::Duration) {
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             match message {
                 comn::ServerMessage::Ping(_) => {
@@ -129,21 +140,47 @@ impl Game {
                 }
                 comn::ServerMessage::Pong(sequence_num) => {
                     if self.ping.record_pong(recv_time, sequence_num).is_err() {
-                        warn!("Ignoring out-of-order pong {:?}", sequence_num);
+                        debug!("Ignoring out-of-order pong {:?}", sequence_num);
                     } else {
                         debug!("Received pong -> estimation {:?}", self.ping.estimate());
                     }
                 }
                 comn::ServerMessage::Tick { tick_num, tick } => {
                     self.recv_tick_time.record_tick(recv_time, tick_num);
-                    self.state.tick_num = tick_num;
-                    self.state.entities = tick.entities;
+
+                    let tick_time =
+                        self.state.settings.tick_duration().as_secs_f32() * tick_num.0 as f32;
+                    if tick_time < self.interp_game_time {
+                        debug!(
+                            "Ignoring old tick of time {} vs our interp_game_time={}",
+                            tick_time, self.interp_game_time,
+                        );
+                    } else {
+                        self.received_ticks.insert(tick_num, tick);
+                    }
                 }
             }
         }
 
+        self.interp_game_time += dt.as_secs_f32();
+
         if let Some(sequence_num) = self.ping.next_ping_sequence_num() {
             self.send(comn::ClientMessage::Ping(sequence_num));
+        }
+
+        let mut remove_num = None;
+        if let Some((min_tick_num, min_tick)) = self.received_ticks.iter().next() {
+            let min_tick_time =
+                self.state.settings.tick_duration().as_secs_f32() * min_tick_num.0 as f32;
+
+            if self.interp_game_time >= min_tick_time {
+                self.state.tick_num = *min_tick_num;
+                self.state.entities = min_tick.entities.clone();
+                remove_num = Some(*min_tick_num);
+            }
+        }
+        if let Some(remove_num) = remove_num {
+            self.received_ticks.remove(&remove_num);
         }
     }
 
@@ -171,6 +208,10 @@ impl Game {
 
     pub fn recv_tick_time(&self) -> &GameTimeEstimation {
         &self.recv_tick_time
+    }
+
+    pub fn interp_game_time(&self) -> f32 {
+        self.interp_game_time
     }
 
     fn send(&self, message: comn::ClientMessage) {
