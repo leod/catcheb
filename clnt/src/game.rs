@@ -132,6 +132,10 @@ impl Game {
     }
 
     pub fn time_warp_factor(&self) -> f32 {
+        if self.received_ticks.is_empty() {
+            return 0.0;
+        }
+
         let recv_game_time = self.recv_tick_time.estimate(Instant::now());
         if let Some(recv_game_time) = recv_game_time {
             let current_time_lag = recv_game_time - self.interp_game_time;
