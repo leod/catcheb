@@ -83,7 +83,7 @@ impl GameTimeEstimation {
         }
     }
 
-    pub fn estimate(&self, ping: &PingEstimation, now: Instant) -> Option<f32> {
+    pub fn estimate(&self, now: Instant) -> Option<f32> {
         self.recv_tick_times
             .front()
             .and_then(|(first_time, first_num)| {
@@ -131,6 +131,18 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
+    pub fn time_warp_factor(&self) -> f32 {
+        let recv_game_time = self.recv_tick_time.estimate(Instant::now());
+        if let Some(recv_game_time) = recv_game_time {
+            let current_time_lag = recv_game_time - self.interp_game_time;
+            let time_lag_deviation = self.target_time_lag - current_time_lag;
+
+            0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
+        } else {
+            0.0
+        }
+    }
+
     pub fn update(&mut self, dt: std::time::Duration) {
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             match message {
@@ -162,7 +174,7 @@ impl Game {
             }
         }
 
-        self.interp_game_time += dt.as_secs_f32();
+        self.interp_game_time += dt.as_secs_f32() * self.time_warp_factor();
 
         if let Some(sequence_num) = self.ping.next_ping_sequence_num() {
             self.send(comn::ClientMessage::Ping(sequence_num));

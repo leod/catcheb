@@ -169,6 +169,7 @@ async fn app(
     let mut dt_ms_var = stats::Var::default();
     let mut frame_ms_var = stats::Var::default();
     let mut time_lag_ms_var = stats::Var::default();
+    let mut time_warp_factor_var = stats::Var::default();
 
     loop {
         while let Some(event) = events.next_event().await {
@@ -193,6 +194,17 @@ async fn app(
         let dt = start_time.duration_since(last_time);
         last_time = start_time;
 
+        let recv_game_time = game
+            .recv_tick_time()
+            .estimate(Instant::now())
+            .unwrap_or(-1.0);
+        let our_game_time =
+            game.state().tick_num.0 as f32 * game.state().settings.tick_duration().as_secs_f32();
+
+        time_warp_factor_var.record(game.time_warp_factor());
+        dt_ms_var.record(dt.as_secs_f32() * 1000.0);
+        time_lag_ms_var.record((recv_game_time - game.interp_game_time()) * 1000.0);
+
         game.update(dt);
 
         //while input_timer.tick() {
@@ -206,13 +218,6 @@ async fn app(
             &game.state(),
             game.interp_game_time(),
         )?;
-
-        let recv_game_time = game
-            .recv_tick_time()
-            .estimate(&game.ping(), Instant::now())
-            .unwrap_or(-1.0);
-        let our_game_time =
-            game.state().tick_num.0 as f32 * game.state().settings.tick_duration().as_secs_f32();
 
         let mut debug_y: f32 = 15.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {
@@ -245,14 +250,16 @@ async fn app(
             "recv delay std dev: {:.4}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
+        debug(&format!(
+            "time warp factor: {:.4}",
+            time_warp_factor_var.mean().unwrap_or(-1.0),
+        ))?;
 
         gfx.present(&window)?;
 
         let end_time = Instant::now();
 
-        dt_ms_var.record(dt.as_secs_f32() * 1000.0);
         frame_ms_var.record(end_time.duration_since(start_time).as_secs_f32() * 1000.0);
-        time_lag_ms_var.record((recv_game_time - game.interp_game_time()) * 1000.0);
     }
 }
 
