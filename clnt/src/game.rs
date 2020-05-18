@@ -32,7 +32,7 @@ impl GameTimeEstimation {
 
         self.recv_tick_times.push_back((recv_time, num));
 
-        if self.recv_tick_times.len() > 128 {
+        if self.recv_tick_times.len() > 1000 {
             self.recv_tick_times.pop_front();
         }
     }
@@ -57,7 +57,7 @@ impl GameTimeEstimation {
     }
 
     pub fn recv_delay_std_dev(&self) -> Option<f32> {
-        self.shifted_recv_tick_times().map(|samples| {
+        /*self.shifted_recv_tick_times().map(|samples| {
             let samples: Vec<(f32, f32)> = samples.collect();
             let line = stats::linear_regression_with_beta(1.0, samples.iter().copied());
 
@@ -66,7 +66,18 @@ impl GameTimeEstimation {
                 .map(|(delta_time, delta_game_time)| line.eval(*delta_time) - delta_game_time);
 
             stats::std_dev(recv_delay)
-        })
+        })*/
+
+        if !self.recv_tick_times.is_empty() {
+            Some(stats::std_dev(
+                self.recv_tick_times
+                    .iter()
+                    .zip(self.recv_tick_times.iter().skip(1))
+                    .map(|((time_a, _), (time_b, _))| time_b.duration_since(*time_a).as_secs_f32()),
+            ))
+        } else {
+            None
+        }
     }
 
     pub fn estimate(&self, ping: &PingEstimation, now: Instant) -> Option<f32> {

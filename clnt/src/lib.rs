@@ -242,6 +242,10 @@ async fn app(
             "delta game time: {:.2}ms",
             delta_game_time_ms_var.mean().unwrap_or(-1.0),
         ))?;
+        debug(&format!(
+            "recv delay std dev: {:.4}",
+            1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
+        ))?;
 
         gfx.present(&window)?;
 
