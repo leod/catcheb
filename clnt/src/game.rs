@@ -7,12 +7,12 @@ use comn::util::PingEstimation;
 
 use crate::webrtc;
 
-pub struct ServerGameTimeEstimation {
+pub struct GameTimeEstimation {
     ticks_per_second: usize,
     recv_tick_times: VecDeque<(Instant, comn::TickNum)>,
 }
 
-impl ServerGameTimeEstimation {
+impl GameTimeEstimation {
     pub fn new(ticks_per_second: usize) -> Self {
         Self {
             ticks_per_second,
@@ -67,7 +67,7 @@ pub struct Game {
     my_player_id: comn::PlayerId,
     webrtc_client: webrtc::Client,
     ping: PingEstimation,
-    server_game_time: ServerGameTimeEstimation,
+    recv_tick_time: GameTimeEstimation,
 }
 
 impl Game {
@@ -78,7 +78,7 @@ impl Game {
             my_player_id: join.your_player_id,
             webrtc_client,
             ping: PingEstimation::default(),
-            server_game_time: ServerGameTimeEstimation::new(join.game_settings.ticks_per_second),
+            recv_tick_time: GameTimeEstimation::new(join.game_settings.ticks_per_second),
         }
     }
 
@@ -101,7 +101,7 @@ impl Game {
                     }
                 }
                 comn::ServerMessage::Tick { tick_num, tick } => {
-                    self.server_game_time.record_tick(recv_time, tick_num);
+                    self.recv_tick_time.record_tick(recv_time, tick_num);
                     self.state.tick_num = tick_num;
                     self.state.entities = tick.entities;
                 }
@@ -135,8 +135,8 @@ impl Game {
         &self.ping
     }
 
-    pub fn server_game_time(&self) -> &ServerGameTimeEstimation {
-        &self.server_game_time
+    pub fn recv_tick_time(&self) -> &GameTimeEstimation {
+        &self.recv_tick_time
     }
 
     fn send(&self, message: comn::ClientMessage) {

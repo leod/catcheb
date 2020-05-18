@@ -163,5 +163,6 @@ impl Game {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tick {
     pub entities: BTreeMap<EntityId, Entity>,
+    pub last_inputs: BTreeMap<PlayerId, Input>,
     pub events: Vec<Event>,
 }
