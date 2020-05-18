@@ -206,14 +206,14 @@ async fn app(
 
         delta_ms_var.record(delta_ms as f32);
 
-        let server_game_time = game
-            .server_game_time()
+        let recv_tick_time = game
+            .recv_tick_time()
             .estimate(&game.ping(), Instant::now())
             .unwrap_or(-1.0);
         let our_game_time =
             game.state().tick_num.0 as f32 * game.state().settings.tick_duration().as_secs_f32();
 
-        delta_game_time_ms_var.record((our_game_time - server_game_time) * 1000.0);
+        delta_game_time_ms_var.record((our_game_time - recv_tick_time) * 1000.0);
 
         let mut debug_y: f32 = 15.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {
@@ -236,7 +236,7 @@ async fn app(
             "ping: {:.1}ms",
             game.ping().estimate().as_secs_f32() * 1000.0
         ))?;
-        debug(&format!("server game time: {:.2}s", server_game_time,))?;
+        debug(&format!("recv tick time: {:.2}s", recv_tick_time,))?;
         debug(&format!("our game time: {:.2}s", our_game_time,))?;
         debug(&format!(
             "delta game time: {:.2}ms",

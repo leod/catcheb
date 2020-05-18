@@ -339,6 +339,7 @@ impl Runner {
                 let tick = comn::Tick {
                     entities: state.entities.clone(),
                     events: Vec::new(),
+                    last_inputs: Default::default(), // TODO: send last_inputs
                 };
 
                 messages.push((
