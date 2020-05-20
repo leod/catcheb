@@ -8,7 +8,7 @@ pub const PLAYER_MOVE_L: f32 = 35.714;
 
 impl Game {
     pub fn run_player_input(&mut self, player_id: PlayerId, input: &Input) -> GameResult<()> {
-        let delta_s = self.settings.tick_duration().as_secs_f32();
+        let delta_s = self.settings.tick_period();
         let map_size = self.settings.size;
 
         if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
