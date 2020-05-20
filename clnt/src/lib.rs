@@ -160,7 +160,6 @@ async fn app(
     }
 
     let mut game = game::Game::new(join_success, webrtc_client);
-    let mut input_timer = Timer::time_per_second(game.settings().ticks_per_second as f32);
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
@@ -202,12 +201,7 @@ async fn app(
         dt_ms_var.record(dt.as_secs_f32() * 1000.0);
         time_lag_ms_var.record((recv_game_time - game.interp_game_time()) * 1000.0);
 
-        game.update(dt);
-
-        //while input_timer.tick() {
-        if input_timer.tick() {
-            game.player_input(&current_input(&pressed_keys));
-        }
+        game.update(dt, &current_input(&pressed_keys));
 
         render_game(
             &mut gfx,
