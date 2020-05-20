@@ -1,7 +1,7 @@
 pub mod entities;
 pub mod run;
 
-use std::{collections::BTreeMap, time::Duration};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,9 @@ use nalgebra as na;
 
 use entities::{DangerGuy, PlayerEntity};
 
+use crate::GameTime;
+
+pub type Time = f32;
 pub type Vector = na::Vector2<f32>;
 pub type Point = na::Point2<f32>;
 
@@ -38,13 +41,10 @@ impl Default for Settings {
 }
 
 impl Settings {
-    pub fn tick_duration(&self) -> Duration {
-        Duration::from_secs_f32(1.0 / (self.ticks_per_second as f32))
+    pub fn tick_period(&self) -> GameTime {
+        1.0 / (self.ticks_per_second as f32)
     }
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct Time(pub f32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct PlayerId(pub u32);

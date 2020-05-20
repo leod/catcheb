@@ -1,102 +1,14 @@
-use std::{
-    collections::{BTreeMap, VecDeque},
-    time::Duration,
-};
+use std::{collections::BTreeMap, time::Duration};
 
 use instant::Instant;
 use log::{debug, info, warn};
 
-use comn::util::{stats, PingEstimation};
+use comn::{
+    util::{GameTimeEstimation, PingEstimation},
+    GameTime,
+};
 
 use crate::webrtc;
-
-pub struct GameTimeEstimation {
-    tick_duration: f32,
-    recv_tick_times: VecDeque<(Instant, comn::TickNum)>,
-}
-
-impl GameTimeEstimation {
-    pub fn new(ticks_per_second: usize) -> Self {
-        Self {
-            tick_duration: 1.0 / ticks_per_second as f32,
-            recv_tick_times: VecDeque::new(),
-        }
-    }
-
-    pub fn record_tick(&mut self, recv_time: Instant, num: comn::TickNum) {
-        if let Some((last_time, last_num)) = self.recv_tick_times.back() {
-            if num < *last_num {
-                // Received packages out of order, just ignore
-                return;
-            }
-
-            assert!(recv_time >= *last_time);
-        }
-
-        self.recv_tick_times.push_back((recv_time, num));
-
-        if self.recv_tick_times.len() > 1000 {
-            self.recv_tick_times.pop_front();
-        }
-    }
-
-    pub fn shifted_recv_tick_times(&self) -> Option<impl Iterator<Item = (f32, f32)> + '_> {
-        self.recv_tick_times
-            .front()
-            .copied()
-            .map(|(first_time, first_num)| {
-                self.recv_tick_times.iter().map(move |(time, num)| {
-                    let delta_time = time.duration_since(first_time).as_secs_f32();
-                    let delta_game_time = self.tick_duration * (num.0 - first_num.0) as f32;
-
-                    (delta_time, delta_game_time)
-                })
-            })
-    }
-
-    pub fn linear_regression(&self) -> Option<stats::LinearRegression> {
-        self.shifted_recv_tick_times()
-            .map(|samples| stats::linear_regression_with_beta(1.0, samples))
-    }
-
-    pub fn recv_delay_std_dev(&self) -> Option<f32> {
-        /*self.shifted_recv_tick_times().map(|samples| {
-            let samples: Vec<(f32, f32)> = samples.collect();
-            let line = stats::linear_regression_with_beta(1.0, samples.iter().copied());
-
-            let recv_delay = samples
-                .iter()
-                .map(|(delta_time, delta_game_time)| line.eval(*delta_time) - delta_game_time);
-
-            stats::std_dev(recv_delay)
-        })*/
-
-        if !self.recv_tick_times.is_empty() {
-            Some(stats::std_dev(
-                self.recv_tick_times
-                    .iter()
-                    .zip(self.recv_tick_times.iter().skip(1))
-                    .map(|((time_a, _), (time_b, _))| time_b.duration_since(*time_a).as_secs_f32()),
-            ))
-        } else {
-            None
-        }
-    }
-
-    pub fn estimate(&self, now: Instant) -> Option<f32> {
-        self.recv_tick_times
-            .front()
-            .and_then(|(first_time, first_num)| {
-                self.shifted_recv_tick_times().map(|samples| {
-                    let line = stats::linear_regression_with_beta(1.0, samples);
-                    let delta_time = now.duration_since(*first_time).as_secs_f32();
-                    let delta_game_time = line.eval(delta_time);
-
-                    delta_game_time + self.tick_duration * first_num.0 as f32
-                })
-            })
-    }
-}
 
 pub struct Game {
     state: comn::Game,
@@ -106,13 +18,13 @@ pub struct Game {
     ping: PingEstimation,
     received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
     recv_tick_time: GameTimeEstimation,
-    interp_game_time: f32,
-    target_time_lag: f32,
+    interp_game_time: GameTime,
+    target_time_lag: GameTime,
 }
 
 impl Game {
     pub fn new(join: comn::JoinSuccess, webrtc_client: webrtc::Client) -> Self {
-        let target_time_lag = join.game_settings.tick_duration().as_secs_f32() * 3.0;
+        let target_time_lag = join.game_settings.tick_period() * 3.0;
 
         Self {
             state: comn::Game::new(join.game_settings.clone()),
@@ -121,7 +33,7 @@ impl Game {
             webrtc_client,
             ping: PingEstimation::default(),
             received_ticks: BTreeMap::new(),
-            recv_tick_time: GameTimeEstimation::new(join.game_settings.ticks_per_second),
+            recv_tick_time: GameTimeEstimation::new(join.game_settings.tick_period()),
             interp_game_time: 0.0,
             target_time_lag,
         }
@@ -162,14 +74,14 @@ impl Game {
                     }
                 }
                 comn::ServerMessage::Tick { tick_num, tick } => {
-                    self.recv_tick_time.record_tick(recv_time, tick_num);
+                    let game_time = self.state.settings.tick_period() * tick_num.0 as f32;
 
-                    let tick_time =
-                        self.state.settings.tick_duration().as_secs_f32() * tick_num.0 as f32;
-                    if tick_time < self.interp_game_time {
+                    self.recv_tick_time.record_tick(recv_time, game_time);
+
+                    if game_time < self.interp_game_time {
                         debug!(
                             "Ignoring old tick of time {} vs our interp_game_time={}",
-                            tick_time, self.interp_game_time,
+                            game_time, self.interp_game_time,
                         );
                     } else {
                         self.received_ticks.insert(tick_num, tick);
@@ -186,8 +98,7 @@ impl Game {
 
         let mut remove_num = None;
         if let Some((min_tick_num, min_tick)) = self.received_ticks.iter().next() {
-            let min_tick_time =
-                self.state.settings.tick_duration().as_secs_f32() * min_tick_num.0 as f32;
+            let min_tick_time = self.state.settings.tick_period() * min_tick_num.0 as f32;
 
             if self.interp_game_time >= min_tick_time {
                 self.state.tick_num = *min_tick_num;

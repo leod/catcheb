@@ -6,7 +6,6 @@ use std::collections::HashSet;
 use instant::Instant;
 use log::{debug, info, warn};
 
-use js_sys::Date;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
@@ -198,8 +197,6 @@ async fn app(
             .recv_tick_time()
             .estimate(Instant::now())
             .unwrap_or(-1.0);
-        let our_game_time =
-            game.state().tick_num.0 as f32 * game.state().settings.tick_duration().as_secs_f32();
 
         time_warp_factor_var.record(game.time_warp_factor());
         dt_ms_var.record(dt.as_secs_f32() * 1000.0);
