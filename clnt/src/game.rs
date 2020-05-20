@@ -59,7 +59,7 @@ impl Game {
         }
     }
 
-    pub fn update(&mut self, dt: std::time::Duration) {
+    pub fn update(&mut self, dt: std::time::Duration, input: &comn::Input) {
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             match message {
                 comn::ServerMessage::Ping(_) => {
@@ -104,21 +104,17 @@ impl Game {
                 self.state.tick_num = *min_tick_num;
                 self.state.entities = min_tick.entities.clone();
                 remove_num = Some(*min_tick_num);
+
+                self.send(comn::ClientMessage::Input {
+                    tick_num: self.state.tick_num,
+                    input: input.clone(),
+                });
             }
         }
+
         if let Some(remove_num) = remove_num {
             self.received_ticks.remove(&remove_num);
         }
-    }
-
-    pub fn player_input(&mut self, input: &comn::Input) {
-        // TODO: player_input tick_num
-        let tick_num = comn::TickNum(0);
-
-        self.send(comn::ClientMessage::Input {
-            tick_num,
-            input: input.clone(),
-        });
     }
 
     pub fn state(&self) -> &comn::Game {
