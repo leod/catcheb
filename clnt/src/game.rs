@@ -59,7 +59,7 @@ impl Game {
         }
     }
 
-    pub fn update(&mut self, dt: std::time::Duration, input: &comn::Input) {
+    pub fn update(&mut self, dt: Duration, input: &comn::Input) {
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             self.handle_message(recv_time, message);
         }
@@ -83,14 +83,13 @@ impl Game {
             .copied()
             .filter(|tick_num| {
                 let game_time = self.state.settings.tick_period() * tick_num.0 as f32;
-
                 self.state.tick_num < *tick_num && game_time <= new_interp_game_time
             })
             .collect();
 
         self.interp_game_time = new_interp_game_time;
 
-        for started_tick_num in started_tick_nums.iter() {
+        for _ in started_tick_nums.iter() {
             // TODO: Run events
         }
 
@@ -105,7 +104,7 @@ impl Game {
 
         // Do we have a tick to interpolate into ready?
         if self.next_tick.is_none() {
-            let min_next_tick = self.received_ticks.iter().find(|(tick_num, tick)| {
+            let min_next_tick = self.received_ticks.iter().find(|(tick_num, _tick)| {
                 **tick_num > self.state.tick_num && tick_num.0 - self.state.tick_num.0 <= 2
             });
 
