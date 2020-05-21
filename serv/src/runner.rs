@@ -8,7 +8,10 @@ use tokio::sync::{
 };
 use uuid::Uuid;
 
-use comn::util::PingEstimation;
+use comn::{
+    util::{GameTimeEstimation, PingEstimation},
+    GameTime,
+};
 
 use crate::{
     game::Game,
@@ -19,19 +22,21 @@ use crate::{
 pub struct Player {
     pub game_id: comn::GameId,
     pub player_id: comn::PlayerId,
-    pub ping: PingEstimation,
     pub peer: Option<SocketAddr>,
+    pub ping: PingEstimation,
     pub inputs: Vec<(comn::TickNum, comn::Input)>,
+    pub recv_input_time: GameTimeEstimation,
 }
 
 impl Player {
-    pub fn new(game_id: comn::GameId, player_id: comn::PlayerId) -> Self {
+    pub fn new(input_period: GameTime, game_id: comn::GameId, player_id: comn::PlayerId) -> Self {
         Self {
             game_id,
             player_id,
-            ping: PingEstimation::default(),
             peer: None,
+            ping: PingEstimation::default(),
             inputs: Vec::new(),
+            recv_input_time: GameTimeEstimation::new(input_period),
         }
     }
 }
@@ -159,7 +164,7 @@ impl Runner {
         let player_token = comn::PlayerToken(Uuid::new_v4());
         let player_id = game.join(request.player_name);
 
-        let player = Player::new(game_id, player_id);
+        let player = Player::new(game.settings().tick_period(), game_id, player_id);
 
         assert!(!self.players.contains_key(&player_token));
         self.players.insert(player_token, player);

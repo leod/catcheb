@@ -13,7 +13,6 @@ use quicksilver::{
     geom::{Rectangle, Transform, Vector},
     graphics::{Color, FontRenderer, Graphics, VectorFont},
     lifecycle::{run, Event, EventStream, Key, Settings, Window},
-    Timer,
 };
 
 use comn::{
