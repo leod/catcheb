@@ -4,6 +4,7 @@ use instant::Instant;
 
 use crate::{util::stats, GameTime};
 
+#[derive(Debug, Clone)]
 pub struct GameTimeEstimation {
     recv_period: GameTime,
     recv_times: VecDeque<(Instant, GameTime)>,
@@ -75,6 +76,10 @@ impl GameTimeEstimation {
         } else {
             None
         }
+    }
+
+    pub fn has_started(&self) -> bool {
+        !self.recv_times.is_empty()
     }
 
     pub fn estimate(&self, now: Instant) -> Option<GameTime> {
