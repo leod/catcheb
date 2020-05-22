@@ -81,10 +81,10 @@ async fn main() {
         fake_bad_net::Config {
             lag_mean: Duration::from_millis(100),
             lag_std_dev: 20.0,
-            loss: 0.0,
+            loss: 0.05,
         },
     ));
-    //let fake_bad_net_config = None;
+    let fake_bad_net_config = None;
 
     let (recv_message_rx, send_message_rx) = if let Some((config_in, config_out)) =
         fake_bad_net_config

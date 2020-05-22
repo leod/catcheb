@@ -42,7 +42,7 @@ impl Game {
     }
 
     pub fn target_time_lag(&self) -> comn::GameTime {
-        self.state.settings.tick_period() * 2.0
+        self.state.settings.tick_period() * 3.0
     }
 
     pub fn time_warp_factor(&self) -> f32 {
@@ -71,6 +71,25 @@ impl Game {
         // If we are off too far, slow down or speed up playback time.
         let new_interp_game_time =
             self.interp_game_time + dt.as_secs_f32() * self.time_warp_factor();
+
+        // Don't let time run further than the ticks that we have received.
+        let max_tick_num = self
+            .received_ticks
+            .keys()
+            .rev()
+            .next()
+            .copied()
+            .unwrap_or(comn::TickNum(0))
+            .max(self.state.tick_num)
+            .max(
+                self.next_tick
+                    .as_ref()
+                    .map(|(tick_num, _)| *tick_num)
+                    .unwrap_or(comn::TickNum(0)),
+            );
+
+        let new_interp_game_time =
+            new_interp_game_time.min(self.state.tick_game_time(max_tick_num));
 
         // Start all the ticks that we have crossed while advancing our
         // local game time.
@@ -112,7 +131,7 @@ impl Game {
         // Do we have a tick to interpolate into ready?
         if self.next_tick.is_none() {
             let min_next_tick = self.received_ticks.iter().find(|(tick_num, _tick)| {
-                **tick_num > self.state.tick_num && tick_num.0 - self.state.tick_num.0 <= 2
+                **tick_num > self.state.tick_num && tick_num.0 - self.state.tick_num.0 <= 3
             });
 
             if let Some((next_tick_num, next_tick)) = min_next_tick {

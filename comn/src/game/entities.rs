@@ -26,8 +26,6 @@ impl DangerGuy {
         let tau = (t / self.period()).fract();
         let delta = self.end_pos - self.start_pos;
 
-        log::info!("eval at {} {}", t, tau);
-
         if tau < 0.5 {
             self.start_pos + tau * delta
         } else {
