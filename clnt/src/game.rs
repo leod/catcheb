@@ -3,10 +3,7 @@ use std::{collections::BTreeMap, time::Duration};
 use instant::Instant;
 use log::{debug, info, warn};
 
-use comn::{
-    util::{GameTimeEstimation, PingEstimation},
-    GameTime,
-};
+use comn::util::{GameTimeEstimation, PingEstimation};
 
 use crate::webrtc;
 
@@ -22,7 +19,7 @@ pub struct Game {
 
     ping: PingEstimation,
     recv_tick_time: GameTimeEstimation,
-    interp_game_time: GameTime,
+    interp_game_time: comn::GameTime,
 }
 
 impl Game {
@@ -44,7 +41,7 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
-    pub fn target_time_lag(&self) -> GameTime {
+    pub fn target_time_lag(&self) -> comn::GameTime {
         self.state.settings.tick_period() * 3.0
     }
 
@@ -128,6 +125,28 @@ impl Game {
 
     pub fn state(&self) -> &comn::Game {
         &self.state
+    }
+
+    pub fn next_tick(&self) -> Option<&(comn::TickNum, comn::Tick)> {
+        self.next_tick.as_ref()
+    }
+
+    pub fn next_state(&self) -> BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)> {
+        let mut next_state = BTreeMap::new();
+
+        if let Some((next_tick_num, next_tick)) = self.next_tick() {
+            let next_game_time = self.state.tick_game_time(*next_tick_num);
+
+            next_state.extend(
+                next_tick
+                    .entities
+                    .clone()
+                    .into_iter()
+                    .map(|(entity_id, entity)| (entity_id, (next_game_time, entity))),
+            );
+        }
+
+        next_state
     }
 
     pub fn settings(&self) -> &comn::Settings {

@@ -1,7 +1,7 @@
 mod game;
 mod webrtc;
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use instant::Instant;
 use log::{debug, info, warn};
@@ -74,14 +74,30 @@ pub fn render_game(
     gfx: &mut Graphics,
     resources: &mut Resources,
     state: &comn::Game,
-    time: f32,
+    next_state: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    time: comn::GameTime,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
-    for entity in state.entities.values() {
+    let state_time = state.tick_game_time(state.tick_num);
+
+    for (entity_id, entity) in state.entities.iter() {
         match entity {
             comn::Entity::Player(player) => {
-                let pos: mint::Vector2<f32> = player.pos.coords.into();
+                let pos = if let Some((next_time, next_entity)) = next_state.get(entity_id) {
+                    let tau = (time - state_time) / (next_time - state_time);
+
+                    if let Ok(next_player) = next_entity.player() {
+                        let delta = next_player.pos - player.pos;
+                        (player.pos + tau * delta).coords
+                    } else {
+                        player.pos.coords
+                    }
+                } else {
+                    player.pos.coords
+                };
+                let pos: mint::Vector2<f32> = pos.into();
+
                 let size = if let Some(angle) = player.angle {
                     gfx.set_transform(
                         Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
@@ -206,6 +222,7 @@ async fn app(
             &mut gfx,
             &mut resources,
             &game.state(),
+            &game.next_state(),
             game.interp_game_time(),
         )?;
 
