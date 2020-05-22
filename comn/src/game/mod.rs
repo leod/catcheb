@@ -34,7 +34,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             max_num_players: 16,
-            ticks_per_second: 30,
+            ticks_per_second: 10,
             size: Vector::new(1280.0, 720.0),
         }
     }
@@ -95,6 +95,14 @@ pub enum Entity {
 }
 
 impl Entity {
+    pub fn player(&self) -> Result<PlayerEntity> {
+        if let Entity::Player(e) = self {
+            Ok(e.clone())
+        } else {
+            Err(Error::UnexpectedEntityType)
+        }
+    }
+
     pub fn danger_guy(&self) -> Result<DangerGuy> {
         if let Entity::DangerGuy(e) = self {
             Ok(e.clone())
@@ -157,6 +165,10 @@ impl Game {
                 speed: 400.0,
             }),
         ]
+    }
+
+    pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
+        self.settings.tick_period() * tick_num.0 as f32
     }
 }
 
