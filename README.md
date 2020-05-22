@@ -43,3 +43,4 @@ cargo run -j8 --bin serv -- \
 
 ## Credits
 - `clnt/static/Munro-2LYe.ttf`: Munro font: http://www.tenbytwenty.com/
+- `clnt/static/kongtext.ttf`: https://www.1001fonts.com/kongtext-font.html
