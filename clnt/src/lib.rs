@@ -56,10 +56,10 @@ pub struct Resources {
 
 impl Resources {
     pub async fn load(gfx: &mut Graphics) -> quicksilver::Result<Self> {
-        let ttf = VectorFont::load("Munro-2LYe.ttf").await?;
-        let font_small = ttf.to_renderer(gfx, 18.0)?;
-        let font = ttf.to_renderer(gfx, 36.0)?;
-        let font_large = ttf.to_renderer(gfx, 58.0)?;
+        let ttf = VectorFont::load("kongtext.ttf").await?;
+        let font_small = ttf.to_renderer(gfx, 9.0)?;
+        let font = ttf.to_renderer(gfx, 18.0)?;
+        let font_large = ttf.to_renderer(gfx, 40.0)?;
 
         Ok(Self {
             ttf,
@@ -131,6 +131,14 @@ pub fn render_game(
     Ok(())
 }
 
+#[derive(Default)]
+struct Stats {
+    dt_ms: stats::Var,
+    frame_ms: stats::Var,
+    time_lag_ms: stats::Var,
+    time_warp_factor: stats::Var,
+}
+
 async fn app(
     window: Window,
     mut gfx: Graphics,
@@ -179,10 +187,7 @@ async fn app(
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
 
-    let mut dt_ms_var = stats::Var::default();
-    let mut frame_ms_var = stats::Var::default();
-    let mut time_lag_ms_var = stats::Var::default();
-    let mut time_warp_factor_var = stats::Var::default();
+    let mut stats = Stats::default();
 
     loop {
         while let Some(event) = events.next_event().await {
@@ -212,9 +217,11 @@ async fn app(
             .estimate(Instant::now())
             .unwrap_or(-1.0);
 
-        time_warp_factor_var.record(game.time_warp_factor());
-        dt_ms_var.record(dt.as_secs_f32() * 1000.0);
-        time_lag_ms_var.record((recv_game_time - game.interp_game_time()) * 1000.0);
+        stats.time_warp_factor.record(game.time_warp_factor());
+        stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
+        stats
+            .time_lag_ms
+            .record((recv_game_time - game.interp_game_time()) * 1000.0);
 
         game.update(dt, &current_input(&pressed_keys));
 
@@ -231,42 +238,30 @@ async fn app(
             resources
                 .font_small
                 .draw(&mut gfx, s, Color::BLACK, Vector::new(10.0, debug_y))?;
-            debug_y += 20.0;
+            debug_y += 12.0;
             Ok(())
         };
 
-        debug(&format!("dt: {:.1}ms", dt_ms_var.mean().unwrap_or(-1.0)))?;
         debug(&format!(
-            "frame: {:.1}ms",
-            frame_ms_var.mean().unwrap_or(-1.0)
-        ))?;
-        debug(&format!(
-            "ping: {:.1}ms",
+            "ping (ms):     {:.1}",
             game.ping().estimate().as_secs_f32() * 1000.0
         ))?;
-        debug(&format!("recv game time: {:.2}s", recv_game_time))?;
         debug(&format!(
-            "interp game time: {:.2}s",
-            game.interp_game_time()
-        ))?;
-        debug(&format!(
-            "game lag: {:.2}ms",
-            time_lag_ms_var.mean().unwrap_or(-1.0),
-        ))?;
-        debug(&format!(
-            "recv delay std dev: {:.4}",
+            "recv std dev:  {:.2}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
-        debug(&format!(
-            "time warp factor: {:.4}",
-            time_warp_factor_var.mean().unwrap_or(-1.0),
-        ))?;
+        debug(&format!("dt (ms):       {}", stats.dt_ms,))?;
+        debug(&format!("frame (ms):    {}", stats.frame_ms,))?;
+        debug(&format!("time lag (ms): {}", stats.time_lag_ms,))?;
+        debug(&format!("time warp:     {}", stats.time_warp_factor,))?;
 
         gfx.present(&window)?;
 
         let end_time = Instant::now();
 
-        frame_ms_var.record(end_time.duration_since(start_time).as_secs_f32() * 1000.0);
+        stats
+            .frame_ms
+            .record(end_time.duration_since(start_time).as_secs_f32() * 1000.0);
     }
 }
 

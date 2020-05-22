@@ -84,6 +84,7 @@ async fn service(
             send_file(config, "clnt_bg.wasm", "application/wasm").await
         }
         (&Method::GET, "/Munro-2LYe.ttf") => send_file(config, "Munro-2LYe.ttf", "font/ttf").await,
+        (&Method::GET, "/kongtext.ttf") => send_file(config, "kongtext.ttf", "font/ttf").await,
 
         // Establish a WebRTC connection
         (&Method::POST, "/connect_webrtc") => {
