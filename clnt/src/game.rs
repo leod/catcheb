@@ -42,7 +42,7 @@ impl Game {
     }
 
     pub fn target_time_lag(&self) -> comn::GameTime {
-        self.state.settings.tick_period() * 3.0
+        self.state.settings.tick_period() * 2.0
     }
 
     pub fn time_warp_factor(&self) -> f32 {
@@ -66,7 +66,7 @@ impl Game {
 
         // Advance our local game time, making sure to stay behind the
         // receive stream by our desired lag time. We do this so that
-        // we have ticks between we can interpolate.
+        // we have ticks between which we can interpolate.
         //
         // If we are off too far, slow down or speed up playback time.
         let new_interp_game_time =
@@ -97,6 +97,16 @@ impl Game {
                 tick_num: last_tick_num,
                 input: input.clone(),
             });
+
+            if self
+                .next_tick
+                .as_ref()
+                .map_or(false, |(next_tick_num, _)| *next_tick_num <= last_tick_num)
+            {
+                // We have reached the tick that we were interpolating into, so
+                // we'll need to look for the next interpolation target.
+                self.next_tick = None;
+            }
         }
 
         // Do we have a tick to interpolate into ready?

@@ -137,6 +137,7 @@ struct Stats {
     frame_ms: stats::Var,
     time_lag_ms: stats::Var,
     time_warp_factor: stats::Var,
+    tick_interp: stats::Var,
 }
 
 async fn app(
@@ -222,6 +223,11 @@ async fn app(
         stats
             .time_lag_ms
             .record((recv_game_time - game.interp_game_time()) * 1000.0);
+        stats
+            .tick_interp
+            .record(game.next_tick().map_or(0.0, |(next_tick_num, _)| {
+                (next_tick_num.0 - game.state().tick_num.0) as f32
+            }));
 
         game.update(dt, &current_input(&pressed_keys));
 
@@ -250,10 +256,11 @@ async fn app(
             "recv std dev:  {:.2}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
-        debug(&format!("dt (ms):       {}", stats.dt_ms,))?;
-        debug(&format!("frame (ms):    {}", stats.frame_ms,))?;
-        debug(&format!("time lag (ms): {}", stats.time_lag_ms,))?;
-        debug(&format!("time warp:     {}", stats.time_warp_factor,))?;
+        debug(&format!("dt (ms):       {}", stats.dt_ms))?;
+        debug(&format!("frame (ms):    {}", stats.frame_ms))?;
+        debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
+        debug(&format!("time warp:     {}", stats.time_warp_factor))?;
+        debug(&format!("tick interp:   {}", stats.tick_interp))?;
 
         gfx.present(&window)?;
 
