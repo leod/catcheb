@@ -98,7 +98,7 @@ impl Game {
             .keys()
             .copied()
             .filter(|tick_num| {
-                let game_time = self.state.settings.tick_period() * tick_num.0 as f32;
+                let game_time = self.state.tick_game_time(*tick_num);
                 self.state.tick_num < *tick_num && game_time <= new_interp_game_time
             })
             .collect();
@@ -208,7 +208,7 @@ impl Game {
                 }
             }
             comn::ServerMessage::Tick { tick_num, tick } => {
-                let recv_game_time = self.state.settings.tick_period() * tick_num.0 as f32;
+                let recv_game_time = self.state.tick_game_time(tick_num);
 
                 if recv_game_time < self.interp_game_time {
                     debug!(
