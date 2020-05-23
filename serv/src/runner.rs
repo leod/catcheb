@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     collections::HashMap,
     net::SocketAddr,
     time::{Duration, Instant},
@@ -402,15 +401,11 @@ impl Runner {
             .map(|game_id| (*game_id, Vec::new()))
             .collect();
 
-        let now = Instant::now();
-
         // Collect player inputs to run.
         for player in self.players.values_mut() {
             if player.refill_inputs {
                 continue;
             }
-
-            let game = &self.games[&player.game_id];
 
             let mut player_inputs = Vec::new();
             if let Some((oldest_tick_num, oldest_input)) = player.inputs.pop() {
