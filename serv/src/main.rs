@@ -43,7 +43,7 @@ async fn main() {
             Arg::with_name("clnt_dir")
                 .long("clnt_dir")
                 .takes_value(true)
-                .default_value("clnt")
+                .default_value("clnt/static")
                 .help("Directory containing static files to be served over HTTP"),
         )
         .get_matches();

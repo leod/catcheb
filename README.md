@@ -24,7 +24,7 @@
 
 Build the client:
 ```
-cargo build --target wasm32-unknown-unknown
+make clnt
 ```
 This will generate the following files in `clnt/static/`:
 - `clnt_bg.wasm`
