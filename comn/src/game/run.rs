@@ -1,3 +1,4 @@
+use crate::entities::Bullet;
 use crate::{Entity, EntityId, Game, GameError, GameResult, Input, PlayerEntity, PlayerId, Vector};
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -5,11 +6,43 @@ pub const PLAYER_SIT_W: f32 = 50.0;
 pub const PLAYER_SIT_L: f32 = 50.0;
 pub const PLAYER_MOVE_W: f32 = 70.0;
 pub const PLAYER_MOVE_L: f32 = 35.714;
+pub const PLAYER_SHOOT_PERIOD: f32 = 0.3;
+pub const BULLET_MOVE_SPEED: f32 = 900.0;
 
 impl Game {
-    pub fn run_player_input(&mut self, player_id: PlayerId, input: &Input) -> GameResult<()> {
+    pub fn run_tick(&mut self) -> GameResult<()> {
+        let time = self.tick_game_time(self.tick_num);
+
+        let mut remove_ids = Vec::new();
+
+        for (entity_id, entity) in self.entities.iter() {
+            match entity {
+                Entity::Bullet(entity) => {
+                    if !self.settings.aa_rect().contains_point(entity.pos(time)) {
+                        remove_ids.push(*entity_id);
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        for id in remove_ids {
+            self.entities.remove(&id);
+        }
+
+        Ok(())
+    }
+
+    pub fn run_player_input(
+        &mut self,
+        player_id: PlayerId,
+        input: &Input,
+    ) -> GameResult<Vec<Entity>> {
         let delta_s = self.settings.tick_period();
+        let time = self.tick_game_time(self.tick_num);
         let map_size = self.settings.size;
+
+        let mut new_entities = Vec::new();
 
         if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
             let mut delta = Vector::new(0.0, 0.0);
@@ -44,9 +77,22 @@ impl Game {
                 .y
                 .min(map_size.y - PLAYER_SIT_W / 2.0)
                 .max(PLAYER_SIT_W / 2.0);
+
+            if delta.norm() > 0.0
+                && input.use_item
+                && time - player_entity.last_shot_time.unwrap_or(-1000.0) >= PLAYER_SHOOT_PERIOD
+            {
+                player_entity.last_shot_time = Some(time);
+                new_entities.push(Entity::Bullet(Bullet {
+                    owner: player_id,
+                    start_time: time,
+                    start_pos: player_entity.pos,
+                    vel: delta.normalize() * BULLET_MOVE_SPEED,
+                }));
+            }
         }
 
-        Ok(())
+        Ok(new_entities)
     }
 
     pub fn get_entity(&mut self, entity_id: EntityId) -> GameResult<&Entity> {

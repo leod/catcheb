@@ -7,9 +7,11 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::{DangerGuy, PlayerEntity};
+use entities::DangerGuy;
 
-use crate::GameTime;
+use crate::{geom, GameTime};
+
+pub use entities::Entity;
 
 pub type Time = f32;
 pub type Vector = na::Vector2<f32>;
@@ -43,6 +45,10 @@ impl Default for Settings {
 impl Settings {
     pub fn tick_period(&self) -> GameTime {
         1.0 / (self.ticks_per_second as f32)
+    }
+
+    pub fn aa_rect(&self) -> geom::AaRect {
+        geom::AaRect::new_top_left(Point::new(0.0, 0.0), self.size)
     }
 }
 
@@ -87,47 +93,6 @@ pub struct Input {
 pub enum Item {
     Gun { shots: u32 },
     StunGun,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Entity {
-    Player(PlayerEntity),
-    Bullet {
-        owner: PlayerId,
-        pos: Point,
-        dir: Vector,
-        angle: f32,
-    },
-    Item {
-        item: Item,
-        pos: Point,
-    },
-    ItemSpawn {
-        pos: Point,
-    },
-    Wall {
-        pos: Point,
-        size: Vector,
-    },
-    DangerGuy(DangerGuy),
-}
-
-impl Entity {
-    pub fn player(&self) -> Result<PlayerEntity> {
-        if let Entity::Player(e) = self {
-            Ok(e.clone())
-        } else {
-            Err(Error::UnexpectedEntityType)
-        }
-    }
-
-    pub fn danger_guy(&self) -> Result<DangerGuy> {
-        if let Entity::DangerGuy(e) = self {
-            Ok(e.clone())
-        } else {
-            Err(Error::UnexpectedEntityType)
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -186,7 +151,7 @@ impl Game {
     }
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
-        self.settings.tick_period() * tick_num.0 as f32
+        self.settings.tick_period() * tick_num.0 as GameTime
     }
 }
 

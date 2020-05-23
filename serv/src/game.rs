@@ -60,15 +60,22 @@ impl Game {
             owner: player_id,
             pos: comn::Point::new(350.0, 100.0),
             angle: None,
+            last_shot_time: None,
         }));
 
         player_id
     }
 
     pub fn run_tick(&mut self, inputs: &[(comn::PlayerId, comn::TickNum, comn::Input)]) {
+        self.state.run_tick().unwrap();
+
         //debug!("tick with {} inputs", inputs.len());
         for (player_id, _tick_num, input) in inputs {
-            self.state.run_player_input(*player_id, input).unwrap();
+            let new_entities = self.state.run_player_input(*player_id, input).unwrap();
+
+            for entity in new_entities {
+                self.add_entity(entity);
+            }
         }
 
         self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1)
