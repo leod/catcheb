@@ -1,7 +1,6 @@
-use std::{collections::BTreeMap, time::Duration};
-
 use instant::Instant;
 use log::{debug, info, warn};
+use std::{collections::BTreeMap, time::Duration};
 
 use comn::util::{GameTimeEstimation, PingEstimation};
 
@@ -20,6 +19,7 @@ pub struct Game {
     ping: PingEstimation,
     recv_tick_time: GameTimeEstimation,
     interp_game_time: comn::GameTime,
+    next_time_warp_factor: f32,
 }
 
 impl Game {
@@ -34,6 +34,7 @@ impl Game {
             ping: PingEstimation::default(),
             recv_tick_time: GameTimeEstimation::new(join.game_settings.tick_period()),
             interp_game_time: 0.0,
+            next_time_warp_factor: 1.0,
         }
     }
 
@@ -45,7 +46,11 @@ impl Game {
         self.state.settings.tick_period() * 3.0
     }
 
-    pub fn time_warp_factor(&self) -> f32 {
+    pub fn next_time_warp_factor(&self) -> f32 {
+        self.next_time_warp_factor
+    }
+
+    fn time_warp_factor(&self) -> f32 {
         if let Some(recv_game_time) = self.recv_tick_time.estimate(Instant::now()) {
             let current_time_lag = recv_game_time - self.interp_game_time;
             let time_lag_deviation = self.target_time_lag() - current_time_lag;
@@ -70,7 +75,7 @@ impl Game {
         //
         // If we are off too far, slow down or speed up playback time.
         let new_interp_game_time =
-            self.interp_game_time + dt.as_secs_f32() * self.time_warp_factor();
+            self.interp_game_time + dt.as_secs_f32() * self.next_time_warp_factor;
 
         // Don't let time run further than the ticks that we have received.
         let max_tick_num = self
@@ -104,6 +109,7 @@ impl Game {
             .collect();
 
         self.interp_game_time = new_interp_game_time;
+        self.next_time_warp_factor = self.time_warp_factor();
 
         for tick_num in started_tick_nums.iter() {
             // TODO: Run events

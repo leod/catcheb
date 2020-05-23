@@ -218,7 +218,9 @@ async fn app(
             .estimate(Instant::now())
             .unwrap_or(-1.0);
 
-        stats.time_warp_factor.record(game.time_warp_factor());
+        game.update(dt, &current_input(&pressed_keys));
+
+        stats.time_warp_factor.record(game.next_time_warp_factor());
         stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
         stats
             .time_lag_ms
@@ -228,8 +230,6 @@ async fn app(
             .record(game.next_tick().map_or(0.0, |(next_tick_num, _)| {
                 (next_tick_num.0 - game.state().tick_num.0) as f32
             }));
-
-        game.update(dt, &current_input(&pressed_keys));
 
         render_game(
             &mut gfx,
