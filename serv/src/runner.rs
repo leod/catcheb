@@ -185,7 +185,7 @@ impl Runner {
 
     pub fn run(mut self) {
         while !self.shutdown {
-            // Handle incoming join requests via HTTP channel
+            // Handle incoming join requests via HTTP channel.
             while let Some(join_message) = match self.join_rx.try_recv() {
                 Ok(join_message) => Some(join_message),
                 Err(TryRecvError::Empty) => None,
@@ -204,7 +204,7 @@ impl Runner {
                 }
             }
 
-            // Handle incoming messages via WebRTC channel
+            // Handle incoming messages via WebRTC channel.
             while let Some(message_in) = match self.recv_message_rx.try_recv() {
                 Ok(message_in) => Some(message_in),
                 Err(TryRecvError::Empty) => None,
@@ -232,7 +232,7 @@ impl Runner {
                 }
             }
 
-            // Disconnect players
+            // Disconnect players.
             let remove_player_tokens: Vec<comn::PlayerToken> = self
                 .players
                 .iter()
@@ -254,7 +254,7 @@ impl Runner {
                     .remove_player(player.player_id);
             }
 
-            // Ping players
+            // Ping players.
             let mut messages = Vec::new();
 
             for player in self.players.values_mut() {
@@ -269,7 +269,7 @@ impl Runner {
                 self.send(peer, message);
             }
 
-            // Run the game
+            // Run the game.
             while self.tick_timer.tick() {
                 self.run_tick();
             }
@@ -359,6 +359,7 @@ impl Runner {
 
         let now = Instant::now();
 
+        // Collect player inputs to run.
         for player in self.players.values_mut() {
             if let Some(recv_game_time) = player.recv_input_time.estimate(now) {
                 let game = &self.games[&player.game_id];
@@ -419,6 +420,7 @@ impl Runner {
             }
         }
 
+        // Update the games.
         for (game_id, game) in self.games.iter_mut() {
             let game_inputs = tick_inputs[game_id].as_slice();
             debug!("Updating {:?} with {} inputs", game_id, game_inputs.len());
@@ -426,6 +428,7 @@ impl Runner {
             game.run_tick(game_inputs);
         }
 
+        // Send out tick messages.
         let mut messages = Vec::new();
         for player in self.players.values() {
             if let Some(peer) = player.peer {
