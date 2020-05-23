@@ -24,6 +24,7 @@ pub struct Player {
     pub player_id: comn::PlayerId,
     pub peer: Option<SocketAddr>,
     pub ping: PingEstimation,
+    pub last_input: Option<(comn::TickNum, comn::Input)>,
     pub inputs: Vec<(comn::TickNum, comn::Input)>,
     pub recv_input_time: GameTimeEstimation,
 }
@@ -35,6 +36,7 @@ impl Player {
             player_id,
             peer: None,
             ping: PingEstimation::default(),
+            last_input: None,
             inputs: Vec::new(),
             recv_input_time: GameTimeEstimation::new(input_period),
         }
@@ -279,7 +281,7 @@ impl Runner {
         &mut self,
         peer: SocketAddr,
         recv_time: Instant,
-        message: comn::SignedClientMessage,
+        MESSAge: comn::SignedClientMessage,
     ) {
         if let Some(player) = self.players.get_mut(&message.0) {
             if Some(peer) != player.peer {
@@ -304,6 +306,9 @@ impl Runner {
                 }
                 comn::ClientMessage::Input { tick_num, input } => {
                     player.inputs.push((tick_num, input));
+
+                    let game_time = self.games[&player.game_id].state().tick_game_time(tick_num);
+                    player.recv_input_time.record_tick(recv_time, game_time);
                 }
             }
         } else {
@@ -318,6 +323,8 @@ impl Runner {
             inputs.insert(game_id, Vec::new());
         }
 
+        let now = Instant::now();
+
         for player in self.players.values_mut() {
             // TODO: Consider player input timing
             for (_tick_num, input) in player.inputs.iter() {
@@ -327,6 +334,26 @@ impl Runner {
                     .push((player.player_id, input.clone()));
             }
             player.inputs.clear();
+
+            if let Some(recv_game_time) = player.recv_input_time.estimate(now) {
+                let game = &self.games[&player.game_id];
+                let input_lag = game.state.settings.tick_period() * 2.0;
+
+                let tick_inputs: Vec<_> = player.inputs.drain_filter(|(tick_num, _)| {
+                    game.tick_game_time(tick_num) + input_lag <= recv_game_time
+                }).collect();
+
+                if tick_inputs.is_empty() {
+                    if let Some((last_input_num, last_input)) = self.last_input.clone() {
+                        if 
+                    }
+                        inputs
+                            .get_mut(&player.game_id)
+                            .unwrap()
+                            .push((player.player_id, 
+                } else {
+                }
+            }
         }
 
         for (game_id, game) in self.games.iter_mut() {
