@@ -128,9 +128,8 @@ pub fn render_game(
                 //debug!("bullet at {:?}", bullet);
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
                 let circle = Circle::new(origin, 10.0);
-                gfx.fill_circle(&circle, Color::YELLOW);
+                gfx.fill_circle(&circle, Color::ORANGE);
             }
-            e => panic!("unhandled entity rendering: {:?}", e),
         }
     }
 
