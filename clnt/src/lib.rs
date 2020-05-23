@@ -1,12 +1,11 @@
 mod game;
 mod webrtc;
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use instant::Instant;
 use log::{debug, info, warn};
 
-use js_sys::Date;
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
@@ -14,7 +13,6 @@ use quicksilver::{
     geom::{Rectangle, Transform, Vector},
     graphics::{Color, FontRenderer, Graphics, VectorFont},
     lifecycle::{run, Event, EventStream, Key, Settings, Window},
-    Timer,
 };
 
 use comn::{
@@ -58,10 +56,10 @@ pub struct Resources {
 
 impl Resources {
     pub async fn load(gfx: &mut Graphics) -> quicksilver::Result<Self> {
-        let ttf = VectorFont::load("Munro-2LYe.ttf").await?;
-        let font_small = ttf.to_renderer(gfx, 18.0)?;
-        let font = ttf.to_renderer(gfx, 36.0)?;
-        let font_large = ttf.to_renderer(gfx, 58.0)?;
+        let ttf = VectorFont::load("kongtext.ttf").await?;
+        let font_small = ttf.to_renderer(gfx, 9.0)?;
+        let font = ttf.to_renderer(gfx, 18.0)?;
+        let font_large = ttf.to_renderer(gfx, 40.0)?;
 
         Ok(Self {
             ttf,
@@ -76,15 +74,30 @@ pub fn render_game(
     gfx: &mut Graphics,
     resources: &mut Resources,
     state: &comn::Game,
+    next_state: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    time: comn::GameTime,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
-    let time = state.tick_num.0 as f32 * state.settings.tick_duration().as_secs_f32();
+    let state_time = state.tick_game_time(state.tick_num);
 
-    for entity in state.entities.values() {
+    for (entity_id, entity) in state.entities.iter() {
         match entity {
             comn::Entity::Player(player) => {
-                let pos: mint::Vector2<f32> = player.pos.coords.into();
+                let pos = if let Some((next_time, next_entity)) = next_state.get(entity_id) {
+                    let tau = (time - state_time) / (next_time - state_time);
+
+                    if let Ok(next_player) = next_entity.player() {
+                        let delta = next_player.pos - player.pos;
+                        (player.pos + tau * delta).coords
+                    } else {
+                        player.pos.coords
+                    }
+                } else {
+                    player.pos.coords
+                };
+                let pos: mint::Vector2<f32> = pos.into();
+
                 let size = if let Some(angle) = player.angle {
                     gfx.set_transform(
                         Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
@@ -116,6 +129,15 @@ pub fn render_game(
     }
 
     Ok(())
+}
+
+#[derive(Default)]
+struct Stats {
+    dt_ms: stats::Var,
+    frame_ms: stats::Var,
+    time_lag_ms: stats::Var,
+    time_warp_factor: stats::Var,
+    tick_interp: stats::Var,
 }
 
 async fn app(
@@ -162,14 +184,11 @@ async fn app(
     }
 
     let mut game = game::Game::new(join_success, webrtc_client);
-    let mut input_timer = Timer::time_per_second(game.settings().ticks_per_second as f32);
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
-    let mut last_time_ms = Date::new_0().get_time();
+    let mut last_time = Instant::now();
 
-    let mut delta_ms_var = stats::Var::default();
-    let mut frame_ms_var = stats::Var::default();
-    let mut delta_game_time_ms_var = stats::Var::default();
+    let mut stats = Stats::default();
 
     loop {
         while let Some(event) = events.next_event().await {
@@ -190,63 +209,66 @@ async fn app(
             panic!("Game lost connection");
         }
 
-        let now_time_ms = Date::new_0().get_time();
-        let delta_ms = now_time_ms - last_time_ms;
-        let delta_s = (delta_ms / 1000.0) as f32;
-        last_time_ms = now_time_ms;
+        let start_time = Instant::now();
+        let dt = start_time.duration_since(last_time);
+        last_time = start_time;
 
-        game.update();
-
-        //while input_timer.tick() {
-        if input_timer.tick() {
-            game.player_input(&current_input(&pressed_keys));
-        }
-
-        render_game(&mut gfx, &mut resources, &game.state())?;
-
-        delta_ms_var.record(delta_ms as f32);
-
-        let server_game_time = game
-            .server_game_time()
-            .estimate(&game.ping(), Instant::now())
+        let recv_game_time = game
+            .recv_tick_time()
+            .estimate(Instant::now())
             .unwrap_or(-1.0);
-        let our_game_time =
-            game.state().tick_num.0 as f32 * game.state().settings.tick_duration().as_secs_f32();
 
-        delta_game_time_ms_var.record((our_game_time - server_game_time) * 1000.0);
+        game.update(dt, &current_input(&pressed_keys));
+
+        stats.time_warp_factor.record(game.next_time_warp_factor());
+        stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
+        stats
+            .time_lag_ms
+            .record((recv_game_time - game.interp_game_time()) * 1000.0);
+        stats
+            .tick_interp
+            .record(game.next_tick().map_or(0.0, |(next_tick_num, _)| {
+                (next_tick_num.0 - game.state().tick_num.0) as f32
+            }));
+
+        render_game(
+            &mut gfx,
+            &mut resources,
+            &game.state(),
+            &game.next_state(),
+            game.interp_game_time(),
+        )?;
 
         let mut debug_y: f32 = 15.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {
             resources
                 .font_small
                 .draw(&mut gfx, s, Color::BLACK, Vector::new(10.0, debug_y))?;
-            debug_y += 20.0;
+            debug_y += 12.0;
             Ok(())
         };
 
         debug(&format!(
-            "delta: {:.1}ms",
-            delta_ms_var.mean().unwrap_or(-1.0)
-        ))?;
-        debug(&format!(
-            "frame: {:.1}ms",
-            frame_ms_var.mean().unwrap_or(-1.0)
-        ))?;
-        debug(&format!(
-            "ping: {:.1}ms",
+            "ping (ms):     {:.1}",
             game.ping().estimate().as_secs_f32() * 1000.0
         ))?;
-        debug(&format!("server game time: {:.2}s", server_game_time,))?;
-        debug(&format!("our game time: {:.2}s", our_game_time,))?;
         debug(&format!(
-            "delta game time: {:.2}ms",
-            delta_game_time_ms_var.mean().unwrap_or(-1.0),
+            "recv std dev:  {:.2}",
+            1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
+        debug(&format!("dt (ms):       {}", stats.dt_ms))?;
+        debug(&format!("frame (ms):    {}", stats.frame_ms))?;
+        debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
+        debug(&format!("time warp:     {}", stats.time_warp_factor))?;
+        debug(&format!("tick interp:   {}", stats.tick_interp))?;
 
         gfx.present(&window)?;
 
-        let end_time_ms = Date::new_0().get_time();
-        frame_ms_var.record((end_time_ms - now_time_ms) as f32);
+        let end_time = Instant::now();
+
+        stats
+            .frame_ms
+            .record(end_time.duration_since(start_time).as_secs_f32() * 1000.0);
     }
 }
 

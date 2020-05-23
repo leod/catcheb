@@ -24,7 +24,7 @@
 
 Build the client:
 ```
-cargo build --target wasm32-unknown-unknown
+make clnt
 ```
 This will generate the following files in `clnt/static/`:
 - `clnt_bg.wasm`
@@ -43,3 +43,4 @@ cargo run -j8 --bin serv -- \
 
 ## Credits
 - `clnt/static/Munro-2LYe.ttf`: Munro font: http://www.tenbytwenty.com/
+- `clnt/static/kongtext.ttf`: https://www.1001fonts.com/kongtext-font.html

@@ -1,7 +1,7 @@
 pub mod entities;
 pub mod run;
 
-use std::{collections::BTreeMap, time::Duration};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,9 @@ use nalgebra as na;
 
 use entities::{DangerGuy, PlayerEntity};
 
+use crate::GameTime;
+
+pub type Time = f32;
 pub type Vector = na::Vector2<f32>;
 pub type Point = na::Point2<f32>;
 
@@ -31,29 +34,44 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             max_num_players: 16,
-            ticks_per_second: 10,
+            ticks_per_second: 30,
             size: Vector::new(1280.0, 720.0),
         }
     }
 }
 
 impl Settings {
-    pub fn tick_duration(&self) -> Duration {
-        Duration::from_secs_f32(1.0 / (self.ticks_per_second as f32))
+    pub fn tick_period(&self) -> GameTime {
+        1.0 / (self.ticks_per_second as f32)
     }
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct Time(pub f32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct PlayerId(pub u32);
 
+impl PlayerId {
+    pub fn next(&self) -> PlayerId {
+        PlayerId(self.0 + 1)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct EntityId(pub u32);
 
+impl EntityId {
+    pub fn next(&self) -> EntityId {
+        EntityId(self.0 + 1)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TickNum(pub u32);
+
+impl TickNum {
+    pub fn next(&self) -> TickNum {
+        TickNum(self.0 + 1)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Input {
@@ -95,6 +113,14 @@ pub enum Entity {
 }
 
 impl Entity {
+    pub fn player(&self) -> Result<PlayerEntity> {
+        if let Entity::Player(e) = self {
+            Ok(e.clone())
+        } else {
+            Err(Error::UnexpectedEntityType)
+        }
+    }
+
     pub fn danger_guy(&self) -> Result<DangerGuy> {
         if let Entity::DangerGuy(e) = self {
             Ok(e.clone())
@@ -158,10 +184,15 @@ impl Game {
             }),
         ]
     }
+
+    pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
+        self.settings.tick_period() * tick_num.0 as f32
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tick {
     pub entities: BTreeMap<EntityId, Entity>,
+    pub last_inputs: BTreeMap<PlayerId, Input>,
     pub events: Vec<Event>,
 }

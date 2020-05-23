@@ -1,5 +1,5 @@
 clnt:
-	cd clnt && cargo build -j2 --release --target wasm32-unknown-unknown
+	cd clnt && cargo build -j4 --release --target wasm32-unknown-unknown
 	wasm-bindgen \
 		--target web \
 		--no-typescript \
@@ -12,7 +12,7 @@ clnt:
 	cp clnt/pkg/clnt_bg.wasm clnt/static/
 
 clnt-debug:
-	cd clnt && cargo build --target wasm32-unknown-unknown
+	cd clnt && cargo build -j4 --target wasm32-unknown-unknown
 	wasm-bindgen \
 		--target web \
 		--no-typescript \

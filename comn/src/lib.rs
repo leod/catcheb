@@ -15,6 +15,7 @@ pub use crate::{
 
 pub use crate::game::Error as GameError;
 pub use crate::game::Result as GameResult;
+pub use crate::game::Time as GameTime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GameId(pub Uuid);
