@@ -27,25 +27,3 @@ pub enum Entity {
         end_pos: Point,
     },
 }
-
-pub struct EntityData {
-    entity: Entity,
-    pos: Option<Pos>,
-}
-
-// PLAYER
-// Common:
-// - last input
-// - owner
-// - position
-// - angle
-//
-// Client:
-// - predicted position
-// 
-// Server:
-// - position history?
-
-// BULLET
-// Common:
-// hk

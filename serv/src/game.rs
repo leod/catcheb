@@ -65,8 +65,9 @@ impl Game {
         player_id
     }
 
-    pub fn run_tick(&mut self, inputs: &[(comn::PlayerId, comn::Input)]) {
-        for (player_id, input) in inputs {
+    pub fn run_tick(&mut self, inputs: &[(comn::PlayerId, comn::TickNum, comn::Input)]) {
+        //debug!("tick with {} inputs", inputs.len());
+        for (player_id, _tick_num, input) in inputs {
             self.state.run_player_input(*player_id, input).unwrap();
         }
 
