@@ -105,17 +105,18 @@ impl Game {
 
         self.interp_game_time = new_interp_game_time;
 
-        for _ in started_tick_nums.iter() {
+        for tick_num in started_tick_nums.iter() {
             // TODO: Run events
+
+            // TODO: Limit number of inputs to send, when skipping large numbers of ticks
+            self.send(comn::ClientMessage::Input {
+                tick_num: *tick_num,
+                input: input.clone(),
+            });
         }
 
         if let Some(last_tick_num) = started_tick_nums.last().copied() {
             self.snap_to_tick(last_tick_num, self.received_ticks[&last_tick_num].clone());
-
-            self.send(comn::ClientMessage::Input {
-                tick_num: last_tick_num,
-                input: input.clone(),
-            });
 
             if self
                 .next_tick
