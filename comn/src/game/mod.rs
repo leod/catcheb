@@ -49,11 +49,29 @@ impl Settings {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct PlayerId(pub u32);
 
+impl PlayerId {
+    pub fn next(&self) -> PlayerId {
+        PlayerId(self.0 + 1)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct EntityId(pub u32);
 
+impl EntityId {
+    pub fn next(&self) -> EntityId {
+        EntityId(self.0 + 1)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TickNum(pub u32);
+
+impl TickNum {
+    pub fn next(&self) -> TickNum {
+        TickNum(self.0 + 1)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Input {

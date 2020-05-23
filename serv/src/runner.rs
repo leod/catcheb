@@ -1,4 +1,8 @@
-use std::{collections::HashMap, net::SocketAddr, time::Instant};
+use std::{
+    collections::{BTreeMap, HashMap},
+    net::SocketAddr,
+    time::Instant,
+};
 
 use log::{debug, info, warn};
 use rand::seq::IteratorRandom;
@@ -243,10 +247,7 @@ impl Runner {
 
             for player_token in remove_player_tokens {
                 let player = self.players.remove(&player_token).unwrap();
-                info!(
-                    "Player {:?} with token {:?} timed out",
-                    player, player_token
-                );
+                info!("Player with token {:?} timed out", player_token);
                 self.games
                     .get_mut(&player.game_id)
                     .unwrap()
@@ -281,7 +282,7 @@ impl Runner {
         &mut self,
         peer: SocketAddr,
         recv_time: Instant,
-        MESSAge: comn::SignedClientMessage,
+        message: comn::SignedClientMessage,
     ) {
         if let Some(player) = self.players.get_mut(&message.0) {
             if Some(peer) != player.peer {
@@ -305,10 +306,43 @@ impl Runner {
                     }
                 }
                 comn::ClientMessage::Input { tick_num, input } => {
-                    player.inputs.push((tick_num, input));
+                    let game = &self.games[&player.game_id].state();
 
-                    let game_time = self.games[&player.game_id].state().tick_game_time(tick_num);
-                    player.recv_input_time.record_tick(recv_time, game_time);
+                    if tick_num <= game.tick_num {
+                        // Sorted insert of the new input. We use the negative
+                        // tick number as key, so that newer elements are to
+                        // the left.
+                        match player
+                            .inputs
+                            .binary_search_by_key(&-(tick_num.0 as isize), |(tick_num, _)| {
+                                -(tick_num.0 as isize)
+                            }) {
+                            Ok(_) => {
+                                // Received the same input more than once.
+                            }
+                            Err(pos) => {
+                                player.inputs.insert(pos, (tick_num, input));
+                            }
+                        }
+
+                        // Keep track of when we receive player input, so that
+                        // we can predict when to receive the next player input.
+                        player
+                            .recv_input_time
+                            .record_tick(recv_time, game.tick_game_time(tick_num));
+                    } else {
+                        // Clients try to stay behind the server in time, since
+                        // they always interpolate behind old received state.
+                        // Thus, with a correct client, this case should not
+                        // happen. Ignoring input may help prevent speed
+                        // hacking.
+                        warn!(
+                            "Ignoring input {:?} by player {:?}, which is ahead of our tick num {:?}",
+                            tick_num,
+                            message.0,
+                            game.tick_num,
+                        );
+                    }
                 }
             }
         } else {
@@ -317,50 +351,79 @@ impl Runner {
     }
 
     fn run_tick(&mut self) {
-        let mut inputs = HashMap::new();
-
-        for &game_id in self.games.keys() {
-            inputs.insert(game_id, Vec::new());
-        }
+        let mut tick_inputs: HashMap<_, _> = self
+            .games
+            .keys()
+            .map(|game_id| (*game_id, Vec::new()))
+            .collect();
 
         let now = Instant::now();
 
         for player in self.players.values_mut() {
-            // TODO: Consider player input timing
-            for (_tick_num, input) in player.inputs.iter() {
-                inputs
-                    .get_mut(&player.game_id)
-                    .unwrap()
-                    .push((player.player_id, input.clone()));
-            }
-            player.inputs.clear();
-
             if let Some(recv_game_time) = player.recv_input_time.estimate(now) {
                 let game = &self.games[&player.game_id];
                 let input_lag = game.state.settings.tick_period() * 2.0;
+                let game_inputs = tick_inputs.get_mut(&player.game_id).unwrap();
 
-                let tick_inputs: Vec<_> = player.inputs.drain_filter(|(tick_num, _)| {
-                    game.tick_game_time(tick_num) + input_lag <= recv_game_time
-                }).collect();
+                let split_pos = player
+                    .inputs
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .filter_map(|(i, (tick_num, _))| {
+                        // We are scanning through the received inputs from
+                        // left to right, with increasing tick numbers. We want
+                        // to find the first input that we do _not_ want to run
+                        // in this ticket.
+                        if game.state().tick_game_time(*tick_num) + input_lag > recv_game_time {
+                            // It's too early for this input, so stop scanning.
+                            Some(i)
+                        } else {
+                            None
+                        }
+                    })
+                    .next()
+                    .unwrap_or(0);
 
-                if tick_inputs.is_empty() {
-                    if let Some((last_input_num, last_input)) = self.last_input.clone() {
-                        if 
-                    }
-                        inputs
-                            .get_mut(&player.game_id)
-                            .unwrap()
-                            .push((player.player_id, 
-                } else {
+                let player_inputs_to_run = player.inputs.split_off(split_pos);
+
+                if let Some(last_input_to_run) = player_inputs_to_run.first().cloned() {
+                    game_inputs.extend(player_inputs_to_run.into_iter().rev().filter_map(
+                        |(tick_num, input)| {
+                            if player
+                                .last_input
+                                .as_ref()
+                                .map_or(true, |(last_num, _)| tick_num > *last_num)
+                            {
+                                Some((player.player_id, tick_num, input))
+                            } else {
+                                // This inputs is older than the newest
+                                // input that we ran so far for this
+                                // player. In other words, the package was
+                                // received out of order, and our jitter
+                                // buffering was not able to make up for
+                                // it.
+                                //
+                                // Ignore this out-of-date input.
+                                None
+                            }
+                        },
+                    ));
+                    player.last_input = Some(last_input_to_run);
+                } else if let Some((last_input_num, last_input)) = player.last_input.clone() {
+                    // We did not receive the correct input in time, just reuse
+                    // the previous one.
+                    game_inputs.push((player.player_id, last_input_num.next(), last_input.clone()));
+                    player.last_input = Some((last_input_num.next(), last_input));
                 }
             }
         }
 
         for (game_id, game) in self.games.iter_mut() {
-            let inputs = inputs[game_id].as_slice();
-            //debug!("Updating {:?} with {} inputs", game_id, inputs.len());
+            let game_inputs = tick_inputs[game_id].as_slice();
+            debug!("Updating {:?} with {} inputs", game_id, game_inputs.len());
 
-            game.run_tick(inputs);
+            game.run_tick(game_inputs);
         }
 
         let mut messages = Vec::new();
