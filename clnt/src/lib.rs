@@ -10,7 +10,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
 use quicksilver::{
-    geom::{Rectangle, Transform, Vector},
+    geom::{Circle, Rectangle, Transform, Vector},
     graphics::{Color, FontRenderer, Graphics, VectorFont},
     lifecycle::{run, Event, EventStream, Key, Settings, Window},
 };
@@ -42,7 +42,7 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
         move_right: pressed_keys.contains(&Key::D),
         move_up: pressed_keys.contains(&Key::W),
         move_down: pressed_keys.contains(&Key::S),
-        use_item: false,
+        use_item: pressed_keys.contains(&Key::Space),
         use_action: false,
     }
 }
@@ -123,6 +123,12 @@ pub fn render_game(
                 let size: mint::Vector2<f32> = danger_guy.size.into();
                 let rect = Rectangle::new(origin, size);
                 gfx.fill_rect(&rect, Color::RED);
+            }
+            comn::Entity::Bullet(bullet) => {
+                //debug!("bullet at {:?}", bullet);
+                let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
+                let circle = Circle::new(origin, 10.0);
+                gfx.fill_circle(&circle, Color::YELLOW);
             }
             e => panic!("unhandled entity rendering: {:?}", e),
         }
