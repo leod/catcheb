@@ -1,7 +1,8 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    cmp::Ordering,
+    collections::HashMap,
     net::SocketAddr,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use log::{debug, info, warn};
@@ -13,7 +14,7 @@ use tokio::sync::{
 use uuid::Uuid;
 
 use comn::{
-    util::{GameTimeEstimation, PingEstimation},
+    util::{stats, GameTimeEstimation, PingEstimation, Timer},
     GameTime,
 };
 
@@ -62,6 +63,13 @@ impl Default for Config {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct Stats {
+    pub num_players: stats::Var,
+    pub num_games: stats::Var,
+    pub num_inputs_per_game_tick: stats::Var,
+}
+
 pub struct JoinMessage {
     pub request: comn::JoinRequest,
     pub reply_tx: oneshot::Sender<comn::JoinReply>,
@@ -85,6 +93,9 @@ pub struct Runner {
 
     shutdown: bool,
     tick_timer: comn::util::Timer,
+
+    stats: Stats,
+    print_stats_timer: Timer,
 }
 
 impl Runner {
@@ -106,6 +117,8 @@ impl Runner {
             send_message_tx,
             shutdown: false,
             tick_timer,
+            stats: Stats::default(),
+            print_stats_timer: Timer::with_duration(Duration::from_secs(5)),
         }
     }
 
@@ -185,96 +198,109 @@ impl Runner {
 
     pub fn run(mut self) {
         while !self.shutdown {
-            // Handle incoming join requests via HTTP channel.
-            while let Some(join_message) = match self.join_rx.try_recv() {
-                Ok(join_message) => Some(join_message),
-                Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Closed) => {
-                    info!("join_rx closed, terminating thread");
-                    return;
-                }
-            } {
-                info!("Processing {:?}", join_message.request);
+            self.run_update();
 
-                let reply = self.try_join_game(join_message.request);
-
-                if join_message.reply_tx.send(reply).is_err() {
-                    info!("reply_tx closed, terminating thread");
-                    return;
-                }
-            }
-
-            // Handle incoming messages via WebRTC channel.
-            while let Some(message_in) = match self.recv_message_rx.try_recv() {
-                Ok(message_in) => Some(message_in),
-                Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Closed) => {
-                    info!("recv_message_rx closed, terminating thread");
-                    return;
-                }
-            } {
-                let signed_message = comn::SignedClientMessage::deserialize(&message_in.data);
-
-                match signed_message {
-                    Some(signed_message) => {
-                        /*debug!(
-                            "Received message from {:?}: {:?}",
-                            message_in.peer, signed_message
-                        );*/
-                        self.handle_message(message_in.peer, message_in.recv_time, signed_message);
-                    }
-                    None => {
-                        warn!(
-                            "Failed to deserialize message from {:?}, ignoring",
-                            message_in.peer,
-                        );
-                    }
-                }
-            }
-
-            // Disconnect players.
-            let remove_player_tokens: Vec<comn::PlayerToken> = self
-                .players
-                .iter()
-                .filter_map(|(player_token, player)| {
-                    if player.ping.is_timeout() {
-                        Some(*player_token)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            for player_token in remove_player_tokens {
-                let player = self.players.remove(&player_token).unwrap();
-                info!("Player with token {:?} timed out", player_token);
-                self.games
-                    .get_mut(&player.game_id)
-                    .unwrap()
-                    .remove_player(player.player_id);
-            }
-
-            // Ping players.
-            let mut messages = Vec::new();
-
-            for player in self.players.values_mut() {
-                if let Some(sequence_num) = player.ping.next_ping_sequence_num() {
-                    if let Some(peer) = player.peer {
-                        messages.push((peer, comn::ServerMessage::Ping(sequence_num)));
-                    }
-                }
-            }
-
-            for (peer, message) in messages {
-                self.send(peer, message);
-            }
-
-            // Run the game.
-            while self.tick_timer.tick() {
-                self.run_tick();
+            if self.print_stats_timer.exhaust().is_some() {
+                debug!("num players:          {}", self.stats.num_players);
+                debug!("num games:            {}", self.stats.num_games);
+                debug!(
+                    "inputs per game tick: {}",
+                    self.stats.num_inputs_per_game_tick
+                );
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    pub fn run_update(&mut self) {
+        // Handle incoming join requests via HTTP channel.
+        while let Some(join_message) = match self.join_rx.try_recv() {
+            Ok(join_message) => Some(join_message),
+            Err(TryRecvError::Empty) => None,
+            Err(TryRecvError::Closed) => {
+                info!("join_rx closed, terminating thread");
+                return;
+            }
+        } {
+            info!("Processing {:?}", join_message.request);
+
+            let reply = self.try_join_game(join_message.request);
+
+            if join_message.reply_tx.send(reply).is_err() {
+                info!("reply_tx closed, terminating thread");
+                return;
+            }
+        }
+
+        // Handle incoming messages via WebRTC channel.
+        while let Some(message_in) = match self.recv_message_rx.try_recv() {
+            Ok(message_in) => Some(message_in),
+            Err(TryRecvError::Empty) => None,
+            Err(TryRecvError::Closed) => {
+                info!("recv_message_rx closed, terminating thread");
+                return;
+            }
+        } {
+            let signed_message = comn::SignedClientMessage::deserialize(&message_in.data);
+
+            match signed_message {
+                Some(signed_message) => {
+                    /*debug!(
+                        "Received message from {:?}: {:?}",
+                        message_in.peer, signed_message
+                    );*/
+                    self.handle_message(message_in.peer, message_in.recv_time, signed_message);
+                }
+                None => {
+                    warn!(
+                        "Failed to deserialize message from {:?}, ignoring",
+                        message_in.peer,
+                    );
+                }
+            }
+        }
+
+        // Disconnect players.
+        let remove_player_tokens: Vec<comn::PlayerToken> = self
+            .players
+            .iter()
+            .filter_map(|(player_token, player)| {
+                if player.ping.is_timeout() {
+                    Some(*player_token)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for player_token in remove_player_tokens {
+            let player = self.players.remove(&player_token).unwrap();
+            info!("Player with token {:?} timed out", player_token);
+            self.games
+                .get_mut(&player.game_id)
+                .unwrap()
+                .remove_player(player.player_id);
+        }
+
+        // Ping players.
+        let mut messages = Vec::new();
+
+        for player in self.players.values_mut() {
+            if let Some(sequence_num) = player.ping.next_ping_sequence_num() {
+                if let Some(peer) = player.peer {
+                    messages.push((peer, comn::ServerMessage::Ping(sequence_num)));
+                }
+            }
+        }
+
+        for (peer, message) in messages {
+            self.send(peer, message);
+        }
+
+        // Run the game.
+        while self.tick_timer.tick() {
+            self.run_tick();
         }
     }
 
@@ -309,17 +335,13 @@ impl Runner {
                     let game = &self.games[&player.game_id].state();
 
                     if tick_num <= game.tick_num {
-                        // Sorted insert of the new input. We use the negative
-                        // tick number as key, so that newer elements are to
-                        // the left.
+                        // Sorted insert of the new input, so that inputs are
+                        // sorted by tick number descending
                         match player
                             .inputs
-                            .binary_search_by_key(&-(tick_num.0 as isize), |(tick_num, _)| {
-                                -(tick_num.0 as isize)
-                            }) {
-                            Ok(_) => {
-                                // Received the same input more than once.
-                            }
+                            .binary_search_by(|(ex_tick_num, _)| tick_num.cmp(ex_tick_num))
+                        {
+                            Ok(_) => {}
                             Err(pos) => {
                                 player.inputs.insert(pos, (tick_num, input));
                             }
@@ -363,69 +385,68 @@ impl Runner {
         for player in self.players.values_mut() {
             if let Some(recv_game_time) = player.recv_input_time.estimate(now) {
                 let game = &self.games[&player.game_id];
-                let input_lag = game.state.settings.tick_period() * 2.0;
-                let game_inputs = tick_inputs.get_mut(&player.game_id).unwrap();
+                let input_lag = game.state.settings.tick_period() * 1.5;
 
-                let split_pos = player
-                    .inputs
-                    .iter()
-                    .enumerate()
-                    .rev()
-                    .filter_map(|(i, (tick_num, _))| {
-                        // We are scanning through the received inputs from
-                        // left to right, with increasing tick numbers. We want
-                        // to find the first input that we do _not_ want to run
-                        // in this ticket.
-                        if game.state().tick_game_time(*tick_num) + input_lag > recv_game_time {
-                            // It's too early for this input, so stop scanning.
-                            Some(i)
-                        } else {
-                            None
-                        }
-                    })
-                    .next()
-                    .unwrap_or(0);
+                // Collect inputs that are to be run for this player, trying to
+                // maintain some buffer to deal with jitter.
+                let mut player_inputs = Vec::new();
+                while let Some((oldest_tick_num, oldest_input)) = player.inputs.last().cloned() {
+                    if game.state().tick_game_time(oldest_tick_num) + input_lag > recv_game_time {
+                        // It's too early for this input, so stop scanning.
+                        break;
+                    }
 
-                let player_inputs_to_run = player.inputs.split_off(split_pos);
+                    player.inputs.pop();
 
-                if let Some(last_input_to_run) = player_inputs_to_run.first().cloned() {
-                    game_inputs.extend(player_inputs_to_run.into_iter().rev().filter_map(
-                        |(tick_num, input)| {
-                            if player
-                                .last_input
-                                .as_ref()
-                                .map_or(true, |(last_num, _)| tick_num > *last_num)
-                            {
-                                Some((player.player_id, tick_num, input))
-                            } else {
-                                // This inputs is older than the newest
-                                // input that we ran so far for this
-                                // player. In other words, the package was
-                                // received out of order, and our jitter
-                                // buffering was not able to make up for
-                                // it.
-                                //
-                                // Ignore this out-of-date input.
-                                None
-                            }
-                        },
-                    ));
-                    player.last_input = Some(last_input_to_run);
-                } else if let Some((last_input_num, last_input)) = player.last_input.clone() {
+                    if player
+                        .last_input
+                        .as_ref()
+                        .map_or(true, |(last_num, _)| oldest_tick_num > *last_num)
+                    {
+                        player_inputs.push((oldest_tick_num, oldest_input));
+                    } else {
+                        // This inputs is older than the newest input that we
+                        // ran so far for this player. In other words, the
+                        // package was received out of order, and our jitter
+                        // buffering was not able to make up for it.
+                        //
+                        // Ignore this out-of-date input.
+                        continue;
+                    }
+                }
+
+                if player_inputs.is_empty() {
                     // We did not receive the correct input in time, just reuse
                     // the previous one.
-                    game_inputs.push((player.player_id, last_input_num.next(), last_input.clone()));
-                    player.last_input = Some((last_input_num.next(), last_input));
+                    // TODO: Reuse player inputs only up to some limit.
+                    if let Some((last_input_num, last_input)) = player.last_input.clone() {
+                        //player_inputs.push((last_input_num.next(), last_input));
+                    }
                 }
+
+                player.last_input = player_inputs.last().cloned();
+
+                tick_inputs.get_mut(&player.game_id).unwrap().extend(
+                    player_inputs
+                        .into_iter()
+                        .map(|(tick_num, input)| (player.player_id, tick_num, input)),
+                );
             }
         }
 
+        // Record some statistics for monitoring.
+        self.stats.num_players.record(self.players.len() as f32);
+        self.stats.num_games.record(self.games.len() as f32);
+        self.stats.num_inputs_per_game_tick.record(
+            tick_inputs
+                .values()
+                .map(|inputs| inputs.len() as f32)
+                .sum::<f32>(),
+        );
+
         // Update the games.
         for (game_id, game) in self.games.iter_mut() {
-            let game_inputs = tick_inputs[game_id].as_slice();
-            debug!("Updating {:?} with {} inputs", game_id, game_inputs.len());
-
-            game.run_tick(game_inputs);
+            game.run_tick(tick_inputs[game_id].as_slice());
         }
 
         // Send out tick messages.
