@@ -81,6 +81,7 @@ impl Game {
 
         self.state.run_tick(&mut context).unwrap();
 
+        // TODO: Sort player input by tick num
         for (player_id, _tick_num, input) in inputs {
             self.state
                 .run_player_input(*player_id, input, &mut context)
@@ -121,8 +122,11 @@ impl Game {
             self.remove_entity(entity_id);
         }
 
-        for player_id in context.killed_players {
+        for (player_id, reason) in context.killed_players {
             self.kill_player(player_id);
+            context
+                .events
+                .push(comn::Event::PlayerDied { player_id, reason });
         }
 
         self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1);
