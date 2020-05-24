@@ -168,15 +168,24 @@ impl Game {
         vec![
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(200.0, 200.0),
-                end_pos: Point::new(500.0, 200.0),
-                size: Vector::new(100.0, 100.0),
-                speed: 200.0,
+                end_pos: Point::new(900.0, 200.0),
+                size: Vector::new(100.0, 50.0),
+                speed: 2000.0,
+                wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(700.0, 600.0),
                 end_pos: Point::new(700.0, 100.0),
                 size: Vector::new(50.0, 100.0),
                 speed: 400.0,
+                wait_time: 0.0,
+            }),
+            Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(50.0, 700.0),
+                end_pos: Point::new(1230.0, 700.0),
+                size: Vector::new(100.0, 50.0),
+                speed: 200.0,
+                wait_time: 0.0,
             }),
         ]
     }

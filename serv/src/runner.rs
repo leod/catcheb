@@ -344,7 +344,7 @@ impl Runner {
                         // Clients try to stay behind the server in time, since
                         // they always interpolate behind old received state.
                         // Thus, with a correct client, this case should not
-                        // happen. Ignoring input may help prevent speed
+                        // happen. Ignoring input here may help prevent speed
                         // hacking.
                         warn!(
                             "Ignoring input {:?} by player {:?}, which is ahead of our tick num {:?}",

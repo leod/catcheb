@@ -53,21 +53,32 @@ pub struct DangerGuy {
     pub end_pos: Point,
     pub size: Vector,
     pub speed: f32,
+    pub wait_time: GameTime,
 }
 
 impl DangerGuy {
+    pub fn walk_time(&self) -> GameTime {
+        (self.end_pos - self.start_pos).norm() / self.speed
+    }
+
     pub fn period(&self) -> GameTime {
-        (2.0 * (self.end_pos - self.start_pos).norm()) / self.speed
+        2.0 * (self.walk_time() + self.wait_time)
     }
 
     pub fn pos(&self, t: GameTime) -> Point {
-        let tau = (t / self.period()).fract();
+        let tau = (t / self.period()).fract() * self.period();
         let delta = self.end_pos - self.start_pos;
 
-        if tau < 0.5 {
-            self.start_pos + tau * delta
+        // TODO: Simplify, maybe pareen?
+        if tau < self.wait_time {
+            self.start_pos
+        } else if tau <= self.wait_time + self.walk_time() {
+            self.start_pos + (tau - self.wait_time) / self.walk_time() * delta
+        } else if tau < 2.0 * self.wait_time + self.walk_time() {
+            self.end_pos
         } else {
-            self.end_pos - tau * delta
+            self.end_pos
+                - (tau - 2.0 * self.wait_time - self.walk_time()) / self.walk_time() * delta
         }
     }
 
