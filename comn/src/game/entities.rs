@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::{PlayerId, Point, Vector},
+    geom::AaRect,
     GameError, GameResult, GameTime,
 };
 
@@ -68,6 +69,10 @@ impl DangerGuy {
         } else {
             self.end_pos - tau * delta
         }
+    }
+
+    pub fn aa_rect(&self, t: GameTime) -> AaRect {
+        AaRect::new_center(self.pos(t), self.size)
     }
 }
 

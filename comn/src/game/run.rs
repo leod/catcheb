@@ -20,6 +20,23 @@ impl Game {
                 Entity::Bullet(entity) => {
                     if !self.settings.aa_rect().contains_point(entity.pos(time)) {
                         remove_ids.push(*entity_id);
+                        continue;
+                    }
+
+                    for (entity_id_b, entity_b) in self.entities.iter() {
+                        if *entity_id == *entity_id_b {
+                            continue;
+                        }
+
+                        match entity_b {
+                            Entity::DangerGuy(entity_b) => {
+                                if entity_b.aa_rect(time).contains_point(entity.pos(time)) {
+                                    remove_ids.push(*entity_id);
+                                    break;
+                                }
+                            }
+                            _ => (),
+                        }
                     }
                 }
                 _ => (),
