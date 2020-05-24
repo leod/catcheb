@@ -7,9 +7,11 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::{DangerGuy, PlayerEntity};
+use entities::DangerGuy;
 
-use crate::GameTime;
+use crate::{geom, GameTime};
+
+pub use entities::Entity;
 
 pub type Time = f32;
 pub type Vector = na::Vector2<f32>;
@@ -28,6 +30,7 @@ pub struct Settings {
     pub max_num_players: usize,
     pub ticks_per_second: usize,
     pub size: Vector,
+    pub spawn_points: Vec<Point>,
 }
 
 impl Default for Settings {
@@ -36,6 +39,11 @@ impl Default for Settings {
             max_num_players: 16,
             ticks_per_second: 30,
             size: Vector::new(1280.0, 720.0),
+            spawn_points: vec![
+                Point::new(350.0, 100.0),
+                Point::new(600.0, 600.0),
+                Point::new(50.0, 500.0),
+            ],
         }
     }
 }
@@ -43,6 +51,10 @@ impl Default for Settings {
 impl Settings {
     pub fn tick_period(&self) -> GameTime {
         1.0 / (self.ticks_per_second as f32)
+    }
+
+    pub fn aa_rect(&self) -> geom::AaRect {
+        geom::AaRect::new_top_left(Point::new(0.0, 0.0), self.size)
     }
 }
 
@@ -90,58 +102,42 @@ pub enum Item {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Entity {
-    Player(PlayerEntity),
-    Bullet {
-        owner: PlayerId,
-        pos: Point,
-        dir: Vector,
-        angle: f32,
-    },
-    Item {
-        item: Item,
-        pos: Point,
-    },
-    ItemSpawn {
-        pos: Point,
-    },
-    Wall {
-        pos: Point,
-        size: Vector,
-    },
-    DangerGuy(DangerGuy),
-}
-
-impl Entity {
-    pub fn player(&self) -> Result<PlayerEntity> {
-        if let Entity::Player(e) = self {
-            Ok(e.clone())
-        } else {
-            Err(Error::UnexpectedEntityType)
-        }
-    }
-
-    pub fn danger_guy(&self) -> Result<DangerGuy> {
-        if let Entity::DangerGuy(e) = self {
-            Ok(e.clone())
-        } else {
-            Err(Error::UnexpectedEntityType)
-        }
-    }
+pub enum DeathReason {
+    ShotByPlayer(PlayerId),
+    TouchedTheDanger,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
-    PlayerJoined { player_id: PlayerId, name: String },
-    PlayerShotGun { player_id: PlayerId, dir: Vector },
-    PlayerShotStunGun { player_id: PlayerId, dir: Vector },
-    EntityRemoved { entity_id: EntityId },
-    PlayerSpawned { pos: Point },
+    PlayerShotGun {
+        player_id: PlayerId,
+        dir: Vector,
+    },
+    PlayerShotStunGun {
+        player_id: PlayerId,
+        dir: Vector,
+    },
+    PlayerSpawned {
+        player_id: PlayerId,
+        pos: Point,
+    },
+    PlayerDied {
+        player_id: PlayerId,
+        reason: DeathReason,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlayerState {
+    Alive,
+    Dead,
+    Respawning { respawn_time: GameTime },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
     pub name: String,
+    pub state: PlayerState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -172,21 +168,34 @@ impl Game {
         vec![
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(200.0, 200.0),
-                end_pos: Point::new(500.0, 200.0),
-                size: Vector::new(100.0, 100.0),
-                speed: 200.0,
+                end_pos: Point::new(900.0, 200.0),
+                size: Vector::new(100.0, 50.0),
+                speed: 2000.0,
+                wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(700.0, 600.0),
                 end_pos: Point::new(700.0, 100.0),
                 size: Vector::new(50.0, 100.0),
                 speed: 400.0,
+                wait_time: 0.0,
+            }),
+            Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(50.0, 700.0),
+                end_pos: Point::new(1230.0, 700.0),
+                size: Vector::new(100.0, 50.0),
+                speed: 200.0,
+                wait_time: 0.0,
             }),
         ]
     }
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
-        self.settings.tick_period() * tick_num.0 as f32
+        self.settings.tick_period() * tick_num.0 as GameTime
+    }
+
+    pub fn current_game_time(&self) -> GameTime {
+        self.tick_game_time(self.tick_num)
     }
 }
 
