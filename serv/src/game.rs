@@ -1,4 +1,5 @@
 use log::{debug, info};
+use rand::seq::SliceRandom;
 
 use comn::{game::run::RunContext, Entity, PlayerState};
 
@@ -99,11 +100,19 @@ impl Game {
                 PlayerState::Respawning { respawn_time } if current_time >= respawn_time => {
                     debug!("Respawning player {:?}", player_id);
 
+                    // TODO: Random
+                    let spawn_pos = self
+                        .state
+                        .settings
+                        .spawn_points
+                        .choose(&mut rand::thread_rng())
+                        .unwrap();
+
                     context
                         .new_entities
                         .push(Entity::Player(comn::PlayerEntity {
                             owner: *player_id,
-                            pos: comn::Point::new(350.0, 100.0),
+                            pos: *spawn_pos,
                             angle: None,
                             last_shot_time: None,
                         }));
