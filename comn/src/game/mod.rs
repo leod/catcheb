@@ -96,12 +96,29 @@ pub enum Item {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DeathReason {
+    ShotByPlayer(PlayerId),
+    TouchedTheDanger,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
-    PlayerJoined { player_id: PlayerId, name: String },
-    PlayerShotGun { player_id: PlayerId, dir: Vector },
-    PlayerShotStunGun { player_id: PlayerId, dir: Vector },
-    EntityRemoved { entity_id: EntityId },
-    PlayerSpawned { pos: Point },
+    PlayerShotGun {
+        player_id: PlayerId,
+        dir: Vector,
+    },
+    PlayerShotStunGun {
+        player_id: PlayerId,
+        dir: Vector,
+    },
+    PlayerSpawned {
+        player_id: PlayerId,
+        pos: Point,
+    },
+    PlayerDied {
+        player_id: PlayerId,
+        reason: DeathReason,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

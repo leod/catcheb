@@ -1,3 +1,4 @@
+mod event_list;
 mod game;
 mod webrtc;
 
@@ -145,6 +146,11 @@ struct Stats {
     tick_interp: stats::Var,
 }
 
+#[derive(Debug, Clone, Default)]
+struct Config {
+    event_list: event_list::Config,
+}
+
 async fn app(
     window: Window,
     mut gfx: Graphics,
@@ -152,6 +158,7 @@ async fn app(
 ) -> quicksilver::Result<()> {
     info!("Starting up");
 
+    let config = Config::default();
     let mut resources = Resources::load(&mut gfx).await?;
 
     // TODO: Graceful error handling in client
@@ -193,6 +200,8 @@ async fn app(
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
 
+    let mut event_list = event_list::EventList::new(config.event_list);
+
     let mut stats = Stats::default();
 
     loop {
@@ -223,7 +232,11 @@ async fn app(
             .estimate(Instant::now())
             .unwrap_or(-1.0);
 
-        game.update(dt, &current_input(&pressed_keys));
+        let events = game.update(dt, &current_input(&pressed_keys));
+
+        for event in events {
+            event_list.push(event);
+        }
 
         stats.time_warp_factor.record(game.next_time_warp_factor());
         stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
@@ -266,6 +279,12 @@ async fn app(
         debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
         debug(&format!("time warp:     {}", stats.time_warp_factor))?;
         debug(&format!("tick interp:   {}", stats.tick_interp))?;
+
+        event_list.render(
+            &mut gfx,
+            &mut resources.font_small,
+            Vector::new(800.0, 15.0),
+        )?;
 
         gfx.present(&window)?;
 

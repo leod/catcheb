@@ -1,9 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::entities::Bullet;
 use crate::{
-    geom::AaRect, Entity, EntityId, Event, Game, GameError, GameResult, Input, PlayerEntity,
-    PlayerId, Vector,
+    geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, Input,
+    PlayerEntity, PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -19,7 +19,7 @@ pub struct RunContext {
     pub events: Vec<Event>,
     pub new_entities: Vec<Entity>,
     pub removed_entities: BTreeSet<EntityId>,
-    pub killed_players: BTreeSet<PlayerId>,
+    pub killed_players: BTreeMap<PlayerId, DeathReason>,
 }
 
 impl Game {
@@ -54,7 +54,10 @@ impl Game {
 
                                 if aa_rect.contains_point(bullet.pos(time)) {
                                     context.removed_entities.insert(*entity_id);
-                                    context.killed_players.insert(player.owner);
+                                    context.killed_players.insert(
+                                        player.owner,
+                                        DeathReason::ShotByPlayer(bullet.owner),
+                                    );
                                 }
                             }
                             _ => (),
