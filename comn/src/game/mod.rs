@@ -30,6 +30,7 @@ pub struct Settings {
     pub max_num_players: usize,
     pub ticks_per_second: usize,
     pub size: Vector,
+    pub spawn_points: Vec<Point>,
 }
 
 impl Default for Settings {
@@ -38,6 +39,11 @@ impl Default for Settings {
             max_num_players: 16,
             ticks_per_second: 30,
             size: Vector::new(1280.0, 720.0),
+            spawn_points: vec![
+                Point::new(350.0, 100.0),
+                Point::new(600.0, 600.0),
+                Point::new(50.0, 500.0),
+            ],
         }
     }
 }
