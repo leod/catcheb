@@ -40,17 +40,8 @@ impl Entity {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum PlayerState {
-    Alive,
-    Respawning {
-        death_time: GameTime,
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlayerEntity {
     pub owner: PlayerId,
-    pub state: PlayerState,
     pub pos: Point,
     pub angle: Option<f32>,
     pub last_shot_time: Option<f32>,

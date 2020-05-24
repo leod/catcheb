@@ -1,5 +1,7 @@
 use crate::entities::Bullet;
-use crate::{Entity, EntityId, Game, GameError, GameResult, Input, PlayerEntity, PlayerId, Vector, Event};
+use crate::{
+    Entity, EntityId, Event, Game, GameError, GameResult, Input, PlayerEntity, PlayerId, Vector,
+};
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
 pub const PLAYER_SIT_W: f32 = 50.0;
@@ -9,15 +11,15 @@ pub const PLAYER_MOVE_L: f32 = 35.714;
 pub const PLAYER_SHOOT_PERIOD: f32 = 0.3;
 pub const BULLET_MOVE_SPEED: f32 = 900.0;
 
-#[derive(Clone, Debug)]
-pub struct UpdateContext {
+#[derive(Clone, Debug, Default)]
+pub struct RunContext {
     pub events: Vec<Event>,
     pub new_entities: Vec<Entity>,
     pub removed_entities: Vec<EntityId>,
 }
 
 impl Game {
-    pub fn run_tick(&mut self, context: &mut UpdateContext) -> GameResult<()> {
+    pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
         let time = self.tick_game_time(self.tick_num);
 
         for (entity_id, entity) in self.entities.iter() {
@@ -55,12 +57,11 @@ impl Game {
         &mut self,
         player_id: PlayerId,
         input: &Input,
-    ) -> GameResult<Vec<Entity>> {
+        context: &mut RunContext,
+    ) -> GameResult<()> {
         let delta_s = self.settings.tick_period();
         let time = self.tick_game_time(self.tick_num);
         let map_size = self.settings.size;
-
-        let mut new_entities = Vec::new();
 
         if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
             let mut delta = Vector::new(0.0, 0.0);
@@ -101,7 +102,7 @@ impl Game {
                 && time - player_entity.last_shot_time.unwrap_or(-1000.0) >= PLAYER_SHOOT_PERIOD
             {
                 player_entity.last_shot_time = Some(time);
-                new_entities.push(Entity::Bullet(Bullet {
+                context.new_entities.push(Entity::Bullet(Bullet {
                     owner: player_id,
                     start_time: time,
                     start_pos: player_entity.pos,
@@ -110,10 +111,8 @@ impl Game {
             }
         }
 
-        Ok(new_entities)
+        Ok(())
     }
-
-    pub fn kill_player(
 
     pub fn get_entity(&mut self, entity_id: EntityId) -> GameResult<&Entity> {
         self.entities
