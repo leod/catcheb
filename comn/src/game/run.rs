@@ -1,5 +1,5 @@
 use crate::entities::Bullet;
-use crate::{Entity, EntityId, Game, GameError, GameResult, Input, PlayerEntity, PlayerId, Vector};
+use crate::{Entity, EntityId, Game, GameError, GameResult, Input, PlayerEntity, PlayerId, Vector, Event};
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
 pub const PLAYER_SIT_W: f32 = 50.0;
@@ -9,17 +9,22 @@ pub const PLAYER_MOVE_L: f32 = 35.714;
 pub const PLAYER_SHOOT_PERIOD: f32 = 0.3;
 pub const BULLET_MOVE_SPEED: f32 = 900.0;
 
-impl Game {
-    pub fn run_tick(&mut self) -> GameResult<()> {
-        let time = self.tick_game_time(self.tick_num);
+#[derive(Clone, Debug)]
+pub struct UpdateContext {
+    pub events: Vec<Event>,
+    pub new_entities: Vec<Entity>,
+    pub removed_entities: Vec<EntityId>,
+}
 
-        let mut remove_ids = Vec::new();
+impl Game {
+    pub fn run_tick(&mut self, context: &mut UpdateContext) -> GameResult<()> {
+        let time = self.tick_game_time(self.tick_num);
 
         for (entity_id, entity) in self.entities.iter() {
             match entity {
                 Entity::Bullet(entity) => {
                     if !self.settings.aa_rect().contains_point(entity.pos(time)) {
-                        remove_ids.push(*entity_id);
+                        context.removed_entities.push(*entity_id);
                         continue;
                     }
 
@@ -31,7 +36,7 @@ impl Game {
                         match entity_b {
                             Entity::DangerGuy(entity_b) => {
                                 if entity_b.aa_rect(time).contains_point(entity.pos(time)) {
-                                    remove_ids.push(*entity_id);
+                                    context.removed_entities.push(*entity_id);
                                     break;
                                 }
                             }
@@ -41,10 +46,6 @@ impl Game {
                 }
                 _ => (),
             }
-        }
-
-        for id in remove_ids {
-            self.entities.remove(&id);
         }
 
         Ok(())
@@ -111,6 +112,8 @@ impl Game {
 
         Ok(new_entities)
     }
+
+    pub fn kill_player(
 
     pub fn get_entity(&mut self, entity_id: EntityId) -> GameResult<&Entity> {
         self.entities
