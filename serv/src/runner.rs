@@ -71,7 +71,8 @@ impl Default for Config {
 pub struct Stats {
     pub num_players: stats::Var,
     pub num_games: stats::Var,
-    pub num_inputs_per_game_tick: stats::Var,
+    pub num_inputs_per_player_tick: stats::Var,
+    pub input_delay: stats::Var,
 }
 
 pub struct JoinMessage {
@@ -209,8 +210,9 @@ impl Runner {
                 debug!("num games:            {}", self.stats.num_games);
                 debug!(
                     "inputs per game tick: {}",
-                    self.stats.num_inputs_per_game_tick
+                    self.stats.num_inputs_per_player_tick
                 );
+                debug!("input delay         : {}", self.stats.input_delay,);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -416,6 +418,13 @@ impl Runner {
                 player_inputs.push(player.inputs.pop().unwrap());
             }
 
+            let game = &self.games[&player.game_id];
+            for (input_num, _) in player_inputs.iter() {
+                self.stats
+                    .input_delay
+                    .record((game.state().tick_num.0 - input_num.0) as f32);
+            }
+
             if player_inputs.is_empty() {
                 // We did not receive the correct input in time, just reuse
                 // the previous one.
@@ -439,11 +448,12 @@ impl Runner {
         // Record some statistics for monitoring.
         self.stats.num_players.record(self.players.len() as f32);
         self.stats.num_games.record(self.games.len() as f32);
-        self.stats.num_inputs_per_game_tick.record(
+        self.stats.num_inputs_per_player_tick.record(
             tick_inputs
                 .values()
                 .map(|inputs| inputs.len() as f32)
-                .sum::<f32>(),
+                .sum::<f32>()
+                / self.players.len() as f32,
         );
 
         // Update the games.
