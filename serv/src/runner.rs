@@ -1,5 +1,4 @@
 use std::{
-    cmp::Ordering,
     collections::HashMap,
     net::SocketAddr,
     time::{Duration, Instant},
@@ -72,7 +71,8 @@ impl Default for Config {
 pub struct Stats {
     pub num_players: stats::Var,
     pub num_games: stats::Var,
-    pub num_inputs_per_game_tick: stats::Var,
+    pub num_inputs_per_player_tick: stats::Var,
+    pub input_delay: stats::Var,
 }
 
 pub struct JoinMessage {
@@ -210,8 +210,9 @@ impl Runner {
                 debug!("num games:            {}", self.stats.num_games);
                 debug!(
                     "inputs per game tick: {}",
-                    self.stats.num_inputs_per_game_tick
+                    self.stats.num_inputs_per_player_tick
                 );
+                debug!("input delay         : {}", self.stats.input_delay,);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -343,7 +344,7 @@ impl Runner {
                         // Clients try to stay behind the server in time, since
                         // they always interpolate behind old received state.
                         // Thus, with a correct client, this case should not
-                        // happen. Ignoring input may help prevent speed
+                        // happen. Ignoring input here may help prevent speed
                         // hacking.
                         warn!(
                             "Ignoring input {:?} by player {:?}, which is ahead of our tick num {:?}",
@@ -402,15 +403,11 @@ impl Runner {
             .map(|game_id| (*game_id, Vec::new()))
             .collect();
 
-        let now = Instant::now();
-
         // Collect player inputs to run.
-        for player in self.players.values_mut() {
+        for (player_token, player) in self.players.iter_mut() {
             if player.refill_inputs {
                 continue;
             }
-
-            let game = &self.games[&player.game_id];
 
             let mut player_inputs = Vec::new();
             if let Some((oldest_tick_num, oldest_input)) = player.inputs.pop() {
@@ -421,6 +418,13 @@ impl Runner {
                 player_inputs.push(player.inputs.pop().unwrap());
             }
 
+            let game = &self.games[&player.game_id];
+            for (input_num, _) in player_inputs.iter() {
+                self.stats
+                    .input_delay
+                    .record((game.state().tick_num.0 - input_num.0) as f32);
+            }
+
             if player_inputs.is_empty() {
                 // We did not receive the correct input in time, just reuse
                 // the previous one.
@@ -428,7 +432,7 @@ impl Runner {
                     player_inputs.push((last_input_num.next(), last_input));
                 }
 
-                info!("will refill");
+                debug!("Will refill input for player {:?}", player_token);
                 player.refill_inputs = true;
             }
 
@@ -444,11 +448,12 @@ impl Runner {
         // Record some statistics for monitoring.
         self.stats.num_players.record(self.players.len() as f32);
         self.stats.num_games.record(self.games.len() as f32);
-        self.stats.num_inputs_per_game_tick.record(
+        self.stats.num_inputs_per_player_tick.record(
             tick_inputs
                 .values()
                 .map(|inputs| inputs.len() as f32)
-                .sum::<f32>(),
+                .sum::<f32>()
+                / self.players.len() as f32,
         );
 
         // Update the games.
@@ -461,17 +466,17 @@ impl Runner {
         for player in self.players.values() {
             if let Some(peer) = player.peer {
                 // TODO: Sending state properly
-                let state = self.games[&player.game_id].state();
+                let game = &self.games[&player.game_id];
                 let tick = comn::Tick {
-                    entities: state.entities.clone(),
-                    events: Vec::new(),
+                    entities: game.state().entities.clone(),
+                    events: game.last_events.clone(),
                     last_inputs: Default::default(), // TODO: send last_inputs
                 };
 
                 messages.push((
                     peer,
                     comn::ServerMessage::Tick {
-                        tick_num: state.tick_num,
+                        tick_num: game.state().tick_num,
                         tick,
                     },
                 ));

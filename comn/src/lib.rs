@@ -1,4 +1,5 @@
 pub mod game;
+pub mod geom;
 pub mod util;
 
 use serde::{Deserialize, Serialize};
@@ -7,12 +8,13 @@ use uuid::Uuid;
 pub use crate::{
     game::{
         entities::{DangerGuy, PlayerEntity},
-        Entity, EntityId, Game, Input, Item, Player, PlayerId, Point, Settings, Tick, TickNum,
-        Time, Vector,
+        DeathReason, Entity, EntityId, Event, Game, Input, Item, Player, PlayerId, PlayerState,
+        Point, Settings, Tick, TickNum, Time, Vector,
     },
     util::ping::SequenceNum,
 };
 
+pub use crate::game::entities;
 pub use crate::game::Error as GameError;
 pub use crate::game::Result as GameResult;
 pub use crate::game::Time as GameTime;

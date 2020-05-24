@@ -61,7 +61,7 @@ impl Game {
         }
     }
 
-    pub fn update(&mut self, dt: Duration, input: &comn::Input) {
+    pub fn update(&mut self, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             self.handle_message(recv_time, message);
         }
@@ -111,10 +111,14 @@ impl Game {
         self.interp_game_time = new_interp_game_time;
         self.next_time_warp_factor = self.time_warp_factor();
 
+        let mut events = Vec::new();
         for tick_num in started_tick_nums.iter() {
-            // TODO: Run events
+            if let Some(tick) = self.received_ticks.get(tick_num) {
+                events.extend(tick.events.clone().into_iter());
+            }
 
             // TODO: Limit number of inputs to send, when skipping large numbers of ticks
+            // TODO: Send input even for ticks that we did not receive
             self.send(comn::ClientMessage::Input {
                 tick_num: *tick_num,
                 input: input.clone(),
@@ -157,6 +161,8 @@ impl Game {
         for tick_num in remove_tick_nums {
             self.received_ticks.remove(&tick_num);
         }
+
+        events
     }
 
     pub fn state(&self) -> &comn::Game {
