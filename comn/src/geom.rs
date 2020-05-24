@@ -11,6 +11,13 @@ impl AaRect {
         Self { top_left, size }
     }
 
+    pub fn new_center(center: Point, size: Vector) -> Self {
+        Self {
+            top_left: center - size / 2.0,
+            size,
+        }
+    }
+
     pub fn contains_point(&self, point: Point) -> bool {
         point.x >= self.top_left.x
             && point.y >= self.top_left.y
