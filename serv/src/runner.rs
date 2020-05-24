@@ -466,17 +466,17 @@ impl Runner {
         for player in self.players.values() {
             if let Some(peer) = player.peer {
                 // TODO: Sending state properly
-                let state = self.games[&player.game_id].state();
+                let game = &self.games[&player.game_id];
                 let tick = comn::Tick {
-                    entities: state.entities.clone(),
-                    events: Vec::new(),
+                    entities: game.state().entities.clone(),
+                    events: game.last_events.clone(),
                     last_inputs: Default::default(), // TODO: send last_inputs
                 };
 
                 messages.push((
                     peer,
                     comn::ServerMessage::Tick {
-                        tick_num: state.tick_num,
+                        tick_num: game.state().tick_num,
                         tick,
                     },
                 ));

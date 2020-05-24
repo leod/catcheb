@@ -105,8 +105,15 @@ pub enum Event {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PlayerState {
+    Alive,
+    Respawning { respawn_time: GameTime },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
     pub name: String,
+    pub state: PlayerState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +159,10 @@ impl Game {
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
         self.settings.tick_period() * tick_num.0 as GameTime
+    }
+
+    pub fn current_game_time(&self) -> GameTime {
+        self.tick_game_time(self.tick_num)
     }
 }
 
