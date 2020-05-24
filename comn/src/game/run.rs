@@ -1,6 +1,9 @@
+use std::collections::BTreeSet;
+
 use crate::entities::Bullet;
 use crate::{
-    Entity, EntityId, Event, Game, GameError, GameResult, Input, PlayerEntity, PlayerId, Vector,
+    geom::AaRect, Entity, EntityId, Event, Game, GameError, GameResult, Input, PlayerEntity,
+    PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -15,7 +18,8 @@ pub const BULLET_MOVE_SPEED: f32 = 900.0;
 pub struct RunContext {
     pub events: Vec<Event>,
     pub new_entities: Vec<Entity>,
-    pub removed_entities: Vec<EntityId>,
+    pub removed_entities: BTreeSet<EntityId>,
+    pub killed_players: BTreeSet<PlayerId>,
 }
 
 impl Game {
@@ -24,9 +28,9 @@ impl Game {
 
         for (entity_id, entity) in self.entities.iter() {
             match entity {
-                Entity::Bullet(entity) => {
-                    if !self.settings.aa_rect().contains_point(entity.pos(time)) {
-                        context.removed_entities.push(*entity_id);
+                Entity::Bullet(bullet) => {
+                    if !self.settings.aa_rect().contains_point(bullet.pos(time)) {
+                        context.removed_entities.insert(*entity_id);
                         continue;
                     }
 
@@ -36,10 +40,21 @@ impl Game {
                         }
 
                         match entity_b {
-                            Entity::DangerGuy(entity_b) => {
-                                if entity_b.aa_rect(time).contains_point(entity.pos(time)) {
-                                    context.removed_entities.push(*entity_id);
-                                    break;
+                            Entity::DangerGuy(danger_guy) => {
+                                if danger_guy.aa_rect(time).contains_point(bullet.pos(time)) {
+                                    context.removed_entities.insert(*entity_id);
+                                }
+                            }
+                            Entity::Player(player) if player.owner != bullet.owner => {
+                                // TODO: Player geometry
+                                let aa_rect = AaRect::new_center(
+                                    player.pos,
+                                    Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
+                                );
+
+                                if aa_rect.contains_point(bullet.pos(time)) {
+                                    context.removed_entities.insert(*entity_id);
+                                    context.killed_players.insert(player.owner);
                                 }
                             }
                             _ => (),
