@@ -24,7 +24,7 @@ pub struct RunContext {
 
 impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
-        let time = self.tick_game_time(self.tick_num);
+        let time = self.current_game_time();
 
         for (entity_id, entity) in self.entities.iter() {
             match entity {
@@ -78,7 +78,7 @@ impl Game {
         context: &mut RunContext,
     ) -> GameResult<()> {
         let delta_s = self.settings.tick_period();
-        let time = self.tick_game_time(self.tick_num);
+        let time = self.current_game_time();
         let map_size = self.settings.size;
 
         if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
@@ -126,6 +126,21 @@ impl Game {
                     start_pos: player_entity.pos,
                     vel: delta.normalize() * BULLET_MOVE_SPEED,
                 }));
+            }
+
+            let pos = player_entity.pos;
+            for (entity_id, entity) in self.entities.iter() {
+                match entity {
+                    Entity::DangerGuy(danger_guy) => {
+                        // TODO: Player geometry
+                        if danger_guy.aa_rect(time).contains_point(pos) {
+                            context
+                                .killed_players
+                                .insert(player_id, DeathReason::TouchedTheDanger);
+                        }
+                    }
+                    _ => (),
+                }
             }
         }
 
