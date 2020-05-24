@@ -404,7 +404,7 @@ impl Runner {
             .collect();
 
         // Collect player inputs to run.
-        for player in self.players.values_mut() {
+        for (player_token, player) in self.players.iter_mut() {
             if player.refill_inputs {
                 continue;
             }
@@ -432,7 +432,7 @@ impl Runner {
                     player_inputs.push((last_input_num.next(), last_input));
                 }
 
-                info!("will refill");
+                debug!("Will refill input for player {:?}", player_token);
                 player.refill_inputs = true;
             }
 

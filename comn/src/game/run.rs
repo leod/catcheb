@@ -129,7 +129,7 @@ impl Game {
             }
 
             let pos = player_entity.pos;
-            for (entity_id, entity) in self.entities.iter() {
+            for (_entity_id, entity) in self.entities.iter() {
                 match entity {
                     Entity::DangerGuy(danger_guy) => {
                         // TODO: Player geometry
