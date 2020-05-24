@@ -90,7 +90,14 @@ impl Game {
         for (player_id, player) in self.state.players.iter_mut() {
             match player.state.clone() {
                 PlayerState::Alive => (),
+                PlayerState::Dead => {
+                    player.state = PlayerState::Respawning {
+                        respawn_time: current_time + RESPAWN_DURATION,
+                    };
+                }
                 PlayerState::Respawning { respawn_time } if current_time >= respawn_time => {
+                    debug!("Respawning player {:?}", player_id);
+
                     context
                         .new_entities
                         .push(Entity::Player(comn::PlayerEntity {
@@ -112,6 +119,10 @@ impl Game {
 
         for entity_id in context.removed_entities {
             self.remove_entity(entity_id);
+        }
+
+        for player_id in context.killed_players {
+            self.kill_player(player_id);
         }
 
         self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1);
@@ -164,5 +175,19 @@ impl Game {
     fn remove_entity(&mut self, entity_id: comn::EntityId) {
         debug!("Removing entity {:?}", entity_id);
         self.state.entities.remove(&entity_id).unwrap();
+    }
+
+    fn kill_player(&mut self, player_id: comn::PlayerId) {
+        let player = self.state.players.get_mut(&player_id).unwrap();
+        debug!(
+            "Killing player {:?} (in state {:?})",
+            player_id, player.state
+        );
+
+        player.state = PlayerState::Dead;
+
+        if let Some((player_entity_id, _)) = self.state.get_player_entity(player_id).unwrap() {
+            self.remove_entity(player_entity_id);
+        }
     }
 }

@@ -107,6 +107,7 @@ pub enum Event {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlayerState {
     Alive,
+    Dead,
     Respawning { respawn_time: GameTime },
 }
 
