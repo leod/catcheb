@@ -1,5 +1,6 @@
 mod event_list;
 mod game;
+mod prediction;
 mod webrtc;
 
 use std::collections::{BTreeMap, HashSet};
@@ -274,6 +275,7 @@ async fn app(
             "recv std dev:  {:.2}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
+        debug("")?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;
         debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
