@@ -31,7 +31,7 @@ impl Game {
             my_player_id: join.your_player_id,
             webrtc_client,
             state: comn::Game::new(join.game_settings.clone()),
-            prediction: Some(Prediction::default()),
+            prediction: Some(Prediction::new(join.your_player_id)),
             next_tick: None,
             received_ticks: BTreeMap::new(),
             ping: PingEstimation::default(),
@@ -186,7 +186,10 @@ impl Game {
         self.next_tick.as_ref()
     }
 
-    pub fn next_state(&self) -> BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)> {
+    pub fn current_entities(&self) -> comn::EntityMap {
+    }
+
+    pub fn next_entities(&self) -> BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)> {
         let mut next_state = BTreeMap::new();
 
         if let Some((next_tick_num, next_tick)) = self.next_tick() {
