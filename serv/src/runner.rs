@@ -470,7 +470,7 @@ impl Runner {
                 let tick = comn::Tick {
                     entities: game.state().entities.clone(),
                     events: game.last_events.clone(),
-                    last_inputs: Default::default(), // TODO: send last_inputs
+                    your_last_input: player.last_input.clone().map(|(tick_num, _)| tick_num),
                 };
 
                 messages.push((

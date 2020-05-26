@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 use comn::util::{GameTimeEstimation, PingEstimation};
 
-use crate::webrtc;
+use crate::{prediction::Prediction, webrtc};
 
 pub struct Game {
     my_token: comn::PlayerToken,
@@ -13,6 +13,8 @@ pub struct Game {
     webrtc_client: webrtc::Client,
 
     state: comn::Game,
+    prediction: Option<Prediction>,
+
     next_tick: Option<(comn::TickNum, comn::Tick)>,
     received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
 
@@ -29,6 +31,7 @@ impl Game {
             my_player_id: join.your_player_id,
             webrtc_client,
             state: comn::Game::new(join.game_settings.clone()),
+            prediction: Some(Prediction::default()),
             next_tick: None,
             received_ticks: BTreeMap::new(),
             ping: PingEstimation::default(),
@@ -65,6 +68,7 @@ impl Game {
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             self.handle_message(recv_time, message);
         }
+
         if let Some(sequence_num) = self.ping.next_ping_sequence_num() {
             self.send(comn::ClientMessage::Ping(sequence_num));
         }
@@ -73,11 +77,14 @@ impl Game {
         // receive stream by our desired lag time. We do this so that
         // we have ticks between which we can interpolate.
         //
-        // If we are off too far, slow down or speed up playback time.
+        // If we are off too far from our lag target, slow down or speed up
+        // playback time.
         let new_interp_game_time =
             self.interp_game_time + dt.as_secs_f32() * self.next_time_warp_factor;
 
         // Don't let time run further than the ticks that we have received.
+        // This is here so that we stop local time if the server drops or
+        // starts lagging heavily.
         let max_tick_num = self
             .received_ticks
             .keys()
@@ -96,42 +103,48 @@ impl Game {
         let new_interp_game_time =
             new_interp_game_time.min(self.state.tick_game_time(max_tick_num));
 
-        // Start all the ticks that we have crossed while advancing our
-        // local game time.
-        let started_tick_nums: Vec<comn::TickNum> = self
-            .received_ticks
-            .keys()
-            .copied()
-            .filter(|tick_num| {
-                let game_time = self.state.tick_game_time(*tick_num);
-                self.state.tick_num < *tick_num && game_time <= new_interp_game_time
-            })
+        let new_tick_num = (new_interp_game_time / self.state.settings.tick_period()) as u32;
+        let crossed_tick_nums: Vec<comn::TickNum> = (self.state.tick_num.0 + 1..=new_tick_num)
+            .map(|i| comn::TickNum(i))
             .collect();
 
         self.interp_game_time = new_interp_game_time;
         self.next_time_warp_factor = self.time_warp_factor();
 
+        // Iterate over all the ticks that we have crossed, also including
+        // those for which we did not anything from the server.
         let mut events = Vec::new();
-        for tick_num in started_tick_nums.iter() {
+        let mut last_server_tick_num = None;
+
+        for tick_num in crossed_tick_nums.iter() {
             if let Some(tick) = self.received_ticks.get(tick_num) {
                 events.extend(tick.events.clone().into_iter());
+                last_server_tick_num = Some(*tick_num);
             }
 
             // TODO: Limit number of inputs to send, when skipping large numbers of ticks
-            // TODO: Send input even for ticks that we did not receive
             self.send(comn::ClientMessage::Input {
                 tick_num: *tick_num,
                 input: input.clone(),
             });
+
+            if let Some(prediction) = self.prediction.as_mut() {
+                prediction.record_tick_input(
+                    *tick_num,
+                    &mut self.state,
+                    input.clone(),
+                    self.received_ticks.get(tick_num),
+                );
+            }
         }
 
-        if let Some(last_tick_num) = started_tick_nums.last().copied() {
-            self.snap_to_tick(last_tick_num, self.received_ticks[&last_tick_num].clone());
+        if let Some(tick_num) = last_server_tick_num {
+            self.snap_to_tick(tick_num, self.received_ticks[&tick_num].clone());
 
             if self
                 .next_tick
                 .as_ref()
-                .map_or(false, |(next_tick_num, _)| *next_tick_num <= last_tick_num)
+                .map_or(false, |(next_tick_num, _)| *next_tick_num <= tick_num)
             {
                 // We have reached the tick that we were interpolating into, so
                 // we'll need to look for the next interpolation target.
@@ -262,4 +275,6 @@ impl Game {
         self.state.tick_num = tick_num;
         self.state.entities = tick.entities;
     }
+
+    fn load_tick(&mut self, tick_num: comn::TickNum, tick: comn::Tick) {}
 }
