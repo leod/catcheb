@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::entities::Bullet;
 use crate::{
     geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, Input,
-    PlayerEntity, PlayerId, Vector,
+    PlayerEntity, PlayerId, Vector, EntityMap,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -71,127 +71,128 @@ impl Game {
         Ok(())
     }
 
-    pub fn run_player_input(
-        &mut self,
-        player_id: PlayerId,
-        input: &Input,
-        context: &mut RunContext,
-    ) -> GameResult<()> {
-        let delta_s = self.settings.tick_period();
-        let time = self.current_game_time();
-        let map_size = self.settings.size;
 
-        if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
-            let mut delta = Vector::new(0.0, 0.0);
+}
 
-            if input.move_left {
-                delta.x -= 1.0;
-            }
-            if input.move_right {
-                delta.x += 1.0;
-            }
-            if input.move_up {
-                delta.y -= 1.0;
-            }
-            if input.move_down {
-                delta.y += 1.0;
-            }
+pub fn run_player_input(
+    &mut self,
+    player_id: PlayerId,
+    input: &Input,
+    entities: &EntityMap,
+    context: &mut RunContext,
+) -> GameResult<()> {
+    let delta_s = self.settings.tick_period();
+    let time = self.current_game_time();
+    let map_size = self.settings.size;
 
-            if delta.norm() > 0.0 {
-                player_entity.pos += delta.normalize() * PLAYER_MOVE_SPEED * delta_s;
-                player_entity.angle = Some(delta.y.atan2(delta.x));
-            } else {
-                player_entity.angle = None;
-            }
+    if let Some((_entity_id, player_entity)) = get_player_entity_mut(entities, player_id)? {
+        let mut delta = Vector::new(0.0, 0.0);
 
-            player_entity.pos.x = player_entity
-                .pos
-                .x
-                .min(map_size.x - PLAYER_SIT_W / 2.0)
-                .max(PLAYER_SIT_W / 2.0);
-            player_entity.pos.y = player_entity
-                .pos
-                .y
-                .min(map_size.y - PLAYER_SIT_W / 2.0)
-                .max(PLAYER_SIT_W / 2.0);
-
-            if delta.norm() > 0.0
-                && input.use_item
-                && time - player_entity.last_shot_time.unwrap_or(-1000.0) >= PLAYER_SHOOT_PERIOD
-            {
-                player_entity.last_shot_time = Some(time);
-                context.new_entities.push(Entity::Bullet(Bullet {
-                    owner: player_id,
-                    start_time: time,
-                    start_pos: player_entity.pos,
-                    vel: delta.normalize() * BULLET_MOVE_SPEED,
-                }));
-            }
-
-            let pos = player_entity.pos;
-            for (_entity_id, entity) in self.entities.iter() {
-                match entity {
-                    Entity::DangerGuy(danger_guy) => {
-                        // TODO: Player geometry
-                        if danger_guy.aa_rect(time).contains_point(pos) {
-                            context
-                                .killed_players
-                                .insert(player_id, DeathReason::TouchedTheDanger);
-                        }
-                    }
-                    _ => (),
-                }
-            }
+        if input.move_left {
+            delta.x -= 1.0;
+        }
+        if input.move_right {
+            delta.x += 1.0;
+        }
+        if input.move_up {
+            delta.y -= 1.0;
+        }
+        if input.move_down {
+            delta.y += 1.0;
         }
 
-        Ok(())
-    }
+        if delta.norm() > 0.0 {
+            player_entity.pos += delta.normalize() * PLAYER_MOVE_SPEED * delta_s;
+            player_entity.angle = Some(delta.y.atan2(delta.x));
+        } else {
+            player_entity.angle = None;
+        }
 
-    pub fn get_entity(&mut self, entity_id: EntityId) -> GameResult<&Entity> {
-        self.entities
-            .get(&entity_id)
-            .ok_or_else(|| GameError::InvalidEntityId(entity_id))
-    }
+        player_entity.pos.x = player_entity
+            .pos
+            .x
+            .min(map_size.x - PLAYER_SIT_W / 2.0)
+            .max(PLAYER_SIT_W / 2.0);
+        player_entity.pos.y = player_entity
+            .pos
+            .y
+            .min(map_size.y - PLAYER_SIT_W / 2.0)
+            .max(PLAYER_SIT_W / 2.0);
 
-    pub fn get_player_entity(
-        &mut self,
-        player_id: PlayerId,
-    ) -> GameResult<Option<(EntityId, &PlayerEntity)>> {
-        Ok(self
-            .entities
-            .iter()
-            .filter_map(|(&id, e)| {
-                if let Entity::Player(ref e) = e {
-                    if e.owner == player_id {
-                        Some((id, e))
-                    } else {
-                        None
+        if delta.norm() > 0.0
+            && input.use_item
+            && time - player_entity.last_shot_time.unwrap_or(-1000.0) >= PLAYER_SHOOT_PERIOD
+        {
+            player_entity.last_shot_time = Some(time);
+            context.new_entities.push(Entity::Bullet(Bullet {
+                owner: player_id,
+                start_time: time,
+                start_pos: player_entity.pos,
+                vel: delta.normalize() * BULLET_MOVE_SPEED,
+            }));
+        }
+
+        let pos = player_entity.pos;
+        for (_entity_id, entity) in entities.iter() {
+            match entity {
+                Entity::DangerGuy(danger_guy) => {
+                    // TODO: Player geometry
+                    if danger_guy.aa_rect(time).contains_point(pos) {
+                        context
+                            .killed_players
+                            .insert(player_id, DeathReason::TouchedTheDanger);
                     }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn try_get_entity(entities: &EntityMap, entity_id: EntityId) -> GameResult<&Entity> {
+    entities
+        .get(&entity_id)
+        .ok_or_else(|| GameError::InvalidEntityId(entity_id))
+}
+
+pub fn get_player_entity(
+    entities: &EntityMap,
+    player_id: PlayerId,
+) -> Option<(EntityId, &PlayerEntity)> {
+    entities
+        .iter()
+        .filter_map(|(&id, e)| {
+            if let Entity::Player(ref e) = e {
+                if e.owner == player_id {
+                    Some((id, e))
                 } else {
                     None
                 }
-            })
-            .next())
-    }
+            } else {
+                None
+            }
+        })
+        .next()
+}
 
-    pub fn get_player_entity_mut(
-        &mut self,
-        player_id: PlayerId,
-    ) -> GameResult<Option<(EntityId, &mut PlayerEntity)>> {
-        Ok(self
-            .entities
-            .iter_mut()
-            .filter_map(|(&id, e)| {
-                if let Entity::Player(ref mut e) = e {
-                    if e.owner == player_id {
-                        Some((id, e))
-                    } else {
-                        None
-                    }
+pub fn get_player_entity_mut(
+    entities: &mut EntityMap,
+    player_id: PlayerId,
+) -> Option<(EntityId, &mut PlayerEntity)> {
+    entities
+        .iter_mut()
+        .filter_map(|(&id, e)| {
+            if let Entity::Player(ref mut e) = e {
+                if e.owner == player_id {
+                    Some((id, e))
                 } else {
                     None
                 }
-            })
-            .next())
-    }
+            } else {
+                None
+            }
+        })
+        .next()
 }
