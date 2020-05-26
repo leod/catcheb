@@ -140,12 +140,15 @@ pub struct Player {
     pub state: PlayerState,
 }
 
+pub type PlayerMap = BTreeMap<PlayerId, Player>;
+pub type EntityMap = BTreeMap<EntityId, Entity>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
     pub settings: Settings,
     pub tick_num: TickNum,
-    pub players: BTreeMap<PlayerId, Player>,
-    pub entities: BTreeMap<EntityId, Entity>,
+    pub players: PlayerMap,
+    pub entities: EntityMap,
 }
 
 impl Game {
@@ -201,7 +204,7 @@ impl Game {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tick {
-    pub entities: BTreeMap<EntityId, Entity>,
-    pub last_inputs: BTreeMap<PlayerId, Input>,
+    pub entities: EntityMap,
     pub events: Vec<Event>,
+    pub your_last_input: Option<TickNum>,
 }
