@@ -16,7 +16,7 @@ impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{:>4.2} {:>4.2} {:>4.2} {:>4.2}",
+            "{:>7.2} {:>7.2} {:>7.2} {:>7.2}",
             self.mean().unwrap_or(0.0 / 0.0),
             self.std_dev().unwrap_or(0.0 / 0.0),
             self.min().unwrap_or(0.0 / 0.0),
