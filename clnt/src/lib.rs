@@ -76,7 +76,7 @@ pub fn render_game(
     gfx: &mut Graphics,
     resources: &mut Resources,
     state: &comn::Game,
-    next_state: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
     time: comn::GameTime,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
@@ -86,7 +86,7 @@ pub fn render_game(
     for (entity_id, entity) in state.entities.iter() {
         match entity {
             comn::Entity::Player(player) => {
-                let pos = if let Some((next_time, next_entity)) = next_state.get(entity_id) {
+                let pos = if let Some((next_time, next_entity)) = next_entities.get(entity_id) {
                     let tau = (time - state_time) / (next_time - state_time);
 
                     if let Ok(next_player) = next_entity.player() {
@@ -246,17 +246,19 @@ async fn app(
             .record((recv_game_time - game.interp_game_time()) * 1000.0);
         stats
             .tick_interp
-            .record(game.next_tick().map_or(0.0, |(next_tick_num, _)| {
-                (next_tick_num.0 - game.state().tick_num.0) as f32
+            .record(game.next_tick_num().map_or(0.0, |next_tick_num| {
+                (next_tick_num.0 - game.tick_num().0) as f32
             }));
 
-        render_game(
-            &mut gfx,
-            &mut resources,
-            &game.state(),
-            &game.next_state(),
-            game.interp_game_time(),
-        )?;
+        if let Some(state) = game.state() {
+            render_game(
+                &mut gfx,
+                &mut resources,
+                &state,
+                &game.next_entities(),
+                game.interp_game_time(),
+            )?;
+        }
 
         let mut debug_y: f32 = 15.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {

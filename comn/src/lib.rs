@@ -52,7 +52,7 @@ pub type JoinReply = Result<JoinSuccess, JoinError>;
 pub enum ServerMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
-    Tick { tick_num: TickNum, tick: Tick },
+    Tick(Tick),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -53,6 +53,10 @@ impl Settings {
         1.0 / (self.ticks_per_second as f32)
     }
 
+    pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
+        self.tick_period() * tick_num.0 as f32
+    }
+
     pub fn aa_rect(&self) -> geom::AaRect {
         geom::AaRect::new_top_left(Point::new(0.0, 0.0), self.size)
     }
@@ -194,7 +198,7 @@ impl Game {
     }
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
-        self.settings.tick_period() * tick_num.0 as GameTime
+        self.settings.tick_game_time(tick_num)
     }
 
     pub fn current_game_time(&self) -> GameTime {
@@ -204,7 +208,7 @@ impl Game {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tick {
-    pub entities: EntityMap,
+    pub state: Game,
     pub events: Vec<Event>,
     pub your_last_input: Option<TickNum>,
 }

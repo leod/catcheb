@@ -7,36 +7,38 @@ use comn::util::{GameTimeEstimation, PingEstimation};
 use crate::{prediction::Prediction, webrtc};
 
 pub struct Game {
+    settings: comn::Settings,
     my_token: comn::PlayerToken,
     my_player_id: comn::PlayerId,
 
     webrtc_client: webrtc::Client,
 
-    state: comn::Game,
+    received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
     prediction: Option<Prediction>,
 
-    next_tick: Option<(comn::TickNum, comn::Tick)>,
-    received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
+    interp_game_time: comn::GameTime,
+    next_tick_num: Option<comn::TickNum>,
 
     ping: PingEstimation,
     recv_tick_time: GameTimeEstimation,
-    interp_game_time: comn::GameTime,
     next_time_warp_factor: f32,
 }
 
 impl Game {
     pub fn new(join: comn::JoinSuccess, webrtc_client: webrtc::Client) -> Self {
+        let prediction = Some(Prediction::new(join.your_player_id));
+        let recv_tick_time = GameTimeEstimation::new(join.game_settings.tick_period());
         Self {
+            settings: join.game_settings,
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
-            state: comn::Game::new(join.game_settings.clone()),
-            prediction: Some(Prediction::new(join.your_player_id)),
-            next_tick: None,
             received_ticks: BTreeMap::new(),
-            ping: PingEstimation::default(),
-            recv_tick_time: GameTimeEstimation::new(join.game_settings.tick_period()),
+            prediction,
             interp_game_time: 0.0,
+            next_tick_num: None,
+            ping: PingEstimation::default(),
+            recv_tick_time,
             next_time_warp_factor: 1.0,
         }
     }
@@ -46,11 +48,15 @@ impl Game {
     }
 
     pub fn target_time_lag(&self) -> comn::GameTime {
-        self.state.settings.tick_period() * 3.0
+        self.settings.tick_period() * 3.0
     }
 
     pub fn next_time_warp_factor(&self) -> f32 {
         self.next_time_warp_factor
+    }
+
+    pub fn next_tick_num(&self) -> Option<comn::TickNum> {
+        self.next_tick_num
     }
 
     fn time_warp_factor(&self) -> f32 {
@@ -92,24 +98,20 @@ impl Game {
             .next()
             .copied()
             .unwrap_or(comn::TickNum(0))
-            .max(self.state.tick_num)
-            .max(
-                self.next_tick
-                    .as_ref()
-                    .map(|(tick_num, _)| *tick_num)
-                    .unwrap_or(comn::TickNum(0)),
-            );
+            .max(self.tick_num())
+            .max(self.next_tick_num.unwrap_or(comn::TickNum(0)));
 
         let new_interp_game_time =
-            new_interp_game_time.min(self.state.tick_game_time(max_tick_num));
+            new_interp_game_time.min(self.settings.tick_game_time(max_tick_num));
 
-        let new_tick_num = (new_interp_game_time / self.state.settings.tick_period()) as u32;
-        let crossed_tick_nums: Vec<comn::TickNum> = (self.state.tick_num.0 + 1..=new_tick_num)
+        let prev_tick_num = self.tick_num();
+        self.interp_game_time = new_interp_game_time;
+        let new_tick_num = self.tick_num();
+        self.next_time_warp_factor = self.time_warp_factor();
+
+        let crossed_tick_nums: Vec<comn::TickNum> = (prev_tick_num.0 + 1..=new_tick_num.0)
             .map(|i| comn::TickNum(i))
             .collect();
-
-        self.interp_game_time = new_interp_game_time;
-        self.next_time_warp_factor = self.time_warp_factor();
 
         // Iterate over all the ticks that we have crossed, also including
         // those for which we did not anything from the server.
@@ -131,7 +133,6 @@ impl Game {
             if let Some(prediction) = self.prediction.as_mut() {
                 prediction.record_tick_input(
                     *tick_num,
-                    &mut self.state,
                     input.clone(),
                     self.received_ticks.get(tick_num),
                 );
@@ -139,27 +140,24 @@ impl Game {
         }
 
         if let Some(tick_num) = last_server_tick_num {
-            self.snap_to_tick(tick_num, self.received_ticks[&tick_num].clone());
-
             if self
-                .next_tick
-                .as_ref()
-                .map_or(false, |(next_tick_num, _)| *next_tick_num <= tick_num)
+                .next_tick_num
+                .map_or(false, |next_tick_num| next_tick_num <= tick_num)
             {
                 // We have reached the tick that we were interpolating into, so
                 // we'll need to look for the next interpolation target.
-                self.next_tick = None;
+                self.next_tick_num = None;
             }
         }
 
         // Do we have a tick to interpolate into ready?
-        if self.next_tick.is_none() {
-            let min_next_tick = self.received_ticks.iter().find(|(tick_num, _tick)| {
-                **tick_num > self.state.tick_num && tick_num.0 - self.state.tick_num.0 <= 3
+        if self.next_tick_num.is_none() {
+            let min_ready_num = self.received_ticks.keys().find(|tick_num| {
+                **tick_num > self.tick_num() && tick_num.0 - self.tick_num().0 <= 3
             });
 
-            if let Some((next_tick_num, next_tick)) = min_next_tick {
-                self.next_tick = Some((*next_tick_num, next_tick.clone()));
+            if let Some(min_ready_num) = min_ready_num {
+                self.next_tick_num = Some(*min_ready_num);
             }
         }
 
@@ -168,7 +166,7 @@ impl Game {
             .received_ticks
             .keys()
             .copied()
-            .filter(|tick_num| *tick_num < self.state.tick_num)
+            .filter(|tick_num| *tick_num < self.tick_num())
             .collect();
 
         for tick_num in remove_tick_nums {
@@ -178,37 +176,64 @@ impl Game {
         events
     }
 
-    pub fn state(&self) -> &comn::Game {
-        &self.state
+    pub fn tick_num(&self) -> comn::TickNum {
+        comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
     }
 
-    pub fn next_tick(&self) -> Option<&(comn::TickNum, comn::Tick)> {
-        self.next_tick.as_ref()
-    }
-
-    pub fn current_entities(&self) -> comn::EntityMap {
+    pub fn state(&self) -> Option<&comn::Game> {
+        if let Some(prediction) = self.prediction.as_ref() {
+            prediction.predicted_state(self.tick_num())
+        } else {
+            self.received_ticks
+                .get(&self.tick_num())
+                .map(|tick| &tick.state)
+        }
     }
 
     pub fn next_entities(&self) -> BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)> {
-        let mut next_state = BTreeMap::new();
+        let mut entities = BTreeMap::new();
 
-        if let Some((next_tick_num, next_tick)) = self.next_tick() {
-            let next_game_time = self.state.tick_game_time(*next_tick_num);
+        if let Some((recv_tick_num, recv_tick)) = self
+            .next_tick_num
+            .and_then(|key| self.received_ticks.get(&key).map(|value| (key, value)))
+        {
+            let recv_game_time = self.settings.tick_game_time(recv_tick_num);
 
-            next_state.extend(
-                next_tick
+            entities.extend(
+                recv_tick
+                    .state
                     .entities
                     .clone()
                     .into_iter()
-                    .map(|(entity_id, entity)| (entity_id, (next_game_time, entity))),
+                    .map(|(entity_id, entity)| (entity_id, (recv_game_time, entity))),
             );
+
+            if let Some(predicted_state) = self
+                .prediction
+                .as_ref()
+                .and_then(|p| p.predicted_state(self.tick_num().next()))
+            {
+                entities.extend(
+                    predicted_state
+                        .entities
+                        .clone()
+                        .into_iter()
+                        .filter(|(_, entity)| Prediction::is_predicted(entity))
+                        .map(|(entity_id, entity)| {
+                            (
+                                entity_id,
+                                (self.settings.tick_game_time(self.tick_num().next()), entity),
+                            )
+                        }),
+                );
+            }
         }
 
-        next_state
+        entities
     }
 
     pub fn settings(&self) -> &comn::Settings {
-        &self.state.settings
+        &self.settings
     }
 
     pub fn ping(&self) -> &PingEstimation {
@@ -236,8 +261,8 @@ impl Game {
                     debug!("Received pong -> estimation {:?}", self.ping.estimate());
                 }
             }
-            comn::ServerMessage::Tick { tick_num, tick } => {
-                let recv_game_time = self.state.tick_game_time(tick_num);
+            comn::ServerMessage::Tick(tick) => {
+                let recv_game_time = tick.state.current_game_time();
 
                 if recv_game_time < self.interp_game_time {
                     debug!(
@@ -249,14 +274,13 @@ impl Game {
                         // If this is the first tick we have recevied from the server, reset
                         // to the correct time
                         self.interp_game_time = recv_game_time;
-                        self.snap_to_tick(tick_num, tick.clone());
 
-                        // TODO: Run events
+                        // TODO: Run events?
 
                         info!("Starting tick stream at recv_game_time={}", recv_game_time);
                     }
 
-                    self.received_ticks.insert(tick_num, tick);
+                    self.received_ticks.insert(tick.state.tick_num, tick);
                 }
 
                 self.recv_tick_time.record_tick(recv_time, recv_game_time);
@@ -273,11 +297,4 @@ impl Game {
             warn!("Failed to send message: {:?}", err);
         }
     }
-
-    fn snap_to_tick(&mut self, tick_num: comn::TickNum, tick: comn::Tick) {
-        self.state.tick_num = tick_num;
-        self.state.entities = tick.entities;
-    }
-
-    fn load_tick(&mut self, tick_num: comn::TickNum, tick: comn::Tick) {}
 }
