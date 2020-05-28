@@ -208,17 +208,16 @@ impl Game {
                     .map(|(entity_id, entity)| (entity_id, (recv_game_time, entity))),
             );
 
-            if let Some(predicted_state) = self
-                .prediction
-                .as_ref()
-                .and_then(|p| p.predicted_state(self.tick_num().next()))
-            {
+            if let Some((prediction, predicted_state)) = self.prediction.as_ref().and_then(|p| {
+                p.predicted_state(self.tick_num().next())
+                    .map(|state| (p, state))
+            }) {
                 entities.extend(
                     predicted_state
                         .entities
                         .clone()
                         .into_iter()
-                        .filter(|(_, entity)| Prediction::is_predicted(entity))
+                        .filter(|(_, entity)| prediction.is_predicted(entity))
                         .map(|(entity_id, entity)| {
                             (
                                 entity_id,
