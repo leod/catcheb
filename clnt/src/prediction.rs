@@ -35,6 +35,15 @@ impl Prediction {
                 Self::correct_prediction(&mut record.state.entities, &server_state.state.entities);
             }
 
+            self.log.insert(
+                tick_num,
+                Record {
+                    state: server_state.state.clone(),
+                    last_input: my_input.clone(),
+                    new_entities: Vec::new(),
+                },
+            );
+
             self.log = self
                 .log
                 .clone()
@@ -48,7 +57,7 @@ impl Prediction {
         self.log.get(&tick_num).map(|record| &record.state)
     }
 
-    pub fn is_predicted(entity: &comn::Entity) -> bool {
+    pub fn is_predicted(&self, entity: &comn::Entity) -> bool {
         false
     }
 
