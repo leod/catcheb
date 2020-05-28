@@ -251,6 +251,8 @@ async fn app(
             }));
 
         if let Some(state) = game.state() {
+            //info!("render {:?}", state);
+            //info!("into {:?}", game.next_entities());
             render_game(
                 &mut gfx,
                 &mut resources,

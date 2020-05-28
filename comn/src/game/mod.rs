@@ -12,6 +12,7 @@ use entities::DangerGuy;
 use crate::{geom, GameTime};
 
 pub use entities::Entity;
+pub use run::RunContext;
 
 pub type Time = f32;
 pub type Vector = na::Vector2<f32>;

@@ -1,7 +1,7 @@
 use log::{debug, info};
 use rand::seq::SliceRandom;
 
-use comn::{game::run::RunContext, Entity, PlayerState};
+use comn::{game::RunContext, Entity, PlayerState};
 
 pub const RESPAWN_DURATION: comn::GameTime = 2.0;
 

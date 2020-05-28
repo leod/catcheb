@@ -191,6 +191,7 @@ impl Game {
     }
 
     pub fn next_entities(&self) -> BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)> {
+        return BTreeMap::new();
         let mut entities = BTreeMap::new();
 
         if let Some((recv_tick_num, recv_tick)) = self
