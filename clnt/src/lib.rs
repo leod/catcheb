@@ -18,7 +18,7 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W},
+    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SHOOT_PERIOD, PLAYER_SIT_L, PLAYER_SIT_W},
     util::stats,
 };
 
@@ -29,7 +29,7 @@ pub fn main() {
 
     run(
         Settings {
-            size: Vector::new(1280.0, 720.0).into(),
+            size: Vector::new(800.0, 600.0).into(),
             fullscreen: true,
             title: "Play Catcheb",
             ..Settings::default()
@@ -285,11 +285,24 @@ async fn app(
         debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
         debug(&format!("time warp:     {}", stats.time_warp_factor))?;
         debug(&format!("tick interp:   {}", stats.tick_interp))?;
+        debug("")?;
+
+        if let Some((_, my_entity)) = game
+            .state()
+            .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
+        {
+            let cooldown = my_entity
+                .last_shot_time
+                .map(|last_time| PLAYER_SHOOT_PERIOD - (game.interp_game_time() - last_time))
+                .unwrap_or(0.0)
+                .max(0.0);
+            debug(&format!("gun cooldown: {:.2}", cooldown))?;
+        }
 
         event_list.render(
             &mut gfx,
             &mut resources.font_small,
-            Vector::new(800.0, 15.0),
+            Vector::new(600.0, 15.0),
         )?;
 
         gfx.present(&window)?;

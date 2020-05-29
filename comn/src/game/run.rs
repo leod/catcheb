@@ -11,7 +11,7 @@ pub const PLAYER_SIT_W: f32 = 50.0;
 pub const PLAYER_SIT_L: f32 = 50.0;
 pub const PLAYER_MOVE_W: f32 = 70.0;
 pub const PLAYER_MOVE_L: f32 = 35.714;
-pub const PLAYER_SHOOT_PERIOD: f32 = 1.0;
+pub const PLAYER_SHOOT_PERIOD: f32 = 0.3;
 pub const BULLET_MOVE_SPEED: f32 = 900.0;
 
 #[derive(Clone, Debug, Default)]
@@ -160,7 +160,7 @@ impl Game {
     }
 
     pub fn get_player_entity(
-        &mut self,
+        &self,
         player_id: PlayerId,
     ) -> GameResult<Option<(EntityId, &PlayerEntity)>> {
         Ok(self
