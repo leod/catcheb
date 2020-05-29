@@ -104,7 +104,7 @@ impl DangerGuy {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bullet {
-    pub owner: PlayerId,
+    pub owner: Option<PlayerId>,
     pub start_time: GameTime,
     pub start_pos: Point,
     pub vel: Vector,

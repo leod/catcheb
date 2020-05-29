@@ -16,6 +16,8 @@ pub const BULLET_MOVE_SPEED: f32 = 400.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 pub const TURRET_RANGE: f32 = 300.0;
+pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
+pub const TURRET_SHOOT_ANGLE: f32 = 0.4;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -51,7 +53,7 @@ impl Game {
                                     context.removed_entities.insert(*entity_id);
                                 }
                             }
-                            Entity::Player(player) if player.owner != bullet.owner => {
+                            Entity::Player(player) if Some(player.owner) != bullet.owner => {
                                 // TODO: Check player-bullet collision on player input
                                 // TODO: Player geometry
                                 let aa_rect = AaRect::new_center(
@@ -61,10 +63,9 @@ impl Game {
 
                                 if aa_rect.contains_point(bullet.pos(time)) {
                                     context.removed_entities.insert(*entity_id);
-                                    context.killed_players.insert(
-                                        player.owner,
-                                        DeathReason::ShotByPlayer(bullet.owner),
-                                    );
+                                    context
+                                        .killed_players
+                                        .insert(player.owner, DeathReason::ShotBy(bullet.owner));
                                 }
                             }
                             _ => (),
@@ -86,8 +87,24 @@ impl Game {
                         .map(|(other_id, _)| *other_id);
 
                     if let Some(target) = turret.target {
-                        let target_angle = turret.angle_to_pos(entities[&target].pos(time));
-                        turret.angle += (target_angle - turret.angle) * 0.3;
+                        let target_pos = entities[&target].pos(time);
+                        let target_angle = turret.angle_to_pos(target_pos);
+                        turret.angle += (target_angle - turret.angle) * 0.2;
+
+                        if time >= turret.next_shot_time
+                            && (target_angle - turret.angle).abs() < TURRET_SHOOT_ANGLE
+                        {
+                            turret.next_shot_time = time + TURRET_SHOOT_PERIOD;
+
+                            let delta = Vector::new(turret.angle.cos(), turret.angle.sin());
+
+                            context.new_entities.push(Entity::Bullet(Bullet {
+                                owner: None,
+                                start_time: time,
+                                start_pos: turret.pos + 20.0 * delta,
+                                vel: delta * BULLET_MOVE_SPEED,
+                            }));
+                        }
                     }
                 }
                 _ => (),
@@ -152,7 +169,7 @@ impl Game {
 
                 if delta.norm() > 0.0 && input.use_item {
                     context.new_entities.push(Entity::Bullet(Bullet {
-                        owner: player_id,
+                        owner: Some(player_id),
                         start_time: input_time,
                         start_pos: ent.pos,
                         vel: delta.normalize() * BULLET_MOVE_SPEED,

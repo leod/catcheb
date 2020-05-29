@@ -72,9 +72,10 @@ impl EventList {
         // TODO: Use player names
         match event {
             Event::PlayerDied { player_id, reason } => Some(match reason {
-                DeathReason::ShotByPlayer(other_player_id) => {
-                    format!("{} got shot by {}", player_id.0, other_player_id.0)
+                DeathReason::ShotBy(Some(other_player_id)) => {
+                    format!("{} shot {}", player_id.0, other_player_id.0)
                 }
+                DeathReason::ShotBy(None) => format!("{} rekt by turret lol", player_id.0),
                 DeathReason::TouchedTheDanger => format!("{} touched the danger", player_id.0),
             }),
             _ => None,
