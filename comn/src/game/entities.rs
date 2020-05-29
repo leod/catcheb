@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    game::{PlayerId, Point, Vector},
+    game::{run, PlayerId, Point, Vector},
     geom::AaRect,
     GameError, GameResult, GameTime,
 };
@@ -44,7 +44,20 @@ pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
     pub angle: Option<f32>,
-    pub last_shot_time: Option<f32>,
+    pub next_shot_time: GameTime,
+    pub shots_left: u32,
+}
+
+impl PlayerEntity {
+    pub fn new(owner: PlayerId, pos: Point) -> Self {
+        Self {
+            owner,
+            pos,
+            angle: Some(0.0),
+            next_shot_time: 0.0,
+            shots_left: run::MAGAZINE_SIZE,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
