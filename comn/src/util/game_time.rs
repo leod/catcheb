@@ -25,7 +25,8 @@ impl GameTimeEstimation {
                 return;
             }
 
-            assert!(recv_time >= *last_recv_time);
+            // I think the following assumption can be broken by `fake_bad_net`.
+            //assert!(recv_time >= *last_recv_time);
         }
 
         self.recv_times.push_back((recv_time, game_time));
