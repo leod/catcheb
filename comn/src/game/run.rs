@@ -107,7 +107,7 @@ impl Game {
                 ent.pos += delta.normalize() * PLAYER_MOVE_SPEED * delta_s;
                 ent.angle = Some(delta.y.atan2(delta.x));
             } else {
-                //ent.angle = None;
+                ent.angle = None;
             }
 
             ent.pos.x = ent

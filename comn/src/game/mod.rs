@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::DangerGuy;
+use entities::{DangerGuy, Turret};
 
 use crate::{geom, GameTime};
 
@@ -194,6 +194,12 @@ impl Game {
                 size: Vector::new(100.0, 50.0),
                 speed: 200.0,
                 wait_time: 0.0,
+            }),
+            Entity::Turret(Turret {
+                pos: Point::new(600.0, 100.0),
+                target: None,
+                angle: 0.0,
+                next_shot_time: 0.0,
             }),
         ]
     }
