@@ -131,6 +131,21 @@ pub fn render_game(
                 let circle = Circle::new(origin, 10.0);
                 gfx.fill_circle(&circle, Color::ORANGE);
             }
+            comn::Entity::Turret(turret) => {
+                let origin: mint::Vector2<f32> = turret.pos.coords.into();
+                let circle = Circle::new(origin, 30.0);
+                gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
+
+                let angle = turret.angle;
+
+                gfx.set_transform(
+                    Transform::rotate(angle.to_degrees()).then(Transform::translate(origin)));
+
+                let rect = Rectangle::new(Vector::new(0.0, -5.0), Vector::new(40.0, 10.0));
+
+                gfx.fill_rect(&rect, Color::BLACK);
+                gfx.set_transform(Transform::IDENTITY);
+            }
         }
     }
 
