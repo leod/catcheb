@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::entities::Bullet;
 use crate::{
     geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, Input,
-    PlayerEntity, PlayerId, TickNum, Vector,
+    PlayerEntity, PlayerId, TickNum, Vector, GameTime,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -11,8 +11,10 @@ pub const PLAYER_SIT_W: f32 = 50.0;
 pub const PLAYER_SIT_L: f32 = 50.0;
 pub const PLAYER_MOVE_W: f32 = 70.0;
 pub const PLAYER_MOVE_L: f32 = 35.714;
-pub const PLAYER_SHOOT_PERIOD: f32 = 0.3;
+pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const BULLET_MOVE_SPEED: f32 = 400.0;
+pub const MAGAZINE_SIZE: u32 = 15;
+pub const RELOAD_DURATION: GameTime = 2.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -85,7 +87,7 @@ impl Game {
             .unwrap_or(time);
         let map_size = self.settings.size;
 
-        if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
+        if let Some((_entity_id, ent)) = self.get_player_entity_mut(player_id)? {
             let mut delta = Vector::new(0.0, 0.0);
 
             if input.move_left {
@@ -102,39 +104,47 @@ impl Game {
             }
 
             if delta.norm() > 0.0 {
-                player_entity.pos += delta.normalize() * PLAYER_MOVE_SPEED * delta_s;
-                player_entity.angle = Some(delta.y.atan2(delta.x));
+                ent.pos += delta.normalize() * PLAYER_MOVE_SPEED * delta_s;
+                ent.angle = Some(delta.y.atan2(delta.x));
             } else {
-                player_entity.angle = None;
+                //ent.angle = None;
             }
 
-            player_entity.pos.x = player_entity
+            ent.pos.x = ent
                 .pos
                 .x
                 .min(map_size.x - PLAYER_SIT_W / 2.0)
                 .max(PLAYER_SIT_W / 2.0);
-            player_entity.pos.y = player_entity
+            ent.pos.y = ent
                 .pos
                 .y
                 .min(map_size.y - PLAYER_SIT_W / 2.0)
                 .max(PLAYER_SIT_W / 2.0);
+            
+            if input_time >= ent.next_shot_time {
+                if ent.shots_left == 0 {
+                    ent.shots_left = MAGAZINE_SIZE;
+                }
 
-            if delta.norm() > 0.0
-                && input.use_item
-                && input_time - player_entity.last_shot_time.unwrap_or(-1000.0)
-                    >= PLAYER_SHOOT_PERIOD
-            {
-                //log::info!("last shot at {:?}, shooting now {:?}", player_entity.last_shot_time, input_time);
-                player_entity.last_shot_time = Some(input_time);
-                context.new_entities.push(Entity::Bullet(Bullet {
-                    owner: player_id,
-                    start_time: input_time,
-                    start_pos: player_entity.pos,
-                    vel: delta.normalize() * BULLET_MOVE_SPEED,
-                }));
+                if delta.norm() > 0.0 && input.use_item {
+                    context.new_entities.push(Entity::Bullet(Bullet {
+                        owner: player_id,
+                        start_time: input_time,
+                        start_pos: ent.pos,
+                        vel: delta.normalize() * BULLET_MOVE_SPEED,
+                    }));
+
+                    ent.shots_left -= 1;
+
+                    if ent.shots_left == 0 {
+                        ent.next_shot_time = input_time + RELOAD_DURATION;
+                    } else {
+                        ent.next_shot_time = input_time + PLAYER_SHOOT_PERIOD;
+                    }
+                }
             }
 
-            let pos = player_entity.pos;
+            let pos = ent.pos;
             for (_entity_id, entity) in self.entities.iter() {
                 match entity {
                     Entity::DangerGuy(danger_guy) => {

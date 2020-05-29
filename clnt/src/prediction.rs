@@ -131,6 +131,7 @@ impl Prediction {
     }
 
     fn correct_prediction(predicted: &mut comn::Game, server: &comn::Game) {
+        // TODO: Smooth correction of positions
         *predicted = server.clone();
     }
 
