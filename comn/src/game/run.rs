@@ -15,9 +15,11 @@ pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const BULLET_MOVE_SPEED: f32 = 400.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
+pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 300.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.4;
+pub const BULLET_RADIUS: f32 = 8.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -68,6 +70,13 @@ impl Game {
                                         .insert(player.owner, DeathReason::ShotBy(bullet.owner));
                                 }
                             }
+                            Entity::Turret(turret) if bullet.owner.is_some() => {
+                                if (bullet.pos(time) - turret.pos).norm()
+                                    < TURRET_RADIUS + BULLET_RADIUS
+                                {
+                                    context.removed_entities.insert(*entity_id);
+                                }
+                            }
                             _ => (),
                         }
                     }
@@ -101,7 +110,7 @@ impl Game {
                             context.new_entities.push(Entity::Bullet(Bullet {
                                 owner: None,
                                 start_time: time,
-                                start_pos: turret.pos + 20.0 * delta,
+                                start_pos: turret.pos + 12.0 * delta,
                                 vel: delta * BULLET_MOVE_SPEED,
                             }));
                         }
