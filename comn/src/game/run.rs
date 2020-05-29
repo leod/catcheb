@@ -12,7 +12,7 @@ pub const PLAYER_SIT_L: f32 = 50.0;
 pub const PLAYER_MOVE_W: f32 = 70.0;
 pub const PLAYER_MOVE_L: f32 = 35.714;
 pub const PLAYER_SHOOT_PERIOD: f32 = 0.3;
-pub const BULLET_MOVE_SPEED: f32 = 300.0;
+pub const BULLET_MOVE_SPEED: f32 = 400.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
