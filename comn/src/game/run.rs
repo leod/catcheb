@@ -7,10 +7,10 @@ use crate::{
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
-pub const PLAYER_SIT_W: f32 = 50.0;
-pub const PLAYER_SIT_L: f32 = 50.0;
-pub const PLAYER_MOVE_W: f32 = 70.0;
-pub const PLAYER_MOVE_L: f32 = 35.714;
+pub const PLAYER_SIT_W: f32 = 40.0;
+pub const PLAYER_SIT_L: f32 = 40.0;
+pub const PLAYER_MOVE_W: f32 = 56.6;
+pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const BULLET_MOVE_SPEED: f32 = 400.0;
 pub const MAGAZINE_SIZE: u32 = 15;
