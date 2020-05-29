@@ -35,17 +35,12 @@ impl Prediction {
             self.log = Default::default();
         }
 
-        info!("at {:?} {:?}", tick_num, server_state);
-
         if let Some((server_state, my_last_input)) = server_state.and_then(|tick| {
             tick.your_last_input
                 .as_ref()
                 .map(|my_last_input| (tick, my_last_input))
         }) {
-            info!("got {:?} at {:?}", my_last_input, tick_num);
-
-            if let Some(record) = self.log.get_mut(my_last_input) {
-                info!("applying correction at {:?}", my_last_input);
+            if let Some(record) = self.log.get_mut(&my_last_input.next()) {
                 Self::correct_prediction(&mut record.state, &server_state.state);
             }
 
@@ -53,14 +48,13 @@ impl Prediction {
                 .log
                 .clone()
                 .into_iter()
-                .filter(|&(tick_num, _)| tick_num >= *my_last_input)
+                .filter(|&(tick_num, _)| tick_num > *my_last_input)
                 .collect();
         }
 
         let last_state = if let Some((first_num, first_record)) = self.log.iter().next() {
-            info!("replaying from {:?}", first_num);
             let mut last_state = first_record.state.clone();
-            for record in self.log.values_mut().skip(1) {
+            for (num, record) in self.log.iter_mut().skip(1) {
                 Self::run_tick(&mut last_state, self.my_player_id, &record.my_last_input);
                 record.state = last_state.clone();
             }
@@ -73,9 +67,8 @@ impl Prediction {
 
         if let Some(mut state) = last_state {
             let events = Self::run_tick(&mut state, self.my_player_id, &my_input);
-            //info!("inserting {:?}", state);
             self.log.insert(
-                tick_num,
+                tick_num.next(),
                 Record {
                     state,
                     my_last_input: my_input.clone(),
@@ -92,7 +85,10 @@ impl Prediction {
     }
 
     pub fn is_predicted(&self, entity: &comn::Entity) -> bool {
-        false
+        match entity {
+            comn::Entity::Player(entity) => entity.owner == self.my_player_id,
+            _ => false,
+        }
     }
 
     fn max_logged_tick_num(&self) -> Option<comn::TickNum> {
