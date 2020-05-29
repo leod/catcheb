@@ -18,7 +18,10 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RANGE},
+    game::run::{
+        BULLET_RADIUS, PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RADIUS,
+        TURRET_RANGE,
+    },
     util::stats,
 };
 
@@ -78,6 +81,7 @@ pub fn render_game(
     state: &comn::Game,
     next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
     time: comn::GameTime,
+    my_player_id: comn::PlayerId,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
@@ -144,12 +148,17 @@ pub fn render_game(
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
-                let circle = Circle::new(origin, 10.0);
-                gfx.fill_circle(&circle, Color::ORANGE);
+                let circle = Circle::new(origin, BULLET_RADIUS);
+                let color = if bullet.owner == Some(my_player_id) {
+                    Color::ORANGE
+                } else {
+                    Color::MAGENTA
+                };
+                gfx.fill_circle(&circle, color);
             }
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
-                let circle = Circle::new(origin, 30.0);
+                let circle = Circle::new(origin, TURRET_RADIUS);
                 gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
 
                 let angle = turret.angle;
@@ -290,6 +299,7 @@ async fn app(
                 &state,
                 &game.next_entities(),
                 game.interp_game_time(),
+                game.my_player_id(),
             )?;
         }
 
@@ -315,7 +325,7 @@ async fn app(
             debug("")?;
         }
 
-        for _ in 0..39 {
+        for _ in 0..40 {
             debug("")?;
         }
         debug(&format!(
