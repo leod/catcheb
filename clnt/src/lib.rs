@@ -18,9 +18,7 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{
-        PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RANGE,
-    },
+    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RANGE},
     util::stats,
 };
 
@@ -304,6 +302,22 @@ async fn app(
             Ok(())
         };
 
+        if let Some((_, my_entity)) = game
+            .state()
+            .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
+        {
+            let cooldown = (my_entity.next_shot_time - game.interp_game_time()).max(0.0);
+            debug(&format!("gun cooldown: {:.2}", cooldown))?;
+            debug(&format!("shots left: {}", my_entity.shots_left))?;
+        } else {
+            // lol
+            debug("")?;
+            debug("")?;
+        }
+
+        for _ in 0..37 {
+            debug("")?;
+        }
         debug(&format!(
             "ping (ms):     {:.1}",
             game.ping().estimate().as_secs_f32() * 1000.0
@@ -312,22 +326,12 @@ async fn app(
             "recv std dev:  {:.2}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
-        debug("")?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;
         debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
         debug(&format!("time warp:     {}", stats.time_warp_factor))?;
         debug(&format!("tick interp:   {}", stats.tick_interp))?;
         debug("")?;
-
-        if let Some((_, my_entity)) = game
-            .state()
-            .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
-        {
-            let cooldown = (my_entity.next_shot_time - game.interp_game_time()).max(0.0);
-            debug(&format!("gun cooldown: {:.2}", cooldown))?;
-            debug(&format!("shots left: {}", my_entity.shots_left))?;
-        }
 
         event_list.render(
             &mut gfx,
