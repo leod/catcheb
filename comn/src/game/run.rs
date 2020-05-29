@@ -86,7 +86,8 @@ impl Game {
                         .map(|(other_id, _)| *other_id);
 
                     if let Some(target) = turret.target {
-                        turret.angle = turret.angle_to_pos(entities[&target].pos(time));
+                        let target_angle = turret.angle_to_pos(entities[&target].pos(time));
+                        turret.angle += (target_angle - turret.angle) * 0.3;
                     }
                 }
                 _ => (),

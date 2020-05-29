@@ -19,7 +19,7 @@ use quicksilver::{
 
 use comn::{
     game::run::{
-        PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SHOOT_PERIOD, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RANGE,
+        PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RANGE,
     },
     util::stats,
 };
@@ -95,6 +95,11 @@ pub fn render_game(
             _ => (),
         }
     }
+
+    /*let screen_rect = Rectangle::new(
+        Vector::new(0.0, 0.0),
+        state.settings.size.into(),
+    );*/
 
     for (entity_id, entity) in state.entities.iter() {
         match entity {
