@@ -129,4 +129,8 @@ pub struct Turret {
 }
 
 impl Turret {
+    pub fn angle_to_pos(&self, pos: Point) -> f32 {
+        let d = pos - self.pos;
+        d.y.atan2(d.x)
+    }
 }
