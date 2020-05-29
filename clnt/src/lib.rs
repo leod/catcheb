@@ -127,7 +127,6 @@ pub fn render_game(
                 gfx.fill_rect(&rect, Color::RED);
             }
             comn::Entity::Bullet(bullet) => {
-                //debug!("bullet at {:?}", bullet);
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
                 let circle = Circle::new(origin, 10.0);
                 gfx.fill_circle(&circle, Color::ORANGE);
