@@ -40,11 +40,7 @@ impl Default for Settings {
             max_num_players: 16,
             ticks_per_second: 30,
             size: Vector::new(800.0, 600.0),
-            spawn_points: vec![
-                Point::new(350.0, 100.0),
-                Point::new(600.0, 400.0),
-                Point::new(50.0, 500.0),
-            ],
+            spawn_points: vec![Point::new(350.0, 100.0), Point::new(600.0, 400.0)],
         }
     }
 }
@@ -108,7 +104,7 @@ pub enum Item {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DeathReason {
-    ShotByPlayer(PlayerId),
+    ShotBy(Option<PlayerId>),
     TouchedTheDanger,
 }
 

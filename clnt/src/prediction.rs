@@ -99,7 +99,7 @@ impl Prediction {
     pub fn is_predicted(&self, entity: &comn::Entity) -> bool {
         match entity {
             comn::Entity::Player(entity) => entity.owner == self.my_player_id,
-            comn::Entity::Bullet(entity) => entity.owner == self.my_player_id,
+            comn::Entity::Bullet(entity) => entity.owner == Some(self.my_player_id),
             _ => false,
         }
     }
