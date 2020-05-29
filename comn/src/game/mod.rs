@@ -12,6 +12,7 @@ use entities::DangerGuy;
 use crate::{geom, GameTime};
 
 pub use entities::Entity;
+pub use run::RunContext;
 
 pub type Time = f32;
 pub type Vector = na::Vector2<f32>;
@@ -38,10 +39,10 @@ impl Default for Settings {
         Self {
             max_num_players: 16,
             ticks_per_second: 30,
-            size: Vector::new(1280.0, 720.0),
+            size: Vector::new(800.0, 600.0),
             spawn_points: vec![
                 Point::new(350.0, 100.0),
-                Point::new(600.0, 600.0),
+                Point::new(600.0, 400.0),
                 Point::new(50.0, 500.0),
             ],
         }
@@ -51,6 +52,10 @@ impl Default for Settings {
 impl Settings {
     pub fn tick_period(&self) -> GameTime {
         1.0 / (self.ticks_per_second as f32)
+    }
+
+    pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
+        self.tick_period() * tick_num.0 as f32
     }
 
     pub fn aa_rect(&self) -> geom::AaRect {
@@ -140,12 +145,15 @@ pub struct Player {
     pub state: PlayerState,
 }
 
+pub type PlayerMap = BTreeMap<PlayerId, Player>;
+pub type EntityMap = BTreeMap<EntityId, Entity>;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Game {
     pub settings: Settings,
     pub tick_num: TickNum,
-    pub players: BTreeMap<PlayerId, Player>,
-    pub entities: BTreeMap<EntityId, Entity>,
+    pub players: PlayerMap,
+    pub entities: EntityMap,
 }
 
 impl Game {
@@ -168,21 +176,21 @@ impl Game {
         vec![
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(200.0, 200.0),
-                end_pos: Point::new(900.0, 200.0),
+                end_pos: Point::new(500.0, 200.0),
                 size: Vector::new(100.0, 50.0),
                 speed: 2000.0,
                 wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(700.0, 600.0),
+                start_pos: Point::new(700.0, 400.0),
                 end_pos: Point::new(700.0, 100.0),
                 size: Vector::new(50.0, 100.0),
                 speed: 400.0,
                 wait_time: 0.0,
             }),
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(50.0, 700.0),
-                end_pos: Point::new(1230.0, 700.0),
+                start_pos: Point::new(50.0, 500.0),
+                end_pos: Point::new(750.0, 500.0),
                 size: Vector::new(100.0, 50.0),
                 speed: 200.0,
                 wait_time: 0.0,
@@ -191,7 +199,7 @@ impl Game {
     }
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
-        self.settings.tick_period() * tick_num.0 as GameTime
+        self.settings.tick_game_time(tick_num)
     }
 
     pub fn current_game_time(&self) -> GameTime {
@@ -201,7 +209,7 @@ impl Game {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tick {
-    pub entities: BTreeMap<EntityId, Entity>,
-    pub last_inputs: BTreeMap<PlayerId, Input>,
+    pub state: Game,
     pub events: Vec<Event>,
+    pub your_last_input: Option<TickNum>,
 }

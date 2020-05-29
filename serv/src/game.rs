@@ -1,8 +1,9 @@
 use log::{debug, info};
 use rand::seq::SliceRandom;
 
-use comn::{game::run::RunContext, Entity, PlayerState};
+use comn::{game::RunContext, Entity, PlayerState};
 
+pub const FIRST_SPAWN_DURATION: comn::GameTime = 0.5;
 pub const RESPAWN_DURATION: comn::GameTime = 2.0;
 
 pub struct Game {
@@ -58,7 +59,7 @@ impl Game {
             .unwrap_or(comn::PlayerId(0));
         let player_id = comn::PlayerId(max_player_id.0 + 1);
 
-        let spawn_time = self.state.current_game_time() + RESPAWN_DURATION;
+        let spawn_time = self.state.current_game_time() + FIRST_SPAWN_DURATION;
         let player = comn::Player {
             name: player_name,
             state: PlayerState::Respawning {
@@ -83,9 +84,10 @@ impl Game {
         self.state.run_tick(&mut context).unwrap();
 
         // TODO: Sort player input by tick num
-        for (player_id, _tick_num, input) in inputs {
+        // TODO: Cap player input tick age
+        for (player_id, input_tick_num, input) in inputs {
             self.state
-                .run_player_input(*player_id, input, &mut context)
+                .run_player_input(*player_id, input, Some(*input_tick_num), &mut context)
                 .unwrap();
         }
 
@@ -138,7 +140,7 @@ impl Game {
                 .push(comn::Event::PlayerDied { player_id, reason });
         }
 
-        self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1);
+        self.state.tick_num = self.state.tick_num.next();
         self.last_events = context.events;
     }
 

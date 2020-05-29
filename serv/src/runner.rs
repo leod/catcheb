@@ -465,21 +465,15 @@ impl Runner {
         let mut messages = Vec::new();
         for player in self.players.values() {
             if let Some(peer) = player.peer {
-                // TODO: Sending state properly
+                // TODO: Delta encode tick state.
                 let game = &self.games[&player.game_id];
                 let tick = comn::Tick {
-                    entities: game.state().entities.clone(),
+                    state: game.state.clone(),
                     events: game.last_events.clone(),
-                    last_inputs: Default::default(), // TODO: send last_inputs
+                    your_last_input: player.last_input.clone().map(|(tick_num, _)| tick_num),
                 };
 
-                messages.push((
-                    peer,
-                    comn::ServerMessage::Tick {
-                        tick_num: game.state().tick_num,
-                        tick,
-                    },
-                ));
+                messages.push((peer, comn::ServerMessage::Tick(tick)));
             }
         }
 

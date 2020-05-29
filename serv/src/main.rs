@@ -22,7 +22,7 @@ pub struct Config {
 
 #[tokio::main]
 async fn main() {
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("serv=debug"));
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
 
     let matches = clap::App::new("serv")
         .arg(
@@ -74,14 +74,14 @@ async fn main() {
 
     let fake_bad_net_config = Some((
         fake_bad_net::Config {
-            lag_mean: Duration::from_millis(100),
-            lag_std_dev: 0.0,
-            loss: 0.0,
+            lag_mean: Duration::from_millis(25),
+            lag_std_dev: 5.0,
+            loss: 0.00,
         },
         fake_bad_net::Config {
-            lag_mean: Duration::from_millis(100),
-            lag_std_dev: 20.0,
-            loss: 0.05,
+            lag_mean: Duration::from_millis(25),
+            lag_std_dev: 5.0,
+            loss: 0.00,
         },
     ));
     let fake_bad_net_config = None;
