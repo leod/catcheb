@@ -39,10 +39,10 @@ impl Default for Settings {
         Self {
             max_num_players: 16,
             ticks_per_second: 30,
-            size: Vector::new(1280.0, 720.0),
+            size: Vector::new(800.0, 600.0),
             spawn_points: vec![
                 Point::new(350.0, 100.0),
-                Point::new(600.0, 600.0),
+                Point::new(600.0, 400.0),
                 Point::new(50.0, 500.0),
             ],
         }
@@ -176,21 +176,21 @@ impl Game {
         vec![
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(200.0, 200.0),
-                end_pos: Point::new(900.0, 200.0),
+                end_pos: Point::new(500.0, 200.0),
                 size: Vector::new(100.0, 50.0),
                 speed: 2000.0,
                 wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(700.0, 600.0),
+                start_pos: Point::new(700.0, 400.0),
                 end_pos: Point::new(700.0, 100.0),
                 size: Vector::new(50.0, 100.0),
                 speed: 400.0,
                 wait_time: 0.0,
             }),
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(50.0, 700.0),
-                end_pos: Point::new(1230.0, 700.0),
+                start_pos: Point::new(50.0, 500.0),
+                end_pos: Point::new(750.0, 500.0),
                 size: Vector::new(100.0, 50.0),
                 speed: 200.0,
                 wait_time: 0.0,

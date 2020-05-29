@@ -43,12 +43,16 @@ impl Game {
         }
     }
 
+    pub fn my_player_id(&self) -> comn::PlayerId {
+        self.my_player_id
+    }
+
     pub fn is_good(&self) -> bool {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
     pub fn target_time_lag(&self) -> comn::GameTime {
-        self.settings.tick_period() * 3.0
+        self.settings.tick_period() * 2.0
     }
 
     pub fn next_time_warp_factor(&self) -> f32 {
