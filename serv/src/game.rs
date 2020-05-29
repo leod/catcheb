@@ -139,7 +139,7 @@ impl Game {
                 .push(comn::Event::PlayerDied { player_id, reason });
         }
 
-        self.state.tick_num = comn::TickNum(self.state.tick_num.0 + 1);
+        self.state.tick_num = self.state.tick_num.next();
         self.last_events = context.events;
     }
 

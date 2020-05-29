@@ -76,6 +76,9 @@ impl Prediction {
         if let Some(mut state) = last_state {
             //info!("running at {:?} in {:?}", tick_num, state.tick_num);
             let events = Self::run_tick(&mut state, self.my_player_id, &my_input);
+
+            assert!(tick_num.next() == state.tick_num);
+
             self.log.insert(
                 tick_num.next(),
                 Record {
@@ -110,8 +113,6 @@ impl Prediction {
         my_player_id: comn::PlayerId,
         my_input: &comn::Input,
     ) -> Vec<comn::Event> {
-        state.tick_num = state.tick_num.next();
-
         let mut context = RunContext::default();
         if let Err(e) = state.run_player_input(my_player_id, &my_input, None, &mut context) {
             // TODO: Simulation error handling on client side
@@ -121,6 +122,10 @@ impl Prediction {
         for entity in context.new_entities {
             Self::add_predicted_entity(state, entity);
         }
+
+        // TODO: We should probably remove the redundant tick_num
+        // state within game state.
+        state.tick_num = state.tick_num.next();
 
         context.events
     }
