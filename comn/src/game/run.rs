@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::entities::Bullet;
 use crate::{
-    geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, Input,
-    PlayerEntity, PlayerId, TickNum, Vector, GameTime,
+    geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime,
+    Input, PlayerEntity, PlayerId, TickNum, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -15,6 +15,7 @@ pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const BULLET_MOVE_SPEED: f32 = 400.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
+pub const TURRET_RANGE: f32 = 300.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -28,7 +29,10 @@ impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
         let time = self.current_game_time();
 
-        for (entity_id, entity) in self.entities.iter() {
+        // TODO: clone
+        let entities = self.entities.clone();
+
+        for (entity_id, entity) in self.entities.iter_mut() {
             match entity {
                 Entity::Bullet(bullet) => {
                     if !self.settings.aa_rect().contains_point(bullet.pos(time)) {
@@ -36,7 +40,7 @@ impl Game {
                         continue;
                     }
 
-                    for (entity_id_b, entity_b) in self.entities.iter() {
+                    for (entity_id_b, entity_b) in entities.iter() {
                         if *entity_id == *entity_id_b {
                             continue;
                         }
@@ -48,6 +52,7 @@ impl Game {
                                 }
                             }
                             Entity::Player(player) if player.owner != bullet.owner => {
+                                // TODO: Check player-bullet collision on player input
                                 // TODO: Player geometry
                                 let aa_rect = AaRect::new_center(
                                     player.pos,
@@ -64,6 +69,24 @@ impl Game {
                             }
                             _ => (),
                         }
+                    }
+                }
+                Entity::Turret(turret) => {
+                    turret.target = entities
+                        .iter()
+                        .filter(|(other_id, _)| **other_id != *entity_id)
+                        .filter_map(|(other_id, other_entity)| {
+                            other_entity
+                                .player()
+                                .ok()
+                                .map(|player| (other_id, (turret.pos - player.pos).norm()))
+                        })
+                        .filter(|(_, dist)| *dist <= TURRET_RANGE)
+                        .min_by(|(_, dist1), (_, dist2)| dist1.partial_cmp(dist2).unwrap())
+                        .map(|(other_id, _)| *other_id);
+
+                    if let Some(target) = turret.target {
+                        turret.angle = turret.angle_to_pos(entities[&target].pos(time));
                     }
                 }
                 _ => (),
@@ -120,7 +143,7 @@ impl Game {
                 .y
                 .min(map_size.y - PLAYER_SIT_W / 2.0)
                 .max(PLAYER_SIT_W / 2.0);
-            
+
             if input_time >= ent.next_shot_time {
                 if ent.shots_left == 0 {
                     ent.shots_left = MAGAZINE_SIZE;
