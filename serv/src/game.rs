@@ -84,6 +84,7 @@ impl Game {
         self.state.run_tick(&mut context).unwrap();
 
         // TODO: Sort player input by tick num
+        // TODO: Cap player input tick age
         for (player_id, input_tick_num, input) in inputs {
             self.state
                 .run_player_input(*player_id, input, Some(*input_tick_num), &mut context)
