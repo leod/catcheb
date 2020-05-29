@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::entities::Bullet;
 use crate::{
     geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, Input,
-    PlayerEntity, PlayerId, Vector,
+    PlayerEntity, PlayerId, TickNum, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -11,7 +11,7 @@ pub const PLAYER_SIT_W: f32 = 50.0;
 pub const PLAYER_SIT_L: f32 = 50.0;
 pub const PLAYER_MOVE_W: f32 = 70.0;
 pub const PLAYER_MOVE_L: f32 = 35.714;
-pub const PLAYER_SHOOT_PERIOD: f32 = 0.3;
+pub const PLAYER_SHOOT_PERIOD: f32 = 1.0;
 pub const BULLET_MOVE_SPEED: f32 = 900.0;
 
 #[derive(Clone, Debug, Default)]
@@ -75,10 +75,14 @@ impl Game {
         &mut self,
         player_id: PlayerId,
         input: &Input,
+        input_tick: Option<TickNum>,
         context: &mut RunContext,
     ) -> GameResult<()> {
         let delta_s = self.settings.tick_period();
         let time = self.current_game_time();
+        let input_time = input_tick
+            .map(|num| self.tick_game_time(num))
+            .unwrap_or(time);
         let map_size = self.settings.size;
 
         if let Some((_entity_id, player_entity)) = self.get_player_entity_mut(player_id)? {
@@ -117,12 +121,14 @@ impl Game {
 
             if delta.norm() > 0.0
                 && input.use_item
-                && time - player_entity.last_shot_time.unwrap_or(-1000.0) >= PLAYER_SHOOT_PERIOD
+                && input_time - player_entity.last_shot_time.unwrap_or(-1000.0)
+                    >= PLAYER_SHOOT_PERIOD
             {
-                player_entity.last_shot_time = Some(time);
+                //log::info!("last shot at {:?}, shooting now {:?}", player_entity.last_shot_time, input_time);
+                player_entity.last_shot_time = Some(input_time);
                 context.new_entities.push(Entity::Bullet(Bullet {
                     owner: player_id,
-                    start_time: time,
+                    start_time: input_time,
                     start_pos: player_entity.pos,
                     vel: delta.normalize() * BULLET_MOVE_SPEED,
                 }));
@@ -133,7 +139,7 @@ impl Game {
                 match entity {
                     Entity::DangerGuy(danger_guy) => {
                         // TODO: Player geometry
-                        if danger_guy.aa_rect(time).contains_point(pos) {
+                        if danger_guy.aa_rect(input_time).contains_point(pos) {
                             context
                                 .killed_players
                                 .insert(player_id, DeathReason::TouchedTheDanger);
