@@ -112,12 +112,10 @@ impl Game {
 
                     context
                         .new_entities
-                        .push(Entity::Player(comn::PlayerEntity {
-                            owner: *player_id,
-                            pos: *spawn_pos,
-                            angle: None,
-                            last_shot_time: None,
-                        }));
+                        .push(Entity::Player(comn::PlayerEntity::new(
+                            *player_id,
+                            *spawn_pos,
+                        )));
 
                     player.state = PlayerState::Alive;
                 }

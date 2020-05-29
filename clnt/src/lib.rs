@@ -290,12 +290,10 @@ async fn app(
             .state()
             .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
         {
-            let cooldown = my_entity
-                .last_shot_time
-                .map(|last_time| PLAYER_SHOOT_PERIOD - (game.interp_game_time() - last_time))
-                .unwrap_or(0.0)
+            let cooldown = (my_entity.next_shot_time - game.interp_game_time())
                 .max(0.0);
             debug(&format!("gun cooldown: {:.2}", cooldown))?;
+            debug(&format!("shots left: {}", my_entity.shots_left))?;
         }
 
         event_list.render(
