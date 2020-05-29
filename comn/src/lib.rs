@@ -8,8 +8,8 @@ use uuid::Uuid;
 pub use crate::{
     game::{
         entities::{DangerGuy, PlayerEntity},
-        DeathReason, Entity, EntityId, Event, Game, Input, Item, Player, PlayerId, PlayerState,
-        Point, Settings, Tick, TickNum, Time, Vector,
+        DeathReason, Entity, EntityId, EntityMap, Event, Game, Input, Item, Player, PlayerId,
+        PlayerMap, PlayerState, Point, Settings, Tick, TickNum, Time, Vector,
     },
     util::ping::SequenceNum,
 };
@@ -52,7 +52,7 @@ pub type JoinReply = Result<JoinSuccess, JoinError>;
 pub enum ServerMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
-    Tick { tick_num: TickNum, tick: Tick },
+    Tick(Tick),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,5 +1,6 @@
 mod event_list;
 mod game;
+mod prediction;
 mod webrtc;
 
 use std::collections::{BTreeMap, HashSet};
@@ -17,7 +18,7 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W},
+    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SHOOT_PERIOD, PLAYER_SIT_L, PLAYER_SIT_W},
     util::stats,
 };
 
@@ -28,7 +29,7 @@ pub fn main() {
 
     run(
         Settings {
-            size: Vector::new(1280.0, 720.0).into(),
+            size: Vector::new(800.0, 600.0).into(),
             fullscreen: true,
             title: "Play Catcheb",
             ..Settings::default()
@@ -75,7 +76,7 @@ pub fn render_game(
     gfx: &mut Graphics,
     resources: &mut Resources,
     state: &comn::Game,
-    next_state: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
     time: comn::GameTime,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
@@ -85,7 +86,7 @@ pub fn render_game(
     for (entity_id, entity) in state.entities.iter() {
         match entity {
             comn::Entity::Player(player) => {
-                let pos = if let Some((next_time, next_entity)) = next_state.get(entity_id) {
+                let pos = if let Some((next_time, next_entity)) = next_entities.get(entity_id) {
                     let tau = (time - state_time) / (next_time - state_time);
 
                     if let Ok(next_player) = next_entity.player() {
@@ -126,7 +127,6 @@ pub fn render_game(
                 gfx.fill_rect(&rect, Color::RED);
             }
             comn::Entity::Bullet(bullet) => {
-                //debug!("bullet at {:?}", bullet);
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
                 let circle = Circle::new(origin, 10.0);
                 gfx.fill_circle(&circle, Color::ORANGE);
@@ -245,17 +245,21 @@ async fn app(
             .record((recv_game_time - game.interp_game_time()) * 1000.0);
         stats
             .tick_interp
-            .record(game.next_tick().map_or(0.0, |(next_tick_num, _)| {
-                (next_tick_num.0 - game.state().tick_num.0) as f32
+            .record(game.next_tick_num().map_or(0.0, |next_tick_num| {
+                (next_tick_num.0 - game.tick_num().0) as f32
             }));
 
-        render_game(
-            &mut gfx,
-            &mut resources,
-            &game.state(),
-            &game.next_state(),
-            game.interp_game_time(),
-        )?;
+        if let Some(state) = game.state() {
+            //info!("render {:?}", state);
+            //info!("into {:?}", game.next_entities());
+            render_game(
+                &mut gfx,
+                &mut resources,
+                &state,
+                &game.next_entities(),
+                game.interp_game_time(),
+            )?;
+        }
 
         let mut debug_y: f32 = 15.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {
@@ -274,16 +278,30 @@ async fn app(
             "recv std dev:  {:.2}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
+        debug("")?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;
         debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
         debug(&format!("time warp:     {}", stats.time_warp_factor))?;
         debug(&format!("tick interp:   {}", stats.tick_interp))?;
+        debug("")?;
+
+        if let Some((_, my_entity)) = game
+            .state()
+            .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
+        {
+            let cooldown = my_entity
+                .last_shot_time
+                .map(|last_time| PLAYER_SHOOT_PERIOD - (game.interp_game_time() - last_time))
+                .unwrap_or(0.0)
+                .max(0.0);
+            debug(&format!("gun cooldown: {:.2}", cooldown))?;
+        }
 
         event_list.render(
             &mut gfx,
             &mut resources.font_small,
-            Vector::new(800.0, 15.0),
+            Vector::new(600.0, 15.0),
         )?;
 
         gfx.present(&window)?;
