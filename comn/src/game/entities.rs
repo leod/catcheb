@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    game::{run, PlayerId, Point, Vector},
+    game::{run, EntityId, PlayerId, Point, Vector},
     geom::AaRect,
     GameError, GameResult, GameTime,
 };
@@ -11,6 +11,7 @@ pub enum Entity {
     Player(PlayerEntity),
     Bullet(Bullet),
     DangerGuy(DangerGuy),
+    Turret(Turret),
 }
 
 impl Entity {
@@ -35,6 +36,7 @@ impl Entity {
             Entity::Player(entity) => entity.pos,
             Entity::Bullet(entity) => entity.pos(time),
             Entity::DangerGuy(entity) => entity.pos(time),
+            Entity::Turret(entity) => entity.pos,
         }
     }
 }
@@ -102,7 +104,7 @@ impl DangerGuy {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bullet {
-    pub owner: PlayerId,
+    pub owner: Option<PlayerId>,
     pub start_time: GameTime,
     pub start_pos: Point,
     pub vel: Vector,
@@ -115,5 +117,20 @@ impl Bullet {
         } else {
             self.start_pos
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Turret {
+    pub pos: Point,
+    pub target: Option<EntityId>,
+    pub angle: f32,
+    pub next_shot_time: GameTime,
+}
+
+impl Turret {
+    pub fn angle_to_pos(&self, pos: Point) -> f32 {
+        let d = pos - self.pos;
+        d.y.atan2(d.x)
     }
 }

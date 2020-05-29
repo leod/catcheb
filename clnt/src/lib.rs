@@ -18,7 +18,10 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SHOOT_PERIOD, PLAYER_SIT_L, PLAYER_SIT_W},
+    game::run::{
+        BULLET_RADIUS, PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RADIUS,
+        TURRET_RANGE,
+    },
     util::stats,
 };
 
@@ -78,10 +81,27 @@ pub fn render_game(
     state: &comn::Game,
     next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
     time: comn::GameTime,
+    my_player_id: comn::PlayerId,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
     let state_time = state.tick_game_time(state.tick_num);
+
+    for (_, entity) in state.entities.iter() {
+        match entity {
+            comn::Entity::Turret(turret) => {
+                let origin: mint::Vector2<f32> = turret.pos.coords.into();
+                let circle = Circle::new(origin, TURRET_RANGE);
+                gfx.fill_circle(&circle, Color::from_rgba(255, 204, 203, 1.0));
+            }
+            _ => (),
+        }
+    }
+
+    /*let screen_rect = Rectangle::new(
+        Vector::new(0.0, 0.0),
+        state.settings.size.into(),
+    );*/
 
     for (entity_id, entity) in state.entities.iter() {
         match entity {
@@ -128,8 +148,29 @@ pub fn render_game(
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
-                let circle = Circle::new(origin, 10.0);
-                gfx.fill_circle(&circle, Color::ORANGE);
+                let circle = Circle::new(origin, BULLET_RADIUS);
+                let color = if bullet.owner == Some(my_player_id) {
+                    Color::ORANGE
+                } else {
+                    Color::MAGENTA
+                };
+                gfx.fill_circle(&circle, color);
+            }
+            comn::Entity::Turret(turret) => {
+                let origin: mint::Vector2<f32> = turret.pos.coords.into();
+                let circle = Circle::new(origin, TURRET_RADIUS);
+                gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
+
+                let angle = turret.angle;
+
+                gfx.set_transform(
+                    Transform::rotate(angle.to_degrees()).then(Transform::translate(origin)),
+                );
+
+                let rect = Rectangle::new(Vector::new(0.0, -5.0), Vector::new(40.0, 10.0));
+
+                gfx.fill_rect(&rect, Color::BLACK);
+                gfx.set_transform(Transform::IDENTITY);
             }
         }
     }
@@ -258,6 +299,7 @@ async fn app(
                 &state,
                 &game.next_entities(),
                 game.interp_game_time(),
+                game.my_player_id(),
             )?;
         }
 
@@ -270,6 +312,22 @@ async fn app(
             Ok(())
         };
 
+        if let Some((_, my_entity)) = game
+            .state()
+            .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
+        {
+            let cooldown = (my_entity.next_shot_time - game.interp_game_time()).max(0.0);
+            debug(&format!("gun cooldown: {:.2}", cooldown))?;
+            debug(&format!("shots left: {}", my_entity.shots_left))?;
+        } else {
+            // lol
+            debug("")?;
+            debug("")?;
+        }
+
+        for _ in 0..40 {
+            debug("")?;
+        }
         debug(&format!(
             "ping (ms):     {:.1}",
             game.ping().estimate().as_secs_f32() * 1000.0
@@ -278,23 +336,12 @@ async fn app(
             "recv std dev:  {:.2}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
         ))?;
-        debug("")?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;
         debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
         debug(&format!("time warp:     {}", stats.time_warp_factor))?;
         debug(&format!("tick interp:   {}", stats.tick_interp))?;
         debug("")?;
-
-        if let Some((_, my_entity)) = game
-            .state()
-            .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
-        {
-            let cooldown = (my_entity.next_shot_time - game.interp_game_time())
-                .max(0.0);
-            debug(&format!("gun cooldown: {:.2}", cooldown))?;
-            debug(&format!("shots left: {}", my_entity.shots_left))?;
-        }
 
         event_list.render(
             &mut gfx,
