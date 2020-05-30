@@ -18,7 +18,7 @@ pub const RELOAD_DURATION: GameTime = 2.0;
 pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 200.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
-pub const TURRET_SHOOT_ANGLE: f32 = 0.2;
+pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const BULLET_RADIUS: f32 = 8.0;
 pub const MAX_TURRET_TURN_SPEED: f32 = 2.0;
 
@@ -102,9 +102,9 @@ impl Game {
                         let target_angle = turret.angle_to_pos(target_pos);
                         let angle_dist = ((target_angle - turret.angle).sin())
                             .atan2((target_angle - turret.angle).cos());
-                        turret.angle += (angle_dist * 0.2)
-                            .min(MAX_TURRET_TURN_SPEED * tick_period)
-                            .max(-MAX_TURRET_TURN_SPEED * tick_period);
+                        turret.angle += angle_dist * 0.1;
+                        //.min(MAX_TURRET_TURN_SPEED * tick_period)
+                        //.max(-MAX_TURRET_TURN_SPEED * tick_period);
 
                         if time >= turret.next_shot_time && angle_dist.abs() < TURRET_SHOOT_ANGLE {
                             turret.next_shot_time = time + TURRET_SHOOT_PERIOD;
