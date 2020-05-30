@@ -325,16 +325,24 @@ async fn app(
             debug("")?;
         }
 
-        for _ in 0..40 {
+        for _ in 0..38 {
             debug("")?;
         }
         debug(&format!(
-            "ping (ms):     {:.1}",
+            "ping (ms):        {:.1}",
             game.ping().estimate().as_secs_f32() * 1000.0
         ))?;
         debug(&format!(
-            "recv std dev:  {:.2}",
+            "recv std dev:     {:.2}",
             1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
+        ))?;
+        debug(&format!(
+            "recv rate (kB/s): {:.2}",
+            game.webrtc_client().recv_rate() / 1000.0
+        ))?;
+        debug(&format!(
+            "send rate (kB/s): {:.2}",
+            game.webrtc_client().send_rate() / 1000.0
         ))?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;

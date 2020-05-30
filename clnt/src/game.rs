@@ -51,6 +51,10 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
+    pub fn webrtc_client(&self) -> &webrtc::Client {
+        &self.webrtc_client
+    }
+
     pub fn target_time_lag(&self) -> comn::GameTime {
         self.settings.tick_period() * 2.0
     }
