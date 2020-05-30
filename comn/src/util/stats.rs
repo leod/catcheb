@@ -84,6 +84,15 @@ impl Var {
             Some(self.recent_values().fold(0.0 / 0.0, f32::max))
         }
     }
+
+    pub fn sum_per_sec(&self) -> Option<f32> {
+        if let Some((first_time, _)) = self.records.front() {
+            let sum = self.recent_values().sum::<f32>();
+            Some(sum / Instant::now().duration_since(*first_time).as_secs_f32())
+        } else {
+            None
+        }
+    }
 }
 
 pub fn mean(samples: impl Iterator<Item = f32>) -> f32 {
