@@ -1,14 +1,16 @@
-use std::{collections::VecDeque, fmt};
+use std::{collections::VecDeque, fmt, time::Duration};
+
+use instant::Instant;
 
 #[derive(Debug, Clone)]
 pub struct Var {
-    max_num_samples: usize,
-    recent_values: VecDeque<f32>,
+    sample_duration: Duration,
+    records: VecDeque<(Instant, f32)>,
 }
 
 impl Default for Var {
     fn default() -> Self {
-        Var::new(100)
+        Var::new(Duration::from_secs(1))
     }
 }
 
@@ -26,50 +28,60 @@ impl fmt::Display for Var {
 }
 
 impl Var {
-    pub fn new(max_num_samples: usize) -> Self {
+    pub fn new(sample_duration: Duration) -> Self {
         Self {
-            max_num_samples,
-            recent_values: VecDeque::new(),
+            sample_duration,
+            records: VecDeque::new(),
         }
     }
 
     pub fn record(&mut self, value: f32) {
-        self.recent_values.push_back(value);
+        let now = Instant::now();
 
-        if self.recent_values.len() > self.max_num_samples {
-            self.recent_values.pop_front();
+        self.records.push_back((now, value));
+
+        while let Some((time, _)) = self.records.front() {
+            if now.duration_since(*time) > self.sample_duration {
+                self.records.pop_front();
+            } else {
+                break;
+            }
         }
     }
 
+    pub fn recent_values(&self) -> impl Iterator<Item = f32> + '_ {
+        self.records.iter().map(|(_, value)| *value)
+    }
+
     pub fn mean(&self) -> Option<f32> {
-        if self.recent_values.is_empty() {
+        if self.records.is_empty() {
             None
         } else {
-            Some(mean(self.recent_values.iter().copied()))
+            Some(mean(self.recent_values()))
         }
     }
 
     pub fn std_dev(&self) -> Option<f32> {
-        if self.recent_values.is_empty() {
+        if self.records.is_empty() {
             None
         } else {
-            Some(std_dev(self.recent_values.iter().copied()))
+            Some(std_dev(self.recent_values()))
         }
     }
 
     pub fn min(&self) -> Option<f32> {
-        if self.recent_values.is_empty() {
+        if self.records.is_empty() {
             None
         } else {
-            Some(self.recent_values.iter().copied().fold(0.0 / 0.0, f32::min))
+            Some(self.recent_values().fold(0.0 / 0.0, f32::min))
         }
     }
 
     pub fn max(&self) -> Option<f32> {
-        if self.recent_values.is_empty() {
+        if self.records.is_empty() {
             None
         } else {
-            Some(self.recent_values.iter().copied().fold(0.0 / 0.0, f32::max))
+            Some(self.recent_values().fold(0.0 / 0.0, f32::max))
         }
     }
 }
