@@ -3,7 +3,7 @@
 //! This is based on the `echo_server.html` example from `webrtc-unreliable`,
 //! but translated from JavaScript into Rust.
 
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 use instant::Instant;
 use log::{info, warn};
@@ -15,6 +15,8 @@ use web_sys::{
     ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelInit,
     RtcDataChannelType, RtcPeerConnection, RtcSessionDescriptionInit,
 };
+
+use comn::util::stats;
 
 #[derive(Debug, Clone)]
 pub enum ConnectError {
@@ -64,6 +66,9 @@ pub struct Data {
     channel: RtcDataChannel,
     status: Status,
     received: VecDeque<(Instant, comn::ServerMessage)>,
+
+    recv_rate: stats::Var,
+    send_rate: RefCell<stats::Var>,
 }
 
 pub struct Client {
@@ -92,6 +97,8 @@ impl Client {
             channel,
             status: Status::Connecting,
             received: VecDeque::new(),
+            recv_rate: stats::Var::new(Duration::from_secs(10)),
+            send_rate: RefCell::new(stats::Var::new(Duration::from_secs(10))),
         }));
 
         let on_open = Closure::wrap(Box::new({
@@ -172,6 +179,19 @@ impl Client {
     pub fn status(&self) -> Status {
         self.data.borrow().status
     }
+
+    pub fn recv_rate(&self) -> f32 {
+        self.data.borrow().recv_rate.sum_per_sec().unwrap_or(0.0)
+    }
+
+    pub fn send_rate(&self) -> f32 {
+        self.data
+            .borrow()
+            .send_rate
+            .borrow()
+            .sum_per_sec()
+            .unwrap_or(0.0)
+    }
 }
 
 impl Data {
@@ -198,8 +218,11 @@ impl Data {
         let message = if event.data().is_instance_of::<js_sys::ArrayBuffer>() {
             let abuf = event.data().dyn_into::<js_sys::ArrayBuffer>().unwrap();
             let array = js_sys::Uint8Array::new(&abuf);
+            let vec = array.to_vec();
 
-            if let Some(message) = comn::ServerMessage::deserialize(&array.to_vec()) {
+            self.recv_rate.record(vec.len() as f32);
+
+            if let Some(message) = comn::ServerMessage::deserialize(&vec) {
                 message
             } else {
                 warn!("Failed to deserialize message, ignoring");
@@ -216,6 +239,8 @@ impl Data {
     }
 
     pub fn send(&self, data: &[u8]) -> Result<(), JsValue> {
+        self.send_rate.borrow_mut().record(data.len() as f32);
+
         self.channel.send_with_u8_array(data)
     }
 }
