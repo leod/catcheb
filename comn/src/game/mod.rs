@@ -40,7 +40,7 @@ impl Default for Settings {
             max_num_players: 16,
             ticks_per_second: 30,
             size: Vector::new(800.0, 600.0),
-            spawn_points: vec![Point::new(350.0, 100.0), Point::new(600.0, 400.0)],
+            spawn_points: vec![Point::new(50.0, 50.0), Point::new(550.0, 400.0)],
         }
     }
 }
