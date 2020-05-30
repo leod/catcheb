@@ -18,8 +18,9 @@ pub const RELOAD_DURATION: GameTime = 2.0;
 pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 200.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
-pub const TURRET_SHOOT_ANGLE: f32 = 0.4;
+pub const TURRET_SHOOT_ANGLE: f32 = 0.2;
 pub const BULLET_RADIUS: f32 = 8.0;
+pub const MAX_TURRET_TURN_SPEED: f32 = 2.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -32,6 +33,7 @@ pub struct RunContext {
 impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
         let time = self.current_game_time();
+        let tick_period = self.settings.tick_period();
 
         // TODO: clone
         let entities = self.entities.clone();
@@ -98,11 +100,13 @@ impl Game {
                     if let Some(target) = turret.target {
                         let target_pos = entities[&target].pos(time);
                         let target_angle = turret.angle_to_pos(target_pos);
-                        turret.angle += (target_angle - turret.angle) * 0.2;
+                        let angle_dist = ((target_angle - turret.angle).sin())
+                            .atan2((target_angle - turret.angle).cos());
+                        turret.angle += (angle_dist * 0.2)
+                            .min(MAX_TURRET_TURN_SPEED * tick_period)
+                            .max(-MAX_TURRET_TURN_SPEED * tick_period);
 
-                        if time >= turret.next_shot_time
-                            && (target_angle - turret.angle).abs() < TURRET_SHOOT_ANGLE
-                        {
+                        if time >= turret.next_shot_time && angle_dist.abs() < TURRET_SHOOT_ANGLE {
                             turret.next_shot_time = time + TURRET_SHOOT_PERIOD;
 
                             let delta = Vector::new(turret.angle.cos(), turret.angle.sin());
