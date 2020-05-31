@@ -16,7 +16,7 @@ pub const BULLET_MOVE_SPEED: f32 = 400.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 pub const TURRET_RADIUS: f32 = 30.0;
-pub const TURRET_RANGE: f32 = 200.0;
+pub const TURRET_RANGE: f32 = 400.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -130,13 +130,13 @@ impl Game {
         &mut self,
         player_id: PlayerId,
         input: &Input,
-        input_tick: Option<TickNum>,
+        input_state: Option<&Game>,
         context: &mut RunContext,
     ) -> GameResult<()> {
         let delta_s = self.settings.tick_period();
         let time = self.current_game_time();
-        let input_time = input_tick
-            .map(|num| self.tick_game_time(num))
+        let input_time = input_state
+            .map(|input_state| input_state.current_game_time())
             .unwrap_or(time);
         let map_size = self.settings.size;
 
@@ -198,7 +198,9 @@ impl Game {
             }
 
             let pos = ent.pos;
-            for (_entity_id, entity) in self.entities.iter() {
+            let input_state = input_state.unwrap_or(self);
+
+            for (_entity_id, entity) in input_state.entities.iter() {
                 match entity {
                     Entity::DangerGuy(danger_guy) => {
                         // TODO: Player geometry
