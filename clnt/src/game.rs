@@ -2,9 +2,20 @@ use instant::Instant;
 use log::{debug, info, warn};
 use std::{collections::BTreeMap, time::Duration};
 
-use comn::util::{GameTimeEstimation, PingEstimation};
+use comn::util::{stats, GameTimeEstimation, PingEstimation};
 
 use crate::{prediction::Prediction, webrtc};
+
+/// Statistics for debugging.
+#[derive(Default)]
+pub struct Stats {
+    pub time_lag_ms: stats::Var,
+    pub time_warp_factor: stats::Var,
+    pub tick_interp: stats::Var,
+    pub recv_rate: f32,
+    pub send_rate: f32,
+    pub recv_delay_std_dev: f32,
+}
 
 pub struct Game {
     settings: comn::Settings,
@@ -23,6 +34,8 @@ pub struct Game {
     start_time: Instant,
     recv_tick_time: GameTimeEstimation,
     next_time_warp_factor: f32,
+
+    stats: Stats,
 }
 
 impl Game {
@@ -42,6 +55,7 @@ impl Game {
             start_time: Instant::now(),
             recv_tick_time,
             next_time_warp_factor: 1.0,
+            stats: Stats::default(),
         }
     }
 
@@ -53,25 +67,33 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
-    pub fn webrtc_client(&self) -> &webrtc::Client {
-        &self.webrtc_client
+    pub fn settings(&self) -> &comn::Settings {
+        &self.settings
     }
 
-    pub fn target_time_lag(&self) -> comn::GameTime {
+    pub fn stats(&self) -> &Stats {
+        &self.stats
+    }
+
+    pub fn ping(&self) -> &PingEstimation {
+        &self.ping
+    }
+
+    pub fn interp_game_time(&self) -> comn::GameTime {
+        self.interp_game_time
+    }
+
+    fn target_time_lag(&self) -> comn::GameTime {
         self.settings.tick_period() * 2.5
     }
 
-    pub fn next_time_warp_factor(&self) -> f32 {
-        self.next_time_warp_factor
-    }
-
-    pub fn next_tick_num(&self) -> Option<comn::TickNum> {
-        self.next_tick_num
-    }
-
-    pub fn recv_game_time(&self) -> Option<f32> {
+    fn recv_game_time(&self) -> Option<f32> {
         let time_since_start = Instant::now().duration_since(self.start_time).as_secs_f32();
         self.recv_tick_time.estimate(time_since_start)
+    }
+
+    fn tick_num(&self) -> comn::TickNum {
+        comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
     }
 
     fn time_warp_factor(&self) -> f32 {
@@ -189,11 +211,24 @@ impl Game {
             self.received_ticks.remove(&tick_num);
         }
 
-        events
-    }
+        // Keep some statistics for debugging...
+        self.stats
+            .time_lag_ms
+            .record((self.recv_game_time().unwrap_or(-1.0) - self.interp_game_time) * 1000.0);
+        self.stats
+            .tick_interp
+            .record(self.next_tick_num.map_or(0.0, |next_tick_num| {
+                (next_tick_num.0 - self.tick_num().0) as f32
+            }));
+        self.stats
+            .time_warp_factor
+            .record(self.next_time_warp_factor);
 
-    pub fn tick_num(&self) -> comn::TickNum {
-        comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
+        self.stats.send_rate = self.webrtc_client.send_rate();
+        self.stats.recv_rate = self.webrtc_client.recv_rate();
+        self.stats.recv_delay_std_dev = self.recv_tick_time.recv_delay_std_dev().unwrap_or(-1.0);
+
+        events
     }
 
     pub fn state(&self) -> Option<&comn::Game> {
@@ -247,22 +282,6 @@ impl Game {
         }
 
         entities
-    }
-
-    pub fn settings(&self) -> &comn::Settings {
-        &self.settings
-    }
-
-    pub fn ping(&self) -> &PingEstimation {
-        &self.ping
-    }
-
-    pub fn recv_tick_time(&self) -> &GameTimeEstimation {
-        &self.recv_tick_time
-    }
-
-    pub fn interp_game_time(&self) -> f32 {
-        self.interp_game_time
     }
 
     fn handle_message(&mut self, recv_time: Instant, message: comn::ServerMessage) {
