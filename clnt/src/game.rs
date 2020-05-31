@@ -20,6 +20,7 @@ pub struct Game {
     next_tick_num: Option<comn::TickNum>,
 
     ping: PingEstimation,
+    start_time: Instant,
     recv_tick_time: GameTimeEstimation,
     next_time_warp_factor: f32,
 }
@@ -38,6 +39,7 @@ impl Game {
             interp_game_time: 0.0,
             next_tick_num: None,
             ping: PingEstimation::default(),
+            start_time: Instant::now(),
             recv_tick_time,
             next_time_warp_factor: 1.0,
         }
@@ -56,7 +58,7 @@ impl Game {
     }
 
     pub fn target_time_lag(&self) -> comn::GameTime {
-        self.settings.tick_period() * 2.0
+        self.settings.tick_period() * 2.5
     }
 
     pub fn next_time_warp_factor(&self) -> f32 {
@@ -67,8 +69,13 @@ impl Game {
         self.next_tick_num
     }
 
+    pub fn recv_game_time(&self) -> Option<f32> {
+        let time_since_start = Instant::now().duration_since(self.start_time).as_secs_f32();
+        self.recv_tick_time.estimate(time_since_start)
+    }
+
     fn time_warp_factor(&self) -> f32 {
-        if let Some(recv_game_time) = self.recv_tick_time.estimate(Instant::now()) {
+        if let Some(recv_game_time) = self.recv_game_time() {
             let current_time_lag = recv_game_time - self.interp_game_time;
             let time_lag_deviation = self.target_time_lag() - current_time_lag;
 
@@ -115,6 +122,7 @@ impl Game {
         let prev_tick_num = self.tick_num();
         self.interp_game_time = new_interp_game_time;
         let new_tick_num = self.tick_num();
+
         self.next_time_warp_factor = self.time_warp_factor();
 
         let crossed_tick_nums: Vec<comn::TickNum> = (prev_tick_num.0 + 1..=new_tick_num.0)
@@ -290,7 +298,9 @@ impl Game {
                     self.received_ticks.insert(tick.state.tick_num, tick);
                 }
 
-                self.recv_tick_time.record_tick(recv_time, recv_game_time);
+                let time_since_start = recv_time.duration_since(self.start_time).as_secs_f32();
+                self.recv_tick_time
+                    .record_tick(time_since_start, recv_game_time);
             }
         }
     }
