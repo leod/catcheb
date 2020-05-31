@@ -12,6 +12,7 @@ pub struct Stats {
     pub time_lag_ms: stats::Var,
     pub time_warp_factor: stats::Var,
     pub tick_interp: stats::Var,
+    pub input_delay: stats::Var,
     pub recv_rate: f32,
     pub send_rate: f32,
     pub recv_delay_std_dev: f32,
@@ -299,6 +300,13 @@ impl Game {
             }
             comn::ServerMessage::Tick(tick) => {
                 let recv_game_time = tick.state.current_game_time();
+
+                // Keep some statistics for debugging...
+                if let Some(my_last_input) = tick.your_last_input.as_ref() {
+                    self.stats
+                        .input_delay
+                        .record((tick.state.tick_num.0 - my_last_input.0) as f32 - 1.0);
+                }
 
                 if recv_game_time < self.interp_game_time {
                     debug!(

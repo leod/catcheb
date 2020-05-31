@@ -305,7 +305,7 @@ async fn app(
             debug("")?;
         }
 
-        for _ in 0..38 {
+        for _ in 0..37 {
             debug("")?;
         }
         debug(&format!(
@@ -329,6 +329,7 @@ async fn app(
         debug(&format!("time lag (ms): {}", game.stats().time_lag_ms))?;
         debug(&format!("time warp:     {}", game.stats().time_warp_factor))?;
         debug(&format!("tick interp:   {}", game.stats().tick_interp))?;
+        debug(&format!("input delay:   {}", game.stats().input_delay))?;
         debug("")?;
 
         event_list.render(
