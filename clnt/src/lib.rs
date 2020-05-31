@@ -268,11 +268,6 @@ async fn app(
         let dt = start_time.duration_since(last_time);
         last_time = start_time;
 
-        let recv_game_time = game
-            .recv_tick_time()
-            .estimate(Instant::now())
-            .unwrap_or(-1.0);
-
         let events = game.update(dt, &current_input(&pressed_keys));
 
         for event in events {
@@ -283,7 +278,7 @@ async fn app(
         stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
         stats
             .time_lag_ms
-            .record((recv_game_time - game.interp_game_time()) * 1000.0);
+            .record((game.recv_game_time().unwrap_or(-1.0) - game.interp_game_time()) * 1000.0);
         stats
             .tick_interp
             .record(game.next_tick_num().map_or(0.0, |next_tick_num| {

@@ -388,7 +388,7 @@ impl Runner {
                     // we can predict when to receive the next player input.
                     player
                         .recv_input_time
-                        .record_tick(recv_time, game.tick_game_time(tick_num));
+                        .record_tick(game.current_game_time(), game.tick_game_time(tick_num));
                 }
             }
         } else {
