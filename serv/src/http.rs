@@ -79,9 +79,9 @@ async fn service(
         (&Method::GET, "/") | (&Method::GET, "/index.html") => {
             send_file(config, "index.html", "text/html").await
         }
-        (&Method::GET, "/clnt.js") => send_file(config, "clnt.js", "text/javascript").await,
+        (&Method::GET, "/clnt.js") => send_file(config, "clnt.js.gz", "text/javascript").await,
         (&Method::GET, "/clnt_bg.wasm") => {
-            send_file(config, "clnt_bg.wasm", "application/wasm").await
+            send_file(config, "clnt_bg.wasm.gz", "application/wasm").await
         }
         (&Method::GET, "/Munro-2LYe.ttf") => send_file(config, "Munro-2LYe.ttf", "font/ttf").await,
         (&Method::GET, "/kongtext.ttf") => send_file(config, "kongtext.ttf", "font/ttf").await,
@@ -158,17 +158,21 @@ async fn send_file(
     // Uses tokio_fs to open file asynchronously, then tokio::io::AsyncReadExt
     // to read into memory asynchronously.
 
-    let filename = config.clnt_dir.join(filename);
+    let full_filename = config.clnt_dir.join(filename);
 
-    if let Ok(mut file) = File::open(&filename).await {
+    if let Ok(mut file) = File::open(&full_filename).await {
         let mut buf = Vec::new();
 
         if file.read_to_end(&mut buf).await.is_ok() {
-            let response = Response::builder()
-                .header("Content-Type", content_type)
-                .body(buf.into())
-                .unwrap();
-            Ok(response)
+            let response = Response::builder().header("Content-Type", content_type);
+
+            let response = if filename.ends_with(".gz") {
+                response.header("Content-Encoding", "gzip")
+            } else {
+                response
+            };
+
+            Ok(response.body(buf.into()).unwrap())
         } else {
             warn!("Could not open file for reading: {:?}", filename);
             Ok(internal_server_error())

@@ -27,8 +27,8 @@ Build the client:
 make clnt
 ```
 This will generate the following files in `clnt/static/`:
-- `clnt_bg.wasm`
-- `clnt.js`
+- `clnt_bg.wasm.gz`
+- `clnt.js.gz`
 
 Build and run the server:
 ```
