@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use log::{debug, info};
 use rand::seq::SliceRandom;
 
@@ -5,10 +7,14 @@ use comn::{game::RunContext, Entity, PlayerState};
 
 pub const FIRST_SPAWN_DURATION: comn::GameTime = 0.5;
 pub const RESPAWN_DURATION: comn::GameTime = 2.0;
+pub const KEEP_PREV_STATES_DURATION: comn::GameTime = 1.0;
 
 pub struct Game {
     pub state: comn::Game,
     pub next_entity_id: comn::EntityId,
+
+    /// Previous states, used for reconciliation.
+    pub prev_states: VecDeque<comn::Game>,
 
     /// Events produced in the last update. We keep these around so that we
     /// can send them to the players in this game in `Runner`.
@@ -29,6 +35,7 @@ impl Game {
         Self {
             state,
             next_entity_id,
+            prev_states: VecDeque::new(),
             last_events: Vec::new(),
         }
     }
@@ -84,10 +91,14 @@ impl Game {
         self.state.run_tick(&mut context).unwrap();
 
         // TODO: Sort player input by tick num
-        // TODO: Cap player input tick age
         for (player_id, input_tick_num, input) in inputs {
+            let input_state = self
+                .prev_states
+                .iter()
+                .find(|state| state.tick_num == *input_tick_num);
+
             self.state
-                .run_player_input(*player_id, input, Some(*input_tick_num), &mut context)
+                .run_player_input(*player_id, input, input_state, &mut context)
                 .unwrap();
         }
 
@@ -139,6 +150,14 @@ impl Game {
 
         self.state.tick_num = self.state.tick_num.next();
         self.last_events = context.events;
+
+        self.prev_states.push_back(self.state.clone());
+
+        let max_num_states =
+            (KEEP_PREV_STATES_DURATION * self.state.settings.ticks_per_second as f32) as usize;
+        while self.prev_states.len() > max_num_states {
+            self.prev_states.pop_front();
+        }
     }
 
     pub fn remove_player(&mut self, player_id: comn::PlayerId) {
