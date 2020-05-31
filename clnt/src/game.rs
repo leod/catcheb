@@ -171,6 +171,9 @@ impl Game {
             // Instead, we just jump directly to the last couple of ticks.
             info!("Crossed {} ticks, will skip", crossed_tick_nums.len());
 
+            // TODO: In order to nicely reinitialize prediction, we should take
+            // those crossed ticks for which we actually received a server
+            // state...
             crossed_tick_nums.drain(0..crossed_tick_nums.len() - MAX_TICKS_PER_UPDATE);
         }
         assert!(crossed_tick_nums.len() <= MAX_TICKS_PER_UPDATE);

@@ -30,11 +30,28 @@ impl Prediction {
         my_input: comn::Input,
         server_state: Option<&comn::Tick>,
     ) -> Vec<comn::Event> {
-        if self.max_logged_tick_num().unwrap_or(comn::TickNum(0)) > tick_num {
-            info!("Predicting tick that we already predicted; resetting log");
-            self.log = Default::default();
+        // Let's make as few assumptions as possible regarding consistency
+        // in calls to `record_tick_input`.
+        if let Some(max_logged) = self.max_logged_tick_num() {
+            if max_logged > tick_num {
+                info!(
+                    "Predicting tick that is in our past ({:?} vs {:?}); resetting log",
+                    tick_num, max_logged,
+                );
+                self.log = Default::default();
+            } else if max_logged.next() != tick_num {
+                // TODO: Do we really need to harshly re-initialize prediction
+                // here?
+                info!(
+                    "Skipped ticks in prediction ({:?} vs {:?}); resetting log",
+                    tick_num, max_logged,
+                );
+                self.log = Default::default();
+            }
         }
 
+        // If we have a server state for the tick, apply corrections for our
+        // previous prediction.
         if let Some((server_state, my_last_input)) = server_state.and_then(|tick| {
             tick.your_last_input
                 .as_ref()
@@ -50,6 +67,8 @@ impl Prediction {
                 record.state.tick_num = my_last_input.next();
             }
 
+            // We can now forget about any older predictions in the log.
+            // TODO: Needless clone.
             self.log = self
                 .log
                 .clone()
@@ -59,16 +78,23 @@ impl Prediction {
         }
 
         let last_state = if let Some(first_record) = self.log.values().next() {
+            // Starting at the oldest state in our log, re-apply the inputs
+            // that we had.
             let mut last_state = first_record.state.clone();
             for record in self.log.values_mut().skip(1) {
                 Self::run_tick(&mut last_state, self.my_player_id, &record.my_last_input);
                 record.state = last_state.clone();
             }
+
+            assert!(last_state.tick_num == tick_num);
+
             Some(last_state)
         } else if let Some(server_state) = server_state {
-            //info!("taking server state");
+            // Our prediction log is empty, but we have a server state that we
+            // can use to start prediction.
             Some(server_state.state.clone())
         } else {
+            // We have no state from which we can start prediction.
             None
         };
 
