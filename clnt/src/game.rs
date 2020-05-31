@@ -23,6 +23,8 @@ pub struct Stats {
     pub recv_delay_std_dev: f32,
 }
 
+const MAX_TICKS_PER_UPDATE: usize = 3;
+
 pub struct Game {
     settings: comn::Settings,
     my_token: comn::PlayerToken,
@@ -156,9 +158,25 @@ impl Game {
 
         self.next_time_warp_factor = self.time_warp_factor();
 
-        let crossed_tick_nums: Vec<comn::TickNum> = (prev_tick_num.0 + 1..=new_tick_num.0)
+        let mut crossed_tick_nums: Vec<comn::TickNum> = (prev_tick_num.0 + 1..=new_tick_num.0)
             .map(|i| comn::TickNum(i))
             .collect();
+
+        if crossed_tick_nums.len() > MAX_TICKS_PER_UPDATE {
+            // It's possible that we have a large jump in ticks, e.g. due to a
+            // lag spike, or because we are running in a background tab. In this
+            // case, we don't want to overload ourselves by sending many input
+            // packets and performing prediction over many ticks.
+            //
+            // Instead, we just jump directly to the last couple of ticks.
+            info!("Crossed {} ticks, will skip", crossed_tick_nums.len());
+
+            // TODO: In order to nicely reinitialize prediction, we should take
+            // those crossed ticks for which we actually received a server
+            // state...
+            crossed_tick_nums.drain(0..crossed_tick_nums.len() - MAX_TICKS_PER_UPDATE);
+        }
+        assert!(crossed_tick_nums.len() <= MAX_TICKS_PER_UPDATE);
 
         // Iterate over all the ticks that we have crossed, also including
         // those for which we did not anything from the server.
@@ -190,10 +208,10 @@ impl Game {
             }
         }
 
-        if let Some(tick_num) = last_server_tick_num {
+        if let Some(last_server_tick_num) = last_server_tick_num {
             if self
                 .next_tick_num
-                .map_or(false, |next_tick_num| next_tick_num <= tick_num)
+                .map_or(false, |next_tick_num| next_tick_num <= last_server_tick_num)
             {
                 // We have reached the tick that we were interpolating into, so
                 // we'll need to look for the next interpolation target.
@@ -307,7 +325,7 @@ impl Game {
                 if self.ping.record_pong(recv_time, sequence_num).is_err() {
                     debug!("Ignoring out-of-order pong {:?}", sequence_num);
                 } else {
-                    debug!("Received pong -> estimation {:?}", self.ping.estimate());
+                    //debug!("Received pong -> estimation {:?}", self.ping.estimate());
                 }
             }
             comn::ServerMessage::Tick(tick) => {
