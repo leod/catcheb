@@ -59,8 +59,10 @@ pub enum ServerMessage {
 pub enum ClientMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
-    Input { tick_num: TickNum, input: Input },
+    Input(Vec<(TickNum, Input)>),
 }
+
+pub const MAX_INPUTS_PER_MESSAGE: usize = 5;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedClientMessage(pub PlayerToken, pub ClientMessage);
