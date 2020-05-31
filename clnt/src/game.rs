@@ -200,6 +200,8 @@ impl Game {
         if let Some(prediction) = self.prediction.as_ref() {
             prediction.predicted_state(self.tick_num())
         } else {
+            // TODO: If prediction is disabled, loss in tick packages leads to
+            // obvious flickering, since states will be None.
             self.received_ticks
                 .get(&self.tick_num())
                 .map(|tick| &tick.state)
