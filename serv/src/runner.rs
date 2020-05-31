@@ -95,7 +95,7 @@ pub struct Runner {
     send_message_tx: SendMessageTx,
 
     shutdown: bool,
-    tick_timer: comn::util::Timer,
+    tick_timer: Timer,
 
     stats: Stats,
     print_stats_timer: Timer,
@@ -210,7 +210,7 @@ impl Runner {
                     "inputs per game tick: {}",
                     self.stats.num_inputs_per_player_tick
                 );
-                debug!("input delay         : {}", self.stats.input_delay,);
+                debug!("input delay:          {}", self.stats.input_delay,);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -328,11 +328,11 @@ impl Runner {
                     if player.ping.record_pong(recv_time, sequence_num).is_err() {
                         warn!("Ignoring out-of-order pong from {:?}", peer);
                     } else {
-                        debug!(
+                        /*debug!(
                             "Received pong from {:?} -> estimation {:?}",
                             peer,
                             player.ping.estimate()
-                        );
+                        );*/
                     }
                 }
                 comn::ClientMessage::Input { tick_num, input } => {
