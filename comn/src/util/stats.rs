@@ -10,7 +10,7 @@ pub struct Var {
 
 impl Default for Var {
     fn default() -> Self {
-        Var::new(Duration::from_secs(1))
+        Var::new(Duration::from_secs(10))
     }
 }
 
