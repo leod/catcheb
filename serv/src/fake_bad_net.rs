@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use log::{debug, warn};
+use log::warn;
 use rand::Rng;
 use rand_distr::Distribution;
 

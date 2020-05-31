@@ -6,7 +6,7 @@ mod webrtc;
 use std::collections::{BTreeMap, HashSet};
 
 use instant::Instant;
-use log::{debug, info, warn};
+use log::{info, warn};
 
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
@@ -178,13 +178,11 @@ pub fn render_game(
     Ok(())
 }
 
+/// Statistics for debugging.
 #[derive(Default)]
 struct Stats {
     dt_ms: stats::Var,
     frame_ms: stats::Var,
-    time_lag_ms: stats::Var,
-    time_warp_factor: stats::Var,
-    tick_interp: stats::Var,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -268,31 +266,13 @@ async fn app(
         let dt = start_time.duration_since(last_time);
         last_time = start_time;
 
-        let recv_game_time = game
-            .recv_tick_time()
-            .estimate(Instant::now())
-            .unwrap_or(-1.0);
-
         let events = game.update(dt, &current_input(&pressed_keys));
 
         for event in events {
             event_list.push(event);
         }
 
-        stats.time_warp_factor.record(game.next_time_warp_factor());
-        stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
-        stats
-            .time_lag_ms
-            .record((recv_game_time - game.interp_game_time()) * 1000.0);
-        stats
-            .tick_interp
-            .record(game.next_tick_num().map_or(0.0, |next_tick_num| {
-                (next_tick_num.0 - game.tick_num().0) as f32
-            }));
-
         if let Some(state) = game.state() {
-            //info!("render {:?}", state);
-            //info!("into {:?}", game.next_entities());
             render_game(
                 &mut gfx,
                 &mut resources,
@@ -325,7 +305,7 @@ async fn app(
             debug("")?;
         }
 
-        for _ in 0..38 {
+        for _ in 0..36 {
             debug("")?;
         }
         debug(&format!(
@@ -334,21 +314,28 @@ async fn app(
         ))?;
         debug(&format!(
             "recv std dev:     {:.2}",
-            1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
+            1000.0 * game.stats().recv_delay_std_dev,
+        ))?;
+        debug(&format!(
+            "loss (%):         {:.2}",
+            (1.0 - game.stats().received_ticks.sum_per_sec().unwrap_or(0.0)
+                / game.settings().ticks_per_second as f32)
+                * 100.0,
         ))?;
         debug(&format!(
             "recv rate (kB/s): {:.2}",
-            game.webrtc_client().recv_rate() / 1000.0
+            game.stats().recv_rate / 1000.0
         ))?;
         debug(&format!(
             "send rate (kB/s): {:.2}",
-            game.webrtc_client().send_rate() / 1000.0
+            game.stats().send_rate / 1000.0
         ))?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;
-        debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
-        debug(&format!("time warp:     {}", stats.time_warp_factor))?;
-        debug(&format!("tick interp:   {}", stats.tick_interp))?;
+        debug(&format!("time lag (ms): {}", game.stats().time_lag_ms))?;
+        debug(&format!("time warp:     {}", game.stats().time_warp_factor))?;
+        debug(&format!("tick interp:   {}", game.stats().tick_interp))?;
+        debug(&format!("input delay:   {}", game.stats().input_delay))?;
         debug("")?;
 
         event_list.render(
@@ -359,11 +346,11 @@ async fn app(
 
         gfx.present(&window)?;
 
-        let end_time = Instant::now();
-
+        // Keep some statistics for debugging...
+        stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
         stats
             .frame_ms
-            .record(end_time.duration_since(start_time).as_secs_f32() * 1000.0);
+            .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);
     }
 }
 

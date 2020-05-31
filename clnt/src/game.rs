@@ -1,10 +1,27 @@
+use std::{
+    collections::{BTreeMap, VecDeque},
+    time::Duration,
+};
+
 use instant::Instant;
 use log::{debug, info, warn};
-use std::{collections::BTreeMap, time::Duration};
 
-use comn::util::{GameTimeEstimation, PingEstimation};
+use comn::util::{stats, GameTimeEstimation, PingEstimation};
 
 use crate::{prediction::Prediction, webrtc};
+
+/// Statistics for debugging.
+#[derive(Default)]
+pub struct Stats {
+    pub time_lag_ms: stats::Var,
+    pub time_warp_factor: stats::Var,
+    pub tick_interp: stats::Var,
+    pub input_delay: stats::Var,
+    pub received_ticks: stats::Var,
+    pub recv_rate: f32,
+    pub send_rate: f32,
+    pub recv_delay_std_dev: f32,
+}
 
 pub struct Game {
     settings: comn::Settings,
@@ -13,6 +30,8 @@ pub struct Game {
 
     webrtc_client: webrtc::Client,
 
+    last_inputs: VecDeque<(comn::TickNum, comn::Input)>,
+
     received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
     prediction: Option<Prediction>,
 
@@ -20,8 +39,11 @@ pub struct Game {
     next_tick_num: Option<comn::TickNum>,
 
     ping: PingEstimation,
+    start_time: Instant,
     recv_tick_time: GameTimeEstimation,
     next_time_warp_factor: f32,
+
+    stats: Stats,
 }
 
 impl Game {
@@ -33,13 +55,16 @@ impl Game {
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
+            last_inputs: VecDeque::new(),
             received_ticks: BTreeMap::new(),
             prediction,
             interp_game_time: 0.0,
             next_tick_num: None,
             ping: PingEstimation::default(),
+            start_time: Instant::now(),
             recv_tick_time,
             next_time_warp_factor: 1.0,
+            stats: Stats::default(),
         }
     }
 
@@ -51,24 +76,37 @@ impl Game {
         self.webrtc_client.status() == webrtc::Status::Open
     }
 
-    pub fn webrtc_client(&self) -> &webrtc::Client {
-        &self.webrtc_client
+    pub fn settings(&self) -> &comn::Settings {
+        &self.settings
     }
 
-    pub fn target_time_lag(&self) -> comn::GameTime {
-        self.settings.tick_period() * 2.0
+    pub fn stats(&self) -> &Stats {
+        &self.stats
     }
 
-    pub fn next_time_warp_factor(&self) -> f32 {
-        self.next_time_warp_factor
+    pub fn ping(&self) -> &PingEstimation {
+        &self.ping
     }
 
-    pub fn next_tick_num(&self) -> Option<comn::TickNum> {
-        self.next_tick_num
+    pub fn interp_game_time(&self) -> comn::GameTime {
+        self.interp_game_time
+    }
+
+    fn target_time_lag(&self) -> comn::GameTime {
+        self.settings.tick_period() * 2.5
+    }
+
+    fn recv_game_time(&self) -> Option<f32> {
+        let time_since_start = Instant::now().duration_since(self.start_time).as_secs_f32();
+        self.recv_tick_time.estimate(time_since_start)
+    }
+
+    fn tick_num(&self) -> comn::TickNum {
+        comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
     }
 
     fn time_warp_factor(&self) -> f32 {
-        if let Some(recv_game_time) = self.recv_tick_time.estimate(Instant::now()) {
+        if let Some(recv_game_time) = self.recv_game_time() {
             let current_time_lag = recv_game_time - self.interp_game_time;
             let time_lag_deviation = self.target_time_lag() - current_time_lag;
 
@@ -115,6 +153,7 @@ impl Game {
         let prev_tick_num = self.tick_num();
         self.interp_game_time = new_interp_game_time;
         let new_tick_num = self.tick_num();
+
         self.next_time_warp_factor = self.time_warp_factor();
 
         let crossed_tick_nums: Vec<comn::TickNum> = (prev_tick_num.0 + 1..=new_tick_num.0)
@@ -126,17 +165,21 @@ impl Game {
         let mut events = Vec::new();
         let mut last_server_tick_num = None;
 
+        // TODO: Limit number of ticks to cross, and inputs to send per update
         for tick_num in crossed_tick_nums.iter() {
             if let Some(tick) = self.received_ticks.get(tick_num) {
                 events.extend(tick.events.clone().into_iter());
                 last_server_tick_num = Some(*tick_num);
             }
 
-            // TODO: Limit number of inputs to send, when skipping large numbers of ticks
-            self.send(comn::ClientMessage::Input {
-                tick_num: *tick_num,
-                input: input.clone(),
-            });
+            self.last_inputs.push_back((*tick_num, input.clone()));
+            while self.last_inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
+                self.last_inputs.pop_front();
+            }
+
+            self.send(comn::ClientMessage::Input(
+                self.last_inputs.iter().cloned().collect(),
+            ));
 
             if let Some(prediction) = self.prediction.as_mut() {
                 prediction.record_tick_input(
@@ -181,17 +224,32 @@ impl Game {
             self.received_ticks.remove(&tick_num);
         }
 
-        events
-    }
+        // Keep some statistics for debugging...
+        self.stats
+            .time_lag_ms
+            .record((self.recv_game_time().unwrap_or(-1.0) - self.interp_game_time) * 1000.0);
+        self.stats
+            .tick_interp
+            .record(self.next_tick_num.map_or(0.0, |next_tick_num| {
+                (next_tick_num.0 - self.tick_num().0) as f32
+            }));
+        self.stats
+            .time_warp_factor
+            .record(self.next_time_warp_factor);
 
-    pub fn tick_num(&self) -> comn::TickNum {
-        comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
+        self.stats.send_rate = self.webrtc_client.send_rate();
+        self.stats.recv_rate = self.webrtc_client.recv_rate();
+        self.stats.recv_delay_std_dev = self.recv_tick_time.recv_delay_std_dev().unwrap_or(-1.0);
+
+        events
     }
 
     pub fn state(&self) -> Option<&comn::Game> {
         if let Some(prediction) = self.prediction.as_ref() {
             prediction.predicted_state(self.tick_num())
         } else {
+            // TODO: If prediction is disabled, loss in tick packages leads to
+            // obvious flickering, since states will be None.
             self.received_ticks
                 .get(&self.tick_num())
                 .map(|tick| &tick.state)
@@ -239,22 +297,6 @@ impl Game {
         entities
     }
 
-    pub fn settings(&self) -> &comn::Settings {
-        &self.settings
-    }
-
-    pub fn ping(&self) -> &PingEstimation {
-        &self.ping
-    }
-
-    pub fn recv_tick_time(&self) -> &GameTimeEstimation {
-        &self.recv_tick_time
-    }
-
-    pub fn interp_game_time(&self) -> f32 {
-        self.interp_game_time
-    }
-
     fn handle_message(&mut self, recv_time: Instant, message: comn::ServerMessage) {
         match message {
             comn::ServerMessage::Ping(_) => {
@@ -270,6 +312,16 @@ impl Game {
             }
             comn::ServerMessage::Tick(tick) => {
                 let recv_game_time = tick.state.current_game_time();
+
+                // Keep some statistics for debugging...
+                if let Some(my_last_input) = tick.your_last_input.as_ref() {
+                    self.stats
+                        .input_delay
+                        .record((tick.state.tick_num.0 - my_last_input.0) as f32 - 1.0);
+                }
+                if !self.received_ticks.contains_key(&tick.state.tick_num) {
+                    self.stats.received_ticks.record(1.0);
+                }
 
                 if recv_game_time < self.interp_game_time {
                     debug!(
@@ -290,7 +342,9 @@ impl Game {
                     self.received_ticks.insert(tick.state.tick_num, tick);
                 }
 
-                self.recv_tick_time.record_tick(recv_time, recv_game_time);
+                let time_since_start = recv_time.duration_since(self.start_time).as_secs_f32();
+                self.recv_tick_time
+                    .record_tick(time_since_start, recv_game_time);
             }
         }
     }

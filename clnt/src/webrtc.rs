@@ -62,13 +62,14 @@ impl Default for Config {
 
 pub struct Data {
     on_message: Box<dyn Fn(&Data, &comn::ServerMessage)>,
-    peer: RtcPeerConnection,
     channel: RtcDataChannel,
     status: Status,
     received: VecDeque<(Instant, comn::ServerMessage)>,
 
     recv_rate: stats::Var,
     send_rate: RefCell<stats::Var>,
+
+    _peer: RtcPeerConnection,
 }
 
 pub struct Client {
@@ -93,12 +94,12 @@ impl Client {
 
         let data = Rc::new(RefCell::new(Data {
             on_message,
-            peer: peer.clone(),
             channel,
             status: Status::Connecting,
             received: VecDeque::new(),
             recv_rate: stats::Var::new(Duration::from_secs(10)),
             send_rate: RefCell::new(stats::Var::new(Duration::from_secs(10))),
+            _peer: peer.clone(),
         }));
 
         let on_open = Closure::wrap(Box::new({

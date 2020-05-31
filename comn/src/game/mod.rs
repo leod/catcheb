@@ -168,7 +168,7 @@ impl Game {
         }
     }
 
-    pub fn initial_entities(settings: &Settings) -> Vec<Entity> {
+    pub fn initial_entities(_settings: &Settings) -> Vec<Entity> {
         vec![
             /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(200.0, 200.0),
