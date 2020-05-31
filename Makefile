@@ -10,6 +10,8 @@ clnt:
 		--format iife \
 		--name clnt
 	cp clnt/pkg/clnt_bg.wasm clnt/static/
+	gzip -f clnt/static/clnt_bg.wasm
+	gzip -f clnt/static/clnt.js
 
 clnt-debug:
 	cd clnt && cargo build -j4 --target wasm32-unknown-unknown
