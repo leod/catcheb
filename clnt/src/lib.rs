@@ -120,7 +120,8 @@ pub fn render_game(
                 };
                 let pos: mint::Vector2<f32> = pos.into();
 
-                let size = if let Some(angle) = player.angle {
+                let angle: Option<f32> = None; //player.angle
+                let size = if let Some(angle) = angle {
                     gfx.set_transform(
                         Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
                     );
