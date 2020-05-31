@@ -178,13 +178,11 @@ pub fn render_game(
     Ok(())
 }
 
+/// Statistics for debugging.
 #[derive(Default)]
 struct Stats {
     dt_ms: stats::Var,
     frame_ms: stats::Var,
-    time_lag_ms: stats::Var,
-    time_warp_factor: stats::Var,
-    tick_interp: stats::Var,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -274,20 +272,7 @@ async fn app(
             event_list.push(event);
         }
 
-        stats.time_warp_factor.record(game.next_time_warp_factor());
-        stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
-        stats
-            .time_lag_ms
-            .record((game.recv_game_time().unwrap_or(-1.0) - game.interp_game_time()) * 1000.0);
-        stats
-            .tick_interp
-            .record(game.next_tick_num().map_or(0.0, |next_tick_num| {
-                (next_tick_num.0 - game.tick_num().0) as f32
-            }));
-
         if let Some(state) = game.state() {
-            //info!("render {:?}", state);
-            //info!("into {:?}", game.next_entities());
             render_game(
                 &mut gfx,
                 &mut resources,
@@ -329,21 +314,21 @@ async fn app(
         ))?;
         debug(&format!(
             "recv std dev:     {:.2}",
-            1000.0 * game.recv_tick_time().recv_delay_std_dev().unwrap_or(-1.0),
+            1000.0 * game.stats().recv_delay_std_dev,
         ))?;
         debug(&format!(
             "recv rate (kB/s): {:.2}",
-            game.webrtc_client().recv_rate() / 1000.0
+            game.stats().recv_rate / 1000.0
         ))?;
         debug(&format!(
             "send rate (kB/s): {:.2}",
-            game.webrtc_client().send_rate() / 1000.0
+            game.stats().send_rate / 1000.0
         ))?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;
-        debug(&format!("time lag (ms): {}", stats.time_lag_ms))?;
-        debug(&format!("time warp:     {}", stats.time_warp_factor))?;
-        debug(&format!("tick interp:   {}", stats.tick_interp))?;
+        debug(&format!("time lag (ms): {}", game.stats().time_lag_ms))?;
+        debug(&format!("time warp:     {}", game.stats().time_warp_factor))?;
+        debug(&format!("tick interp:   {}", game.stats().tick_interp))?;
         debug("")?;
 
         event_list.render(
@@ -354,11 +339,11 @@ async fn app(
 
         gfx.present(&window)?;
 
-        let end_time = Instant::now();
-
+        // Keep some statistics for debugging...
+        stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
         stats
             .frame_ms
-            .record(end_time.duration_since(start_time).as_secs_f32() * 1000.0);
+            .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);
     }
 }
 
