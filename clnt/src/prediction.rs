@@ -148,10 +148,6 @@ impl Prediction {
             Self::add_predicted_entity(state, entity);
         }
 
-        if !context.killed_players.is_empty() {
-            info!("AM DED");
-        }
-
         // TODO: We should probably remove the redundant tick_num
         // state within game state.
         state.tick_num = state.tick_num.next();
