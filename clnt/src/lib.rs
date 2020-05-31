@@ -305,7 +305,7 @@ async fn app(
             debug("")?;
         }
 
-        for _ in 0..37 {
+        for _ in 0..36 {
             debug("")?;
         }
         debug(&format!(
@@ -315,6 +315,12 @@ async fn app(
         debug(&format!(
             "recv std dev:     {:.2}",
             1000.0 * game.stats().recv_delay_std_dev,
+        ))?;
+        debug(&format!(
+            "loss (%):         {:.2}",
+            (1.0 - game.stats().received_ticks.sum_per_sec().unwrap_or(0.0)
+                / game.settings().ticks_per_second as f32)
+                * 100.0,
         ))?;
         debug(&format!(
             "recv rate (kB/s): {:.2}",

@@ -13,6 +13,7 @@ pub struct Stats {
     pub time_warp_factor: stats::Var,
     pub tick_interp: stats::Var,
     pub input_delay: stats::Var,
+    pub received_ticks: stats::Var,
     pub recv_rate: f32,
     pub send_rate: f32,
     pub recv_delay_std_dev: f32,
@@ -306,6 +307,9 @@ impl Game {
                     self.stats
                         .input_delay
                         .record((tick.state.tick_num.0 - my_last_input.0) as f32 - 1.0);
+                }
+                if !self.received_ticks.contains_key(&tick.state.tick_num) {
+                    self.stats.received_ticks.record(1.0);
                 }
 
                 if recv_game_time < self.interp_game_time {
