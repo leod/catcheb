@@ -205,7 +205,7 @@ impl Game {
 
     fn remove_entity(&mut self, entity_id: comn::EntityId) {
         debug!("Removing entity {:?}", entity_id);
-        self.state.entities.remove(&entity_id).unwrap();
+        self.state.entities.remove(&entity_id);
     }
 
     fn kill_player(&mut self, player_id: comn::PlayerId) {
