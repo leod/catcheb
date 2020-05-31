@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::entities::Bullet;
 use crate::{
     geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime,
-    Input, PlayerEntity, PlayerId, TickNum, Vector,
+    Input, PlayerEntity, PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -54,21 +54,6 @@ impl Game {
                             Entity::DangerGuy(danger_guy) => {
                                 if danger_guy.aa_rect(time).contains_point(bullet.pos(time)) {
                                     context.removed_entities.insert(*entity_id);
-                                }
-                            }
-                            Entity::Player(player) if Some(player.owner) != bullet.owner => {
-                                // TODO: Check player-bullet collision on player input
-                                // TODO: Player geometry
-                                let aa_rect = AaRect::new_center(
-                                    player.pos,
-                                    Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
-                                );
-
-                                if aa_rect.contains_point(bullet.pos(time)) {
-                                    context.removed_entities.insert(*entity_id);
-                                    context
-                                        .killed_players
-                                        .insert(player.owner, DeathReason::ShotBy(bullet.owner));
                                 }
                             }
                             Entity::Turret(turret) if bullet.owner.is_some() => {
@@ -208,6 +193,17 @@ impl Game {
                             context
                                 .killed_players
                                 .insert(player_id, DeathReason::TouchedTheDanger);
+                        }
+                    }
+                    Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
+                        // TODO: Player geometry
+                        let aa_rect =
+                            AaRect::new_center(pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
+
+                        if aa_rect.contains_point(bullet.pos(input_time)) {
+                            context
+                                .killed_players
+                                .insert(player_id, DeathReason::ShotBy(bullet.owner));
                         }
                     }
                     _ => (),
