@@ -36,8 +36,6 @@ pub struct Config {
 }
 
 pub struct Server {
-    config: Config,
-
     recv_message_tx: RecvMessageTx,
     send_message_rx: SendMessageRx,
 
@@ -61,7 +59,6 @@ impl Server {
             webrtc_unreliable::Server::new(config.listen_addr, config.listen_addr).await?;
 
         Ok(Self {
-            config,
             recv_message_tx,
             send_message_rx,
             webrtc_server,

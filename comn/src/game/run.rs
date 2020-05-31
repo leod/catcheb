@@ -33,7 +33,6 @@ pub struct RunContext {
 impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
         let time = self.current_game_time();
-        let tick_period = self.settings.tick_period();
 
         // TODO: clone
         let entities = self.entities.clone();

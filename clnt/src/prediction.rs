@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use log::{debug, info, warn};
+use log::{info, warn};
 
 use comn::game::RunContext;
 
@@ -58,10 +58,9 @@ impl Prediction {
                 .collect();
         }
 
-        let last_state = if let Some((first_num, first_record)) = self.log.iter().next() {
+        let last_state = if let Some(first_record) = self.log.values().next() {
             let mut last_state = first_record.state.clone();
-            //info!("correcting from {:?}, which is at {:?}", first_num, last_state.tick_num);
-            for (num, record) in self.log.iter_mut().skip(1) {
+            for record in self.log.values_mut().skip(1) {
                 Self::run_tick(&mut last_state, self.my_player_id, &record.my_last_input);
                 record.state = last_state.clone();
             }
