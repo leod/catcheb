@@ -1,6 +1,10 @@
+use std::{
+    collections::{BTreeMap, VecDeque},
+    time::Duration,
+};
+
 use instant::Instant;
 use log::{debug, info, warn};
-use std::{collections::BTreeMap, time::Duration};
 
 use comn::util::{stats, GameTimeEstimation, PingEstimation};
 
@@ -26,6 +30,8 @@ pub struct Game {
 
     webrtc_client: webrtc::Client,
 
+    last_inputs: VecDeque<(comn::TickNum, comn::Input)>,
+
     received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
     prediction: Option<Prediction>,
 
@@ -49,6 +55,7 @@ impl Game {
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
+            last_inputs: VecDeque::new(),
             received_ticks: BTreeMap::new(),
             prediction,
             interp_game_time: 0.0,
@@ -158,17 +165,21 @@ impl Game {
         let mut events = Vec::new();
         let mut last_server_tick_num = None;
 
+        // TODO: Limit number of ticks to cross, and inputs to send per update
         for tick_num in crossed_tick_nums.iter() {
             if let Some(tick) = self.received_ticks.get(tick_num) {
                 events.extend(tick.events.clone().into_iter());
                 last_server_tick_num = Some(*tick_num);
             }
 
-            // TODO: Limit number of inputs to send, when skipping large numbers of ticks
-            self.send(comn::ClientMessage::Input {
-                tick_num: *tick_num,
-                input: input.clone(),
-            });
+            self.last_inputs.push_back((*tick_num, input.clone()));
+            while self.last_inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
+                self.last_inputs.pop_front();
+            }
+
+            self.send(comn::ClientMessage::Input(
+                self.last_inputs.iter().cloned().collect(),
+            ));
 
             if let Some(prediction) = self.prediction.as_mut() {
                 prediction.record_tick_input(
