@@ -1,7 +1,5 @@
 use std::collections::VecDeque;
 
-use instant::Instant;
-
 use crate::{util::stats, GameTime};
 
 #[derive(Debug, Clone)]
@@ -19,7 +17,7 @@ impl GameTimeEstimation {
     }
 
     pub fn record_tick(&mut self, recv_time: f32, game_time: GameTime) {
-        if let Some((last_recv_time, last_game_time)) = self.recv_times.back() {
+        if let Some((_last_recv_time, last_game_time)) = self.recv_times.back() {
             if game_time < *last_game_time {
                 // Received packages out of order, just ignore
                 return;

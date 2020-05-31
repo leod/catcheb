@@ -6,7 +6,7 @@ mod webrtc;
 use std::collections::{BTreeMap, HashSet};
 
 use instant::Instant;
-use log::{debug, info, warn};
+use log::{info, warn};
 
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
