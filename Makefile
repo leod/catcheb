@@ -25,5 +25,7 @@ clnt-debug:
 		--format iife \
 		--name clnt
 	cp clnt/pkg/clnt_bg.wasm clnt/static/
+	gzip -f clnt/static/clnt_bg.wasm
+	gzip -f clnt/static/clnt.js
 
 .PHONY: clnt
