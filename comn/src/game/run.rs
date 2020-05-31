@@ -185,7 +185,7 @@ impl Game {
             let pos = ent.pos;
             let input_state = input_state.unwrap_or(self);
 
-            for (_entity_id, entity) in input_state.entities.iter() {
+            for (entity_id, entity) in input_state.entities.iter() {
                 match entity {
                     Entity::DangerGuy(danger_guy) => {
                         // TODO: Player geometry
@@ -201,6 +201,7 @@ impl Game {
                             AaRect::new_center(pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
 
                         if aa_rect.contains_point(bullet.pos(input_time)) {
+                            context.removed_entities.insert(*entity_id);
                             context
                                 .killed_players
                                 .insert(player_id, DeathReason::ShotBy(bullet.owner));

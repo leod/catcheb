@@ -39,7 +39,7 @@ impl Prediction {
                     tick_num, max_logged,
                 );
                 self.log = Default::default();
-            } else if max_logged.next() != tick_num {
+            } else if max_logged != tick_num {
                 // TODO: Do we really need to harshly re-initialize prediction
                 // here?
                 info!(
