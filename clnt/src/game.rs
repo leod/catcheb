@@ -95,7 +95,7 @@ impl Game {
     }
 
     fn target_time_lag(&self) -> comn::GameTime {
-        self.settings.tick_period() * 2.5
+        self.settings.tick_period() * 1.5
     }
 
     fn recv_game_time(&self) -> Option<f32> {

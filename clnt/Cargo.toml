@@ -52,5 +52,6 @@ features = [
   'RtcSessionDescriptionInit',
   'RtcIceCandidate',
   'RtcDataChannelType',
+  'RtcDataChannelState',
 ]
 

@@ -38,7 +38,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             max_num_players: 16,
-            ticks_per_second: 30,
+            ticks_per_second: 60,
             size: Vector::new(800.0, 600.0),
             spawn_points: vec![Point::new(50.0, 50.0), Point::new(550.0, 400.0)],
         }

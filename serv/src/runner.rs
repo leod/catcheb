@@ -470,9 +470,8 @@ impl Runner {
                 // the previous one.
                 if let Some((last_input_num, last_input)) = player.last_input.clone() {
                     player_tick_inputs.push((last_input_num.next(), last_input));
+                    debug!("Reusing input for player {:?}", player_token);
                 }
-
-                debug!("Reusing input for player {:?}", player_token);
             }
 
             player.last_input = player_tick_inputs.last().cloned();
