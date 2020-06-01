@@ -132,8 +132,14 @@ pub fn render_game(
                 };
                 let rect = Rectangle::new(-size / 2.0, size);
 
-                gfx.fill_rect(&rect, Color::BLUE);
-                gfx.stroke_rect(&rect, Color::GREEN);
+                let color = if player.owner == my_player_id {
+                    Color::GREEN
+                } else {
+                    Color::BLUE
+                };
+
+                gfx.fill_rect(&rect, color);
+                //gfx.stroke_rect(&rect, Color::GREEN);
 
                 gfx.set_transform(Transform::IDENTITY);
                 resources
