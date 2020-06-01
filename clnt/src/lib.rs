@@ -224,6 +224,8 @@ async fn app(
         .unwrap();
 
     while webrtc_client.status() == webrtc::Status::Connecting {
+        info!("waiting...");
+        webrtc_client.debug_ready_state();
         events.next_event().await;
     }
 

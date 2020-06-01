@@ -31,6 +31,7 @@ pub enum ConnectError {
     AddIceCandidate(JsValue),
 }
 
+// TODO: webrtc::Status is redundant, can be replaced by ready_state()
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Status {
     Connecting,
@@ -152,13 +153,19 @@ impl Client {
                 .map_err(ConnectError::ResponseJson)?,
         );
 
+        info!("A");
+
         JsFuture::from(peer.set_remote_description(&answer.into()))
             .await
             .map_err(ConnectError::SetRemoteDescription)?;
 
+        info!("B");
+
         JsFuture::from(peer.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate.into())))
             .await
             .map_err(ConnectError::AddIceCandidate)?;
+
+        info!("C");
 
         Ok(Client {
             data,
@@ -179,6 +186,13 @@ impl Client {
 
     pub fn status(&self) -> Status {
         self.data.borrow().status
+    }
+
+    pub fn debug_ready_state(&self) {
+        info!(
+            "ready state: {:?}",
+            self.data.borrow().channel.ready_state()
+        );
     }
 
     pub fn recv_rate(&self) -> f32 {
