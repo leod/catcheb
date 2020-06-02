@@ -6,7 +6,7 @@ use std::{
 use instant::Instant;
 use log::{debug, info, warn};
 
-use comn::util::{stats, GameTimeEstimation, PingEstimation};
+use comn::util::{stats, GameTimeEstimation, PingEstimation, LossEstimation};
 
 use crate::{prediction::Prediction, webrtc};
 
@@ -18,7 +18,7 @@ pub struct Stats {
     pub tick_interp: stats::Var,
     pub input_delay: stats::Var,
     pub received_ticks: stats::Var,
-    pub loss: stats::Var,
+    pub loss: f32,
     pub recv_rate: f32,
     pub send_rate: f32,
     pub recv_delay_std_dev: f32,
@@ -41,10 +41,12 @@ pub struct Game {
     interp_game_time: comn::GameTime,
     next_tick_num: Option<comn::TickNum>,
 
-    ping: PingEstimation,
     start_time: Instant,
     recv_tick_time: GameTimeEstimation,
     next_time_warp_factor: f32,
+
+    ping: PingEstimation,
+    loss: LossEstimation,
 
     stats: Stats,
 }
@@ -63,10 +65,11 @@ impl Game {
             prediction,
             interp_game_time: 0.0,
             next_tick_num: None,
-            ping: PingEstimation::default(),
             start_time: Instant::now(),
             recv_tick_time,
             next_time_warp_factor: 1.0,
+            ping: PingEstimation::default(),
+            loss: LossEstimation::default(),
             stats: Stats::default(),
         }
     }
@@ -264,14 +267,10 @@ impl Game {
             .time_warp_factor
             .record(self.next_time_warp_factor);
 
+        self.stats.loss = self.loss.estimate().map_or(100.0, |p| p * 100.0);
         self.stats.send_rate = self.webrtc_client.send_rate();
         self.stats.recv_rate = self.webrtc_client.recv_rate();
         self.stats.recv_delay_std_dev = self.recv_tick_time.recv_delay_std_dev().unwrap_or(-1.0);
-        self.stats.loss.record(
-            (1.0 - self.stats.received_ticks.sum_per_sec().unwrap_or(0.0)
-                / self.settings.ticks_per_second as f32)
-                * 100.0,
-        );
 
         events
     }
@@ -343,6 +342,8 @@ impl Game {
                 }
             }
             comn::ServerMessage::Tick(tick) => {
+                self.loss.record_received(tick.state.tick_num.0 as usize);
+
                 let recv_game_time = tick.state.current_game_time();
 
                 // Keep some statistics for debugging...

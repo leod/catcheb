@@ -314,29 +314,30 @@ async fn app(
             debug("")?;
         }
 
-        for _ in 0..36 {
+        for _ in 0..35 {
             debug("")?;
         }
         debug(&format!(
-            "ping (ms):        {:.1}",
+            "ping (ms):        {:>3.3}",
             game.ping().estimate().as_secs_f32() * 1000.0
         ))?;
         debug(&format!(
-            "recv std dev:     {:.2}",
+            "recv std dev:     {:>3.3}",
             1000.0 * game.stats().recv_delay_std_dev,
         ))?;
         debug(&format!(
-            "loss (%):         {:.2}",
-            game.stats().loss.mean().unwrap_or(0.0 / 0.0),
+            "loss (%):         {:>3.3}",
+            game.stats().loss,
         ))?;
         debug(&format!(
-            "recv rate (kB/s): {:.2}",
+            "recv rate (kB/s): {:>3.3}",
             game.stats().recv_rate / 1000.0
         ))?;
         debug(&format!(
-            "send rate (kB/s): {:.2}",
+            "send rate (kB/s): {:>3.3}",
             game.stats().send_rate / 1000.0
         ))?;
+        debug("")?;
         debug(&format!("dt (ms):       {}", stats.dt_ms))?;
         debug(&format!("frame (ms):    {}", stats.frame_ms))?;
         debug(&format!("time lag (ms): {}", game.stats().time_lag_ms))?;
