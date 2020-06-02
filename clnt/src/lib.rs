@@ -327,42 +327,55 @@ async fn app(
         }
 
         if show_stats {
-            for _ in 0..34 {
+            for _ in 0..33 {
                 debug("")?;
             }
             debug(&format!(
-                "recv std dev:     {:>7.3}",
+                "recv std dev:         {:>7.3}",
                 1000.0 * game.stats().recv_delay_std_dev,
             ))?;
             debug(&format!(
-                "loss (%):         {:>7.3}",
+                "loss (%):             {:>7.3}",
                 game.stats().loss.estimate().map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
-                "skip loss (%):    {:>7.3}",
+                "skip loss (%):        {:>7.3}",
                 game.stats()
                     .skip_loss
                     .estimate()
                     .map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
-                "recv rate (kB/s): {:>7.3}",
+                "recv rate (kB/s):     {:>7.3}",
                 game.stats().recv_rate / 1000.0
             ))?;
             debug(&format!(
-                "send rate (kB/s): {:>7.3}",
+                "send rate (kB/s):     {:>7.3}",
                 game.stats().send_rate / 1000.0
             ))?;
             debug("")?;
-            debug(&format!("dt (ms):         {}", stats.dt_ms))?;
-            debug(&format!("frame (ms):      {}", stats.frame_ms))?;
-            debug(&format!("time lag (ms):   {}", game.stats().time_lag_ms))?;
+            debug(&format!("dt (ms):             {}", stats.dt_ms))?;
+            debug(&format!("frame (ms):          {}", stats.frame_ms))?;
             debug(&format!(
-                "time warp:       {}",
+                "time lag (ms):       {}",
+                game.stats().time_lag_ms
+            ))?;
+            debug(&format!(
+                "time lag dev (ms):   {}",
+                game.stats().time_lag_deviation_ms
+            ))?;
+            debug(&format!(
+                "time warp:           {}",
                 game.stats().time_warp_factor
             ))?;
-            debug(&format!("tick interp:     {}", game.stats().tick_interp))?;
-            debug(&format!("input delay:     {}", game.stats().input_delay))?;
+            debug(&format!(
+                "tick interp:         {}",
+                game.stats().tick_interp
+            ))?;
+            debug(&format!(
+                "input delay:         {}",
+                game.stats().input_delay
+            ))?;
         }
 
         event_list.render(
