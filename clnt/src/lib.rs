@@ -314,7 +314,7 @@ async fn app(
             debug("")?;
         }
 
-        for _ in 0..35 {
+        for _ in 0..34 {
             debug("")?;
         }
         debug(&format!(
@@ -325,7 +325,17 @@ async fn app(
             "recv std dev:     {:>3.3}",
             1000.0 * game.stats().recv_delay_std_dev,
         ))?;
-        debug(&format!("loss (%):         {:>3.3}", game.stats().loss,))?;
+        debug(&format!(
+            "loss (%):         {:>3.3}",
+            game.stats().loss.estimate().map_or(100.0, |p| p * 100.0)
+        ))?;
+        debug(&format!(
+            "skip loss (%):    {:>3.3}",
+            game.stats()
+                .skip_loss
+                .estimate()
+                .map_or(100.0, |p| p * 100.0)
+        ))?;
         debug(&format!(
             "recv rate (kB/s): {:>3.3}",
             game.stats().recv_rate / 1000.0
