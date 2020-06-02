@@ -1,6 +1,8 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, iter};
 
 use crate::{util::stats, GameTime};
+
+const SAMPLE_DURATION: f32 = 2.0;
 
 #[derive(Debug, Clone)]
 pub struct GameTimeEstimation {
@@ -33,28 +35,13 @@ impl GameTimeEstimation {
 
         self.recv_times.push_back((recv_time, game_time));
 
-        if self.recv_times.len() > 1000 {
-            self.recv_times.pop_front();
+        while let Some((first_recv_time, _)) = self.recv_times.front() {
+            if recv_time - first_recv_time >= SAMPLE_DURATION {
+                self.recv_times.pop_front();
+            } else {
+                break;
+            }
         }
-    }
-
-    pub fn shifted_recv_times(&self) -> Option<impl Iterator<Item = (f32, GameTime)> + '_> {
-        self.recv_times
-            .front()
-            .copied()
-            .map(|(first_recv_time, first_game_time)| {
-                self.recv_times.iter().map(move |(recv_time, game_time)| {
-                    let delta_recv_time = recv_time - first_recv_time;
-                    let delta_game_time = game_time - first_game_time;
-
-                    (delta_recv_time, delta_game_time)
-                })
-            })
-    }
-
-    pub fn linear_regression(&self) -> Option<stats::LinearRegression> {
-        self.shifted_recv_times()
-            .map(|samples| stats::linear_regression_with_beta(self.recv_period, samples))
     }
 
     pub fn recv_delay_std_dev(&self) -> Option<f32> {
@@ -86,16 +73,28 @@ impl GameTimeEstimation {
     }
 
     pub fn estimate(&self, now: f32) -> Option<GameTime> {
-        self.recv_times
-            .front()
-            .and_then(|(first_recv_time, first_game_time)| {
-                self.shifted_recv_times().map(|samples| {
-                    let line = stats::linear_regression_with_beta(1.0, samples);
-                    let delta_recv_time = now - first_recv_time;
-                    let delta_game_time = line.eval(delta_recv_time);
+        let mut recv_times = self
+            .recv_times
+            .iter()
+            .filter_map(move |(recv_time, game_time)| {
+                if now - recv_time >= SAMPLE_DURATION {
+                    None
+                } else {
+                    Some((recv_time, game_time))
+                }
+            });
 
-                    first_game_time + delta_game_time
-                })
-            })
+        recv_times.next().map(|(first_recv_time, first_game_time)| {
+            let shifted_recv_times = iter::once((first_recv_time, first_game_time))
+                .chain(recv_times)
+                .map(|(recv_time, game_time)| {
+                    (recv_time - first_recv_time, game_time - first_game_time)
+                });
+
+            let line = stats::linear_regression_with_beta(1.0, shifted_recv_times);
+            let delta_recv_time = now - first_recv_time;
+            let delta_game_time = line.eval(delta_recv_time);
+            first_game_time + delta_game_time
+        })
     }
 }

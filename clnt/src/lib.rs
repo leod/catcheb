@@ -327,9 +327,7 @@ async fn app(
         ))?;
         debug(&format!(
             "loss (%):         {:.2}",
-            (1.0 - game.stats().received_ticks.sum_per_sec().unwrap_or(0.0)
-                / game.settings().ticks_per_second as f32)
-                * 100.0,
+            game.stats().loss.mean().unwrap_or(0.0 / 0.0),
         ))?;
         debug(&format!(
             "recv rate (kB/s): {:.2}",
