@@ -10,7 +10,7 @@ pub struct Var {
 
 impl Default for Var {
     fn default() -> Self {
-        Var::new(Duration::from_secs(10))
+        Var::new(Duration::from_secs(5))
     }
 }
 
@@ -18,7 +18,8 @@ impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{:>7.2} {:>7.2} {:>7.2} {:>7.2}",
+            "{:>8.3} {:>8.3} {:>8.3} {:>8.3} {:>8.3}",
+            self.records.back().map(|(_, v)| *v).unwrap_or(0.0 / 0.0),
             self.mean().unwrap_or(0.0 / 0.0),
             self.std_dev().unwrap_or(0.0 / 0.0),
             self.min().unwrap_or(0.0 / 0.0),
@@ -133,6 +134,8 @@ pub fn linear_regression_with_beta(
     samples: impl Iterator<Item = (f32, f32)>,
 ) -> LinearRegression {
     let samples: Vec<(f32, f32)> = samples.collect();
+    assert!(!samples.is_empty());
+
     let avg_x = mean(samples.iter().map(|(x, _)| x).copied());
     let avg_y = mean(samples.iter().map(|(_, y)| y).copied());
     let alpha = avg_y - beta * avg_x;

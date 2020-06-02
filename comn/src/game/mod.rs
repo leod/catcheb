@@ -176,17 +176,17 @@ impl Game {
                 size: Vector::new(100.0, 50.0),
                 speed: 2000.0,
                 wait_time: 2.0,
-            }),*/
+            }),
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(200.0, 400.0),
                 end_pos: Point::new(200.0, 100.0),
                 size: Vector::new(30.0, 80.0),
                 speed: 300.0,
                 wait_time: 1.0,
-            }),
+            }),*/
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(50.0, 500.0),
-                end_pos: Point::new(750.0, 500.0),
+                start_pos: Point::new(40.0, 500.0),
+                end_pos: Point::new(760.0, 500.0),
                 size: Vector::new(80.0, 30.0),
                 speed: 2000.0,
                 wait_time: 2.0,

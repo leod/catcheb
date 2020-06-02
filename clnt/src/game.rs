@@ -18,6 +18,7 @@ pub struct Stats {
     pub tick_interp: stats::Var,
     pub input_delay: stats::Var,
     pub received_ticks: stats::Var,
+    pub loss: stats::Var,
     pub recv_rate: f32,
     pub send_rate: f32,
     pub recv_delay_std_dev: f32,
@@ -98,24 +99,8 @@ impl Game {
         self.settings.tick_period() * 1.5
     }
 
-    fn recv_game_time(&self) -> Option<f32> {
-        let time_since_start = Instant::now().duration_since(self.start_time).as_secs_f32();
-        self.recv_tick_time.estimate(time_since_start)
-    }
-
     fn tick_num(&self) -> comn::TickNum {
         comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
-    }
-
-    fn time_warp_factor(&self) -> f32 {
-        if let Some(recv_game_time) = self.recv_game_time() {
-            let current_time_lag = recv_game_time - self.interp_game_time;
-            let time_lag_deviation = self.target_time_lag() - current_time_lag;
-
-            0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
-        } else {
-            0.0
-        }
     }
 
     pub fn update(&mut self, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
@@ -127,9 +112,9 @@ impl Game {
             self.send(comn::ClientMessage::Ping(sequence_num));
         }
 
-        // Advance our local game time, making sure to stay behind the
-        // receive stream by our desired lag time. We do this so that
-        // we have ticks between which we can interpolate.
+        // Determine new local game time, making sure to stay behind the receive
+        // stream by our desired lag time. We do this so that we have ticks
+        // between which we can interpolate.
         //
         // If we are off too far from our lag target, slow down or speed up
         // playback time.
@@ -149,15 +134,33 @@ impl Game {
             .max(self.tick_num())
             .max(self.next_tick_num.unwrap_or(comn::TickNum(0)));
 
-        let new_interp_game_time =
-            new_interp_game_time.min(self.settings.tick_game_time(max_tick_num));
-
+        // Advance our playback time.
         let prev_tick_num = self.tick_num();
-        self.interp_game_time = new_interp_game_time;
+        self.interp_game_time =
+            new_interp_game_time.min(self.settings.tick_game_time(max_tick_num));
         let new_tick_num = self.tick_num();
 
-        self.next_time_warp_factor = self.time_warp_factor();
+        // Determine the time warp factor to be used in the next update call.
+        let time_since_start = Instant::now().duration_since(self.start_time).as_secs_f32();
+        let recv_game_time = self.recv_tick_time.estimate(time_since_start);
+        self.next_time_warp_factor = if let Some(recv_game_time) = recv_game_time {
+            let current_time_lag = recv_game_time - self.interp_game_time;
+            let time_lag_deviation = self.target_time_lag() - current_time_lag;
 
+            0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
+        } else {
+            0.0
+        };
+
+        // Look at all the intermediate ticks. We will have one of the
+        // following cases:
+        //
+        // 1. In this update call, the tick number did not change, so
+        //    `prev_tick_num == new_tick_num`.
+        // 2. We crossed one tick, e.g. prev_tick_num is 7 and new_tick_num is
+        //    8.
+        // 3. We crossed more than one tick. This should happen only on lag
+        //    spikes, be it local or in the network.
         let mut crossed_tick_nums: Vec<comn::TickNum> = (prev_tick_num.0 + 1..=new_tick_num.0)
             .map(|i| comn::TickNum(i))
             .collect();
@@ -166,17 +169,16 @@ impl Game {
             // It's possible that we have a large jump in ticks, e.g. due to a
             // lag spike, or because we are running in a background tab. In this
             // case, we don't want to overload ourselves by sending many input
-            // packets and performing prediction over many ticks.
-            //
-            // Instead, we just jump directly to the last couple of ticks.
+            // packets and performing prediction over many ticks. Instead, we
+            // just jump directly to the last couple of ticks.
             info!("Crossed {} ticks, will skip", crossed_tick_nums.len());
 
             // TODO: In order to nicely reinitialize prediction, we should take
             // those crossed ticks for which we actually received a server
             // state...
             crossed_tick_nums.drain(0..crossed_tick_nums.len() - MAX_TICKS_PER_UPDATE);
+            assert!(crossed_tick_nums.len() == MAX_TICKS_PER_UPDATE);
         }
-        assert!(crossed_tick_nums.len() <= MAX_TICKS_PER_UPDATE);
 
         // Iterate over all the ticks that we have crossed, also including
         // those for which we did not anything from the server.
@@ -243,9 +245,16 @@ impl Game {
         }
 
         // Keep some statistics for debugging...
-        self.stats
-            .time_lag_ms
-            .record((self.recv_game_time().unwrap_or(-1.0) - self.interp_game_time) * 1000.0);
+        if let Some(recv_game_time) = recv_game_time {
+            self.stats
+                .time_lag_ms
+                .record((recv_game_time - self.interp_game_time) * 1000.0);
+        } else {
+            // We cannot estimate the server time, so we probably disconnected
+            // or just connected.
+            self.stats.time_lag_ms = stats::Var::default();
+        }
+
         self.stats
             .tick_interp
             .record(self.next_tick_num.map_or(0.0, |next_tick_num| {
@@ -258,6 +267,11 @@ impl Game {
         self.stats.send_rate = self.webrtc_client.send_rate();
         self.stats.recv_rate = self.webrtc_client.recv_rate();
         self.stats.recv_delay_std_dev = self.recv_tick_time.recv_delay_std_dev().unwrap_or(-1.0);
+        self.stats.loss.record(
+            (1.0 - self.stats.received_ticks.sum_per_sec().unwrap_or(0.0)
+                / self.settings.ticks_per_second as f32)
+                * 100.0,
+        );
 
         events
     }
