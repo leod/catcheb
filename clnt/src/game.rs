@@ -18,10 +18,11 @@ pub struct Stats {
     pub tick_interp: stats::Var,
     pub input_delay: stats::Var,
     pub received_ticks: stats::Var,
-    pub loss: f32,
     pub recv_rate: f32,
     pub send_rate: f32,
     pub recv_delay_std_dev: f32,
+    pub loss: LossEstimation,
+    pub skip_loss: LossEstimation,
 }
 
 const MAX_TICKS_PER_UPDATE: usize = 3;
@@ -46,8 +47,6 @@ pub struct Game {
     next_time_warp_factor: f32,
 
     ping: PingEstimation,
-    loss: LossEstimation,
-
     stats: Stats,
 }
 
@@ -69,7 +68,6 @@ impl Game {
             recv_tick_time,
             next_time_warp_factor: 1.0,
             ping: PingEstimation::default(),
-            loss: LossEstimation::default(),
             stats: Stats::default(),
         }
     }
@@ -193,6 +191,10 @@ impl Game {
             if let Some(tick) = self.received_ticks.get(tick_num) {
                 events.extend(tick.events.clone().into_iter());
                 last_server_tick_num = Some(*tick_num);
+
+                // For debugging, keep track of how many ticks we do not
+                // receive server data on time.
+                self.stats.skip_loss.record_received(tick_num.0 as usize);
             }
 
             self.last_inputs.push_back((*tick_num, input.clone()));
@@ -267,7 +269,6 @@ impl Game {
             .time_warp_factor
             .record(self.next_time_warp_factor);
 
-        self.stats.loss = self.loss.estimate().map_or(100.0, |p| p * 100.0);
         self.stats.send_rate = self.webrtc_client.send_rate();
         self.stats.recv_rate = self.webrtc_client.recv_rate();
         self.stats.recv_delay_std_dev = self.recv_tick_time.recv_delay_std_dev().unwrap_or(-1.0);
@@ -342,7 +343,9 @@ impl Game {
                 }
             }
             comn::ServerMessage::Tick(tick) => {
-                self.loss.record_received(tick.state.tick_num.0 as usize);
+                self.stats
+                    .loss
+                    .record_received(tick.state.tick_num.0 as usize);
 
                 let recv_game_time = tick.state.current_game_time();
 
