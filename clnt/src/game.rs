@@ -14,6 +14,7 @@ use crate::{prediction::Prediction, webrtc};
 #[derive(Default)]
 pub struct Stats {
     pub time_lag_ms: stats::Var,
+    pub time_lag_deviation_ms: stats::Var,
     pub time_warp_factor: stats::Var,
     pub tick_interp: stats::Var,
     pub input_delay: stats::Var,
@@ -147,6 +148,10 @@ impl Game {
         self.next_time_warp_factor = if let Some(recv_game_time) = recv_game_time {
             let current_time_lag = recv_game_time - self.interp_game_time;
             let time_lag_deviation = self.target_time_lag() - current_time_lag;
+
+            self.stats
+                .time_lag_deviation_ms
+                .record(time_lag_deviation * 1000.0);
 
             0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
         } else {
