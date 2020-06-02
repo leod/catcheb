@@ -6,7 +6,7 @@ use std::{
 use instant::Instant;
 use log::{debug, info, warn};
 
-use comn::util::{stats, GameTimeEstimation, PingEstimation, LossEstimation};
+use comn::util::{stats, GameTimeEstimation, LossEstimation, PingEstimation};
 
 use crate::{prediction::Prediction, webrtc};
 

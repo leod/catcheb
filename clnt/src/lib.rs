@@ -325,10 +325,7 @@ async fn app(
             "recv std dev:     {:>3.3}",
             1000.0 * game.stats().recv_delay_std_dev,
         ))?;
-        debug(&format!(
-            "loss (%):         {:>3.3}",
-            game.stats().loss,
-        ))?;
+        debug(&format!("loss (%):         {:>3.3}", game.stats().loss,))?;
         debug(&format!(
             "recv rate (kB/s): {:>3.3}",
             game.stats().recv_rate / 1000.0
