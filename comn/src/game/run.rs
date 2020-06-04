@@ -12,6 +12,8 @@ pub const PLAYER_SIT_L: f32 = 40.0;
 pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
+pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
+pub const PLAYER_ACCEL_FACTOR: f32 = 0.4;
 pub const BULLET_MOVE_SPEED: f32 = 500.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
@@ -141,8 +143,10 @@ impl Game {
                 delta.y += 1.0;
             }
 
+            ent.vel += ((delta * PLAYER_MOVE_SPEED) - ent.vel) * PLAYER_ACCEL_FACTOR;
+            ent.pos += ent.vel * delta_s;
+
             if delta.norm() > 0.0 {
-                ent.pos += delta.normalize() * PLAYER_MOVE_SPEED * delta_s;
                 ent.angle = Some(delta.y.atan2(delta.x));
             } else {
                 ent.angle = None;
@@ -159,7 +163,7 @@ impl Game {
                 .min(map_size.y - PLAYER_SIT_W / 2.0)
                 .max(PLAYER_SIT_W / 2.0);
 
-            if input_time >= ent.next_shot_time {
+            /*if input_time >= ent.next_shot_time {
                 if ent.shots_left == 0 {
                     ent.shots_left = MAGAZINE_SIZE;
                 }
@@ -180,7 +184,7 @@ impl Game {
                         ent.next_shot_time = input_time + PLAYER_SHOOT_PERIOD;
                     }
                 }
-            }
+            }*/
 
             let pos = ent.pos;
             let input_state = input_state.unwrap_or(self);
