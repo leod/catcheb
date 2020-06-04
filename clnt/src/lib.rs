@@ -251,11 +251,18 @@ async fn app(
     let mut event_list = event_list::EventList::new(config.event_list);
 
     let mut stats = Stats::default();
+    let mut show_stats = false;
 
     loop {
         while let Some(event) = events.next_event().await {
             match event {
                 Event::KeyboardInput(event) => {
+                    if !pressed_keys.contains(&event.key()) {
+                        if event.key() == Key::P {
+                            show_stats = !show_stats;
+                        }
+                    }
+
                     if event.is_down() {
                         pressed_keys.insert(event.key());
                     } else {
@@ -301,49 +308,75 @@ async fn app(
             Ok(())
         };
 
+        debug(&format!(
+            "ping:         {:>3.1}",
+            game.ping().estimate().as_secs_f32() * 1000.0
+        ))?;
+
         if let Some((_, my_entity)) = game
             .state()
             .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
         {
             let cooldown = (my_entity.next_shot_time - game.interp_game_time()).max(0.0);
-            debug(&format!("gun cooldown: {:.2}", cooldown))?;
-            debug(&format!("shots left: {}", my_entity.shots_left))?;
+            debug(&format!("gun cooldown: {:>3.1}", cooldown))?;
+            debug(&format!("shots left:   {}", my_entity.shots_left))?;
         } else {
             // lol
             debug("")?;
             debug("")?;
         }
 
-        for _ in 0..36 {
+        if show_stats {
+            for _ in 0..33 {
+                debug("")?;
+            }
+            debug(&format!(
+                "recv std dev:         {:>7.3}",
+                1000.0 * game.stats().recv_delay_std_dev,
+            ))?;
+            debug(&format!(
+                "loss (%):             {:>7.3}",
+                game.stats().loss.estimate().map_or(100.0, |p| p * 100.0)
+            ))?;
+            debug(&format!(
+                "skip loss (%):        {:>7.3}",
+                game.stats()
+                    .skip_loss
+                    .estimate()
+                    .map_or(100.0, |p| p * 100.0)
+            ))?;
+            debug(&format!(
+                "recv rate (kB/s):     {:>7.3}",
+                game.stats().recv_rate / 1000.0
+            ))?;
+            debug(&format!(
+                "send rate (kB/s):     {:>7.3}",
+                game.stats().send_rate / 1000.0
+            ))?;
             debug("")?;
+            debug(&format!("dt (ms):             {}", stats.dt_ms))?;
+            debug(&format!("frame (ms):          {}", stats.frame_ms))?;
+            debug(&format!(
+                "time lag (ms):       {}",
+                game.stats().time_lag_ms
+            ))?;
+            debug(&format!(
+                "time lag dev (ms):   {}",
+                game.stats().time_lag_deviation_ms
+            ))?;
+            debug(&format!(
+                "time warp:           {}",
+                game.stats().time_warp_factor
+            ))?;
+            debug(&format!(
+                "tick interp:         {}",
+                game.stats().tick_interp
+            ))?;
+            debug(&format!(
+                "input delay:         {}",
+                game.stats().input_delay
+            ))?;
         }
-        debug(&format!(
-            "ping (ms):        {:.1}",
-            game.ping().estimate().as_secs_f32() * 1000.0
-        ))?;
-        debug(&format!(
-            "recv std dev:     {:.2}",
-            1000.0 * game.stats().recv_delay_std_dev,
-        ))?;
-        debug(&format!(
-            "loss (%):         {:.2}",
-            game.stats().loss.mean().unwrap_or(0.0 / 0.0),
-        ))?;
-        debug(&format!(
-            "recv rate (kB/s): {:.2}",
-            game.stats().recv_rate / 1000.0
-        ))?;
-        debug(&format!(
-            "send rate (kB/s): {:.2}",
-            game.stats().send_rate / 1000.0
-        ))?;
-        debug(&format!("dt (ms):       {}", stats.dt_ms))?;
-        debug(&format!("frame (ms):    {}", stats.frame_ms))?;
-        debug(&format!("time lag (ms): {}", game.stats().time_lag_ms))?;
-        debug(&format!("time warp:     {}", game.stats().time_warp_factor))?;
-        debug(&format!("tick interp:   {}", game.stats().tick_interp))?;
-        debug(&format!("input delay:   {}", game.stats().input_delay))?;
-        debug("")?;
 
         event_list.render(
             &mut gfx,

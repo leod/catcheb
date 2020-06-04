@@ -22,7 +22,7 @@ use crate::{
     webrtc::{self, RecvMessageRx, SendMessageTx},
 };
 
-pub const PLAYER_INPUT_BUFFER: usize = 1;
+pub const PLAYER_INPUT_BUFFER: usize = 2;
 pub const MAX_PLAYER_INPUT_AGE: f32 = 1.0;
 
 #[derive(Debug, Clone)]
@@ -438,7 +438,7 @@ impl Runner {
                 .recv_input_time
                 .estimate(
                     game.current_game_time()
-                        - PLAYER_INPUT_BUFFER as GameTime * game.settings.tick_period(),
+                        - (PLAYER_INPUT_BUFFER as GameTime + 0.5) * game.settings.tick_period(),
                 )
                 .unwrap_or(0.0);
 
