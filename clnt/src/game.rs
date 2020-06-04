@@ -161,7 +161,9 @@ impl Game {
                 k
             }*/
 
-            0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
+            //0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
+
+            0.5 * ((-time_lag_deviation).tanh() + 2.0)
         } else {
             0.0
         };
