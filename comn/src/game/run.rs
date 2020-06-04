@@ -143,7 +143,13 @@ impl Game {
                 delta.y += 1.0;
             }
 
-            ent.vel += ((delta * PLAYER_MOVE_SPEED) - ent.vel) * PLAYER_ACCEL_FACTOR;
+            let delta = if delta.norm() > 0.0 {
+                delta.normalize()
+            } else {
+                Vector::zeros()
+            };
+
+            ent.vel += (delta * PLAYER_MOVE_SPEED - ent.vel) * PLAYER_ACCEL_FACTOR;
             ent.pos += ent.vel * delta_s;
 
             if delta.norm() > 0.0 {
