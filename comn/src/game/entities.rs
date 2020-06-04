@@ -45,6 +45,7 @@ impl Entity {
 pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
+    pub vel: Vector,
     pub angle: Option<f32>,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
@@ -55,6 +56,7 @@ impl PlayerEntity {
         Self {
             owner,
             pos,
+            vel: Vector::zeros(),
             angle: Some(0.0),
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
