@@ -67,8 +67,8 @@ where
 
                     match message {
                         Some(mut message) => {
-                            if rng.gen::<f32>() >= self.config.loss {
-                                let lag = Duration::from_secs_f32(self.lag_distribution.sample(&mut rng) / 1000.0);
+                            if rng.gen::<f32>() > self.config.loss {
+                                let lag = Duration::from_secs_f32(self.lag_distribution.sample(&mut rng).max(0.0) / 1000.0);
                                 message.add_fake_lag(lag);
                                 self.delay_queue.insert(message, lag);
                             }

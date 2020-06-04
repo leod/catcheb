@@ -79,9 +79,9 @@ async fn main() {
             loss: 0.05,
         },
         fake_bad_net::Config {
-            lag_mean: Duration::from_millis(25),
-            lag_std_dev: 5.0,
-            loss: 0.05,
+            lag_mean: Duration::from_millis(50),
+            lag_std_dev: 15.0,
+            loss: 0.00,
         },
     ));
     let fake_bad_net_config = None;

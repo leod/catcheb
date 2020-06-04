@@ -6,7 +6,7 @@ use std::{
 use instant::Instant;
 use log::{debug, info, warn};
 
-use comn::util::{stats, GameTimeEstimation, PingEstimation};
+use comn::util::{stats, GameTimeEstimation, LossEstimation, PingEstimation};
 
 use crate::{prediction::Prediction, webrtc};
 
@@ -14,17 +14,19 @@ use crate::{prediction::Prediction, webrtc};
 #[derive(Default)]
 pub struct Stats {
     pub time_lag_ms: stats::Var,
+    pub time_lag_deviation_ms: stats::Var,
     pub time_warp_factor: stats::Var,
     pub tick_interp: stats::Var,
     pub input_delay: stats::Var,
     pub received_ticks: stats::Var,
-    pub loss: stats::Var,
     pub recv_rate: f32,
     pub send_rate: f32,
     pub recv_delay_std_dev: f32,
+    pub loss: LossEstimation,
+    pub skip_loss: LossEstimation,
 }
 
-const MAX_TICKS_PER_UPDATE: usize = 3;
+const MAX_TICKS_PER_UPDATE: usize = 5;
 
 pub struct Game {
     settings: comn::Settings,
@@ -41,11 +43,11 @@ pub struct Game {
     interp_game_time: comn::GameTime,
     next_tick_num: Option<comn::TickNum>,
 
-    ping: PingEstimation,
     start_time: Instant,
     recv_tick_time: GameTimeEstimation,
     next_time_warp_factor: f32,
 
+    ping: PingEstimation,
     stats: Stats,
 }
 
@@ -63,10 +65,10 @@ impl Game {
             prediction,
             interp_game_time: 0.0,
             next_tick_num: None,
-            ping: PingEstimation::default(),
             start_time: Instant::now(),
             recv_tick_time,
             next_time_warp_factor: 1.0,
+            ping: PingEstimation::default(),
             stats: Stats::default(),
         }
     }
@@ -147,12 +149,26 @@ impl Game {
             let current_time_lag = recv_game_time - self.interp_game_time;
             let time_lag_deviation = self.target_time_lag() - current_time_lag;
 
-            0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
+            self.stats
+                .time_lag_deviation_ms
+                .record(time_lag_deviation * 1000.0);
+
+            /*let k = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp());
+
+            if time_lag_deviation > 0.0 {
+                1.0 / k
+            } else {
+                k
+            }*/
+
+            //0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
+
+            0.5 * ((-time_lag_deviation).tanh() + 2.0)
         } else {
             0.0
         };
 
-        // Look at all the intermediate ticks. We will have one of the
+        // lOok at all the intermediate ticks. We will have one of the
         // following cases:
         //
         // 1. In this update call, the tick number did not change, so
@@ -190,6 +206,10 @@ impl Game {
             if let Some(tick) = self.received_ticks.get(tick_num) {
                 events.extend(tick.events.clone().into_iter());
                 last_server_tick_num = Some(*tick_num);
+
+                // For debugging, keep track of how many ticks we do not
+                // receive server data on time.
+                self.stats.skip_loss.record_received(tick_num.0 as usize);
             }
 
             self.last_inputs.push_back((*tick_num, input.clone()));
@@ -267,11 +287,6 @@ impl Game {
         self.stats.send_rate = self.webrtc_client.send_rate();
         self.stats.recv_rate = self.webrtc_client.recv_rate();
         self.stats.recv_delay_std_dev = self.recv_tick_time.recv_delay_std_dev().unwrap_or(-1.0);
-        self.stats.loss.record(
-            (1.0 - self.stats.received_ticks.sum_per_sec().unwrap_or(0.0)
-                / self.settings.ticks_per_second as f32)
-                * 100.0,
-        );
 
         events
     }
@@ -343,6 +358,10 @@ impl Game {
                 }
             }
             comn::ServerMessage::Tick(tick) => {
+                self.stats
+                    .loss
+                    .record_received(tick.state.tick_num.0 as usize);
+
                 let recv_game_time = tick.state.current_game_time();
 
                 // Keep some statistics for debugging...
