@@ -87,10 +87,9 @@ impl GameTimeEstimation {
         recv_times
             .next()
             .and_then(|(first_recv_time, first_game_time)| {
-                let mut shifted_recv_times = iter::once((*first_recv_time, *first_game_time))
-                    .chain(recv_times.map(|(recv_time, game_time)| {
-                        (recv_time - first_recv_time, game_time - first_game_time)
-                    }));
+                let mut shifted_recv_times = recv_times.map(|(recv_time, game_time)| {
+                    (recv_time - first_recv_time, game_time - first_game_time)
+                });
 
                 shifted_recv_times.next().map(|second| {
                     let samples = iter::once(second).chain(shifted_recv_times);

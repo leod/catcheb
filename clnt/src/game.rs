@@ -26,7 +26,7 @@ pub struct Stats {
     pub skip_loss: LossEstimation,
 }
 
-const MAX_TICKS_PER_UPDATE: usize = 3;
+const MAX_TICKS_PER_UPDATE: usize = 5;
 
 pub struct Game {
     settings: comn::Settings,
@@ -153,12 +153,20 @@ impl Game {
                 .time_lag_deviation_ms
                 .record(time_lag_deviation * 1000.0);
 
+            /*let k = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp());
+
+            if time_lag_deviation > 0.0 {
+                1.0 / k
+            } else {
+                k
+            }*/
+
             0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
         } else {
             0.0
         };
 
-        // Look at all the intermediate ticks. We will have one of the
+        // lOok at all the intermediate ticks. We will have one of the
         // following cases:
         //
         // 1. In this update call, the tick number did not change, so
