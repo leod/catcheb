@@ -1,3 +1,4 @@
+mod camera;
 mod event_list;
 mod game;
 mod prediction;
@@ -82,6 +83,7 @@ pub fn render_game(
     next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
     time: comn::GameTime,
     my_player_id: comn::PlayerId,
+    camera_transform: Transform,
 ) -> quicksilver::Result<()> {
     gfx.clear(Color::WHITE);
 
@@ -92,16 +94,19 @@ pub fn render_game(
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
                 let circle = Circle::new(origin, TURRET_RANGE);
+                gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, Color::from_rgba(255, 204, 203, 1.0));
             }
             _ => (),
         }
     }
 
-    /*let screen_rect = Rectangle::new(
-        Vector::new(0.0, 0.0),
-        state.settings.size.into(),
-    );*/
+    {
+        gfx.set_transform(camera_transform);
+        let map_size: mint::Vector2<f32> = state.settings.size.into();
+        let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size);
+        gfx.stroke_rect(&map_rect, Color::BLACK);
+    }
 
     for (entity_id, entity) in state.entities.iter() {
         match entity {
@@ -121,14 +126,16 @@ pub fn render_game(
                 let pos: mint::Vector2<f32> = pos.into();
 
                 let angle: Option<f32> = None; //player.angle
-                let size = if let Some(angle) = angle {
-                    gfx.set_transform(
+                let (transform, size) = if let Some(angle) = angle {
+                    (
                         Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
-                    );
-                    Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L)
+                        Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
+                    )
                 } else {
-                    gfx.set_transform(Transform::translate(pos));
-                    Vector::new(PLAYER_SIT_W, PLAYER_SIT_L)
+                    (
+                        Transform::translate(pos),
+                        Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
+                    )
                 };
                 let rect = Rectangle::new(-size / 2.0, size);
 
@@ -138,10 +145,11 @@ pub fn render_game(
                     Color::BLUE
                 };
 
+                gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);
                 //gfx.stroke_rect(&rect, Color::GREEN);
 
-                gfx.set_transform(Transform::IDENTITY);
+                gfx.set_transform(camera_transform);
                 resources
                     .font
                     .draw(gfx, &player.owner.0.to_string(), Color::BLACK, pos.into())?;
@@ -151,6 +159,7 @@ pub fn render_game(
                     (danger_guy.pos(time) - danger_guy.size / 2.0).coords.into();
                 let size: mint::Vector2<f32> = danger_guy.size.into();
                 let rect = Rectangle::new(origin, size);
+                gfx.set_transform(camera_transform);
                 gfx.fill_rect(&rect, Color::RED);
             }
             comn::Entity::Bullet(bullet) => {
@@ -161,26 +170,31 @@ pub fn render_game(
                 } else {
                     Color::MAGENTA
                 };
+                gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, color);
             }
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
                 let circle = Circle::new(origin, TURRET_RADIUS);
+                gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
 
                 let angle = turret.angle;
 
                 gfx.set_transform(
-                    Transform::rotate(angle.to_degrees()).then(Transform::translate(origin)),
+                    Transform::rotate(angle.to_degrees())
+                        .then(Transform::translate(origin))
+                        .then(camera_transform),
                 );
 
                 let rect = Rectangle::new(Vector::new(0.0, -5.0), Vector::new(40.0, 10.0));
 
                 gfx.fill_rect(&rect, Color::BLACK);
-                gfx.set_transform(Transform::IDENTITY);
             }
         }
     }
+
+    gfx.set_transform(Transform::IDENTITY);
 
     Ok(())
 }
@@ -195,6 +209,7 @@ struct Stats {
 #[derive(Debug, Clone, Default)]
 struct Config {
     event_list: event_list::Config,
+    camera: camera::Config,
 }
 
 async fn app(
@@ -248,6 +263,8 @@ async fn app(
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
 
+    let mut camera = camera::Camera::new(config.camera, game.settings().size);
+
     let mut event_list = event_list::EventList::new(config.event_list);
 
     let mut stats = Stats::default();
@@ -288,6 +305,21 @@ async fn app(
             event_list.push(event);
         }
 
+        {
+            let follow_entity = game.state().and_then(|state| {
+                state
+                    .get_player_entity(game.my_player_id())
+                    .map(|(_id, e)| comn::Entity::Player(e.clone()))
+            });
+            camera.update(
+                dt,
+                &pressed_keys,
+                follow_entity,
+                game.interp_game_time(),
+                comn::Vector::new(window.size().x, window.size().y) * window.scale_factor(),
+            );
+        }
+
         if let Some(state) = game.state() {
             render_game(
                 &mut gfx,
@@ -296,6 +328,7 @@ async fn app(
                 &game.next_entities(),
                 game.interp_game_time(),
                 game.my_player_id(),
+                camera.transform(),
             )?;
         }
 

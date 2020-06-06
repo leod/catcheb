@@ -128,7 +128,7 @@ impl Game {
             .unwrap_or(time);
         let map_size = self.settings.size;
 
-        if let Some((_entity_id, ent)) = self.get_player_entity_mut(player_id)? {
+        if let Some((_entity_id, ent)) = self.get_player_entity_mut(player_id) {
             let mut delta = Vector::new(0.0, 0.0);
 
             if input.move_left {
@@ -231,12 +231,8 @@ impl Game {
             .ok_or_else(|| GameError::InvalidEntityId(entity_id))
     }
 
-    pub fn get_player_entity(
-        &self,
-        player_id: PlayerId,
-    ) -> GameResult<Option<(EntityId, &PlayerEntity)>> {
-        Ok(self
-            .entities
+    pub fn get_player_entity(&self, player_id: PlayerId) -> Option<(EntityId, &PlayerEntity)> {
+        self.entities
             .iter()
             .filter_map(|(&id, e)| {
                 if let Entity::Player(ref e) = e {
@@ -249,15 +245,14 @@ impl Game {
                     None
                 }
             })
-            .next())
+            .next()
     }
 
     pub fn get_player_entity_mut(
         &mut self,
         player_id: PlayerId,
-    ) -> GameResult<Option<(EntityId, &mut PlayerEntity)>> {
-        Ok(self
-            .entities
+    ) -> Option<(EntityId, &mut PlayerEntity)> {
+        self.entities
             .iter_mut()
             .filter_map(|(&id, e)| {
                 if let Entity::Player(ref mut e) = e {
@@ -270,6 +265,6 @@ impl Game {
                     None
                 }
             })
-            .next())
+            .next()
     }
 }
