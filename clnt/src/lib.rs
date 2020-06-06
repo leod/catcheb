@@ -130,7 +130,7 @@ pub fn render_game(
             ..BlendMode::default()
         }));*/
 
-        for (_, entity) in state.entities.iter() {
+        /*for (_, entity) in state.entities.iter() {
             match entity {
                 comn::Entity::Turret(turret) => {
                     let origin: mint::Vector2<f32> = turret.pos.coords.into();
@@ -140,7 +140,7 @@ pub fn render_game(
                 }
                 _ => (),
             }
-        }
+        }*/
 
         gfx.set_blend_mode(Some(Default::default()));
     }
