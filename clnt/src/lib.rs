@@ -308,12 +308,7 @@ async fn app(
             Ok(())
         };
 
-        debug(&format!(
-            "ping:         {:>3.1}",
-            game.ping().estimate().as_secs_f32() * 1000.0
-        ))?;
-
-        if let Some((_, my_entity)) = game
+        /*if let Some((_, my_entity)) = game
             .state()
             .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
         {
@@ -324,58 +319,55 @@ async fn app(
             // lol
             debug("")?;
             debug("")?;
-        }
+        }*/
 
         if show_stats {
-            for _ in 0..33 {
+            for _ in 0..34 {
                 debug("")?;
             }
+
             debug(&format!(
-                "recv std dev:         {:>7.3}",
+                "ping:               {:>7.3}",
+                game.ping().estimate().as_secs_f32() * 1000.0
+            ))?;
+            debug(&format!(
+                "recv stddev:        {:>7.3}",
                 1000.0 * game.stats().recv_delay_std_dev,
             ))?;
             debug(&format!(
-                "loss (%):             {:>7.3}",
+                "loss (%):           {:>7.3}",
                 game.stats().loss.estimate().map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
-                "skip loss (%):        {:>7.3}",
+                "skip loss (%):      {:>7.3}",
                 game.stats()
                     .skip_loss
                     .estimate()
                     .map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
-                "recv rate (kB/s):     {:>7.3}",
+                "recv rate (kB/s):   {:>7.3}",
                 game.stats().recv_rate / 1000.0
             ))?;
             debug(&format!(
-                "send rate (kB/s):     {:>7.3}",
+                "send rate (kB/s):   {:>7.3}",
                 game.stats().send_rate / 1000.0
             ))?;
             debug("")?;
-            debug(&format!("dt (ms):             {}", stats.dt_ms))?;
-            debug(&format!("frame (ms):          {}", stats.frame_ms))?;
+            debug("                        cur      min      max     mean   stddev")?;
+            debug(&format!("dt (ms):           {}", stats.dt_ms))?;
+            debug(&format!("frame (ms):        {}", stats.frame_ms))?;
+            debug(&format!("time lag (ms):     {}", game.stats().time_lag_ms))?;
             debug(&format!(
-                "time lag (ms):       {}",
-                game.stats().time_lag_ms
-            ))?;
-            debug(&format!(
-                "time lag dev (ms):   {}",
+                "time lag dev (ms): {}",
                 game.stats().time_lag_deviation_ms
             ))?;
             debug(&format!(
-                "time warp:           {}",
+                "time warp:         {}",
                 game.stats().time_warp_factor
             ))?;
-            debug(&format!(
-                "tick interp:         {}",
-                game.stats().tick_interp
-            ))?;
-            debug(&format!(
-                "input delay:         {}",
-                game.stats().input_delay
-            ))?;
+            debug(&format!("tick interp:       {}", game.stats().tick_interp))?;
+            debug(&format!("input delay:       {}", game.stats().input_delay))?;
         }
 
         event_list.render(

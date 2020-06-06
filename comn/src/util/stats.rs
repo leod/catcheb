@@ -20,10 +20,10 @@ impl fmt::Display for Var {
             f,
             "{:>8.3} {:>8.3} {:>8.3} {:>8.3} {:>8.3}",
             self.records.back().map(|(_, v)| *v).unwrap_or(0.0 / 0.0),
-            self.mean().unwrap_or(0.0 / 0.0),
-            self.std_dev().unwrap_or(0.0 / 0.0),
             self.min().unwrap_or(0.0 / 0.0),
             self.max().unwrap_or(0.0 / 0.0),
+            self.mean().unwrap_or(0.0 / 0.0),
+            self.std_dev().unwrap_or(0.0 / 0.0),
         )
     }
 }
