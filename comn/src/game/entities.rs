@@ -84,9 +84,17 @@ impl DangerGuy {
         2.0 * (self.walk_time() + self.wait_time)
     }
 
+    pub fn delta(&self) -> Vector {
+        self.end_pos - self.start_pos
+    }
+
+    pub fn tau(&self, t: GameTime) -> GameTime {
+        (t / self.period()).fract() * self.period()
+    }
+
     pub fn pos(&self, t: GameTime) -> Point {
-        let tau = (t / self.period()).fract() * self.period();
-        let delta = self.end_pos - self.start_pos;
+        let delta = self.delta();
+        let tau = self.tau(t);
 
         // TODO: Simplify, maybe pareen?
         if tau < self.wait_time {
@@ -98,6 +106,17 @@ impl DangerGuy {
         } else {
             self.end_pos
                 - (tau - 2.0 * self.wait_time - self.walk_time()) / self.walk_time() * delta
+        }
+    }
+
+    pub fn dir(&self, t: GameTime) -> Vector {
+        let delta = self.delta();
+        let tau = self.tau(t);
+
+        if tau <= self.wait_time + self.walk_time() {
+            delta
+        } else {
+            -delta
         }
     }
 

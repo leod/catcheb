@@ -266,6 +266,7 @@ dependencies = [
  "js-sys",
  "log",
  "mint",
+ "pareen",
  "quicksilver",
  "serde",
  "serde_derive",
@@ -1412,6 +1413,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88cfece6e95d2e717e0872a7f53a8684712ad13822a7979bc760b9c77ec0013b"
 dependencies = [
  "shared_library",
+]
+
+[[package]]
+name = "pareen"
+version = "0.2.3"
+source = "git+https://github.com/leod/pareen.git#d8c5442d202f14abaf562bd51353d4d42206eb68"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
