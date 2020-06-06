@@ -23,7 +23,7 @@ pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 
 pub const TURRET_RADIUS: f32 = 30.0;
-pub const TURRET_RANGE: f32 = 250.0;
+pub const TURRET_RANGE: f32 = 400.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;

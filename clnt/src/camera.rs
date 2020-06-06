@@ -1,6 +1,9 @@
 use std::{collections::HashSet, time::Duration};
 
-use quicksilver::{geom::Transform, input::Key};
+use quicksilver::{
+    geom::{Transform, Vector},
+    input::Key,
+};
 
 use comn::geom;
 
@@ -25,6 +28,7 @@ pub struct Camera {
     centered_pos: comn::Point,
     target: comn::Point,
     map_size: comn::Vector,
+    scale: f32,
 }
 
 impl Camera {
@@ -35,6 +39,7 @@ impl Camera {
             centered_pos: comn::Point::origin(),
             target: comn::Point::origin(),
             map_size,
+            scale: 0.7,
         }
     }
 
@@ -65,11 +70,12 @@ impl Camera {
             // Camera is too far away, just snap to the target position.
             self.target
         };
-        self.centered_pos = self.pos - window_size / 2.0;
+        self.centered_pos = self.pos - window_size / (2.0 * self.scale);
     }
 
     pub fn transform(&self) -> Transform {
         let offset: mint::Vector2<f32> = (-self.centered_pos.coords).into();
         Transform::translate(offset.into())
+            .then(Transform::scale(Vector::new(self.scale, self.scale)))
     }
 }

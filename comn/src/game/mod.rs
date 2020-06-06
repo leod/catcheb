@@ -39,8 +39,8 @@ impl Default for Settings {
         Self {
             max_num_players: 16,
             ticks_per_second: 60,
-            size: Vector::new(1600.0, 1200.0),
-            spawn_points: vec![Point::new(50.0, 50.0), Point::new(50.0, 1000.0)],
+            size: Vector::new(2400.0, 2400.0),
+            spawn_points: vec![Point::new(50.0, 50.0), Point::new(50.0, 1300.0)],
         }
     }
 }
@@ -185,33 +185,33 @@ impl Game {
                 wait_time: 1.0,
             }),*/
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(100.0, 900.0),
-                end_pos: Point::new(1500.0, 900.0),
+                start_pos: Point::new(100.0, 1100.0),
+                end_pos: Point::new(1500.0, 1100.0),
                 size: Vector::new(160.0, 60.0),
                 speed: 2000.0,
                 wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(1500.0, 960.0),
-                end_pos: Point::new(100.0, 960.0),
+                start_pos: Point::new(1500.0, 1160.0),
+                end_pos: Point::new(100.0, 1160.0),
                 size: Vector::new(160.0, 60.0),
                 speed: 2000.0,
                 wait_time: 2.0,
             }),
             Entity::Turret(Turret {
-                pos: Point::new(700.0, 400.0),
+                pos: Point::new(600.0, 400.0),
                 target: None,
                 angle: 0.0,
                 next_shot_time: 0.0,
             }),
             Entity::Turret(Turret {
-                pos: Point::new(1150.0, 400.0),
+                pos: Point::new(1200.0, 400.0),
                 target: None,
                 angle: 0.0,
                 next_shot_time: 0.0,
             }),
             Entity::Turret(Turret {
-                pos: Point::new(925.0, 825.0),
+                pos: Point::new(900.0, 1000.0),
                 target: None,
                 angle: 0.0,
                 next_shot_time: 0.0,

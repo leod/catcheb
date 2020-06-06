@@ -14,7 +14,14 @@ use log::info;
 
 use quicksilver::{
     geom::{Circle, Rectangle, Transform, Vector},
-    graphics::{Color, FontRenderer, Graphics, ResizeHandler, VectorFont},
+    graphics::{
+        //blend::{BlendEquation, BlendFunction, BlendMode, BlendOperation, BlendFactor, BlendChannel, BlendInput},
+        Color,
+        FontRenderer,
+        Graphics,
+        ResizeHandler,
+        VectorFont,
+    },
     input::{Event, Input, Key},
     Settings, Window,
 };
@@ -90,23 +97,45 @@ pub fn render_game(
 ) -> quicksilver::Result<()> {
     let state_time = state.tick_game_time(state.tick_num);
 
-    for (_, entity) in state.entities.iter() {
-        match entity {
-            comn::Entity::Turret(turret) => {
-                let origin: mint::Vector2<f32> = turret.pos.coords.into();
-                let circle = Circle::new(origin.into(), TURRET_RANGE);
-                gfx.set_transform(camera_transform);
-                gfx.fill_circle(&circle, Color::from_rgba(255, 204, 203, 1.0));
-            }
-            _ => (),
-        }
-    }
-
     {
         gfx.set_transform(camera_transform);
         let map_size: mint::Vector2<f32> = state.settings.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
+        gfx.fill_rect(&map_rect, Color::from_rgba(142, 182, 155, 1.0));
         gfx.stroke_rect(&map_rect, Color::BLACK);
+    }
+
+    {
+        /*gfx.set_blend_mode(Some(BlendMode {
+            equation: BlendEquation::Same(BlendOperation::Add),
+            function: BlendFunction::Same {
+                source: BlendFactor::Color {
+                    input: BlendInput::Source,
+                    channel: BlendChannel::Alpha,
+                    is_inverse: false,
+                },
+                destination: BlendFactor::Color {
+                    input: BlendInput::Source,
+                    channel: BlendChannel::Alpha,
+                    is_inverse: true,
+                },
+            },
+            ..BlendMode::default()
+        }));*/
+
+        for (_, entity) in state.entities.iter() {
+            match entity {
+                comn::Entity::Turret(turret) => {
+                    let origin: mint::Vector2<f32> = turret.pos.coords.into();
+                    let circle = Circle::new(origin.into(), TURRET_RANGE);
+                    gfx.set_transform(camera_transform);
+                    gfx.stroke_circle(&circle, Color::from_rgba(255, 0, 0, 1.0));
+                }
+                _ => (),
+            }
+        }
+
+        gfx.set_blend_mode(Some(Default::default()));
     }
 
     for (entity_id, entity) in state.entities.iter() {
@@ -142,19 +171,19 @@ pub fn render_game(
                 let rect = Rectangle::new(-size / 2.0, size);
 
                 let color = if player.owner == my_player_id {
-                    Color::GREEN
-                } else {
                     Color::BLUE
+                } else {
+                    Color::from_rgba(148, 0, 211, 1.0)
                 };
 
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);
-                //gfx.stroke_rect(&rect, Color::GREEN);
+                gfx.stroke_rect(&rect, Color::BLACK);
 
                 gfx.set_transform(camera_transform);
                 resources
                     .font
-                    .draw(gfx, &player.owner.0.to_string(), Color::BLACK, pos.into())?;
+                    .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;
             }
             comn::Entity::DangerGuy(danger_guy) => {
                 let origin: mint::Vector2<f32> =
@@ -163,6 +192,7 @@ pub fn render_game(
                 let rect = Rectangle::new(origin.into(), size.into());
                 gfx.set_transform(camera_transform);
                 gfx.fill_rect(&rect, Color::RED);
+                gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
@@ -174,12 +204,14 @@ pub fn render_game(
                 };
                 gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, color);
+                gfx.stroke_circle(&circle, Color::BLACK);
             }
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
                 let circle = Circle::new(origin.into(), TURRET_RADIUS);
                 gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
+                gfx.stroke_circle(&circle, Color::BLACK);
 
                 let angle = turret.angle;
 
