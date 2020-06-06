@@ -13,9 +13,10 @@ use instant::Instant;
 use log::info;
 
 use quicksilver::{
+    Window, Settings,
     geom::{Circle, Rectangle, Transform, Vector},
     graphics::{Color, FontRenderer, Graphics, VectorFont},
-    lifecycle::{run, Event, EventStream, Key, Settings, Window},
+    input::{Event, Input, Key},
 };
 
 use comn::{
@@ -31,7 +32,7 @@ pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
-    run(
+    quicksilver::run(
         Settings {
             size: Vector::new(800.0, 600.0).into(),
             fullscreen: true,
@@ -93,7 +94,7 @@ pub fn render_game(
         match entity {
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
-                let circle = Circle::new(origin, TURRET_RANGE);
+                let circle = Circle::new(origin.into(), TURRET_RANGE);
                 gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, Color::from_rgba(255, 204, 203, 1.0));
             }
@@ -104,7 +105,7 @@ pub fn render_game(
     {
         gfx.set_transform(camera_transform);
         let map_size: mint::Vector2<f32> = state.settings.size.into();
-        let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size);
+        let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
 
@@ -128,12 +129,12 @@ pub fn render_game(
                 let angle: Option<f32> = None; //player.angle
                 let (transform, size) = if let Some(angle) = angle {
                     (
-                        Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
+                        Transform::rotate(angle.to_degrees()).then(Transform::translate(pos.into())),
                         Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
                     )
                 } else {
                     (
-                        Transform::translate(pos),
+                        Transform::translate(pos.into()),
                         Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
                     )
                 };
@@ -158,13 +159,13 @@ pub fn render_game(
                 let origin: mint::Vector2<f32> =
                     (danger_guy.pos(time) - danger_guy.size / 2.0).coords.into();
                 let size: mint::Vector2<f32> = danger_guy.size.into();
-                let rect = Rectangle::new(origin, size);
+                let rect = Rectangle::new(origin.into(), size.into());
                 gfx.set_transform(camera_transform);
                 gfx.fill_rect(&rect, Color::RED);
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
-                let circle = Circle::new(origin, BULLET_RADIUS);
+                let circle = Circle::new(origin.into(), BULLET_RADIUS);
                 let color = if bullet.owner == Some(my_player_id) {
                     Color::ORANGE
                 } else {
@@ -175,7 +176,7 @@ pub fn render_game(
             }
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
-                let circle = Circle::new(origin, TURRET_RADIUS);
+                let circle = Circle::new(origin.into(), TURRET_RADIUS);
                 gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
 
@@ -183,7 +184,7 @@ pub fn render_game(
 
                 gfx.set_transform(
                     Transform::rotate(angle.to_degrees())
-                        .then(Transform::translate(origin))
+                        .then(Transform::translate(origin.into()))
                         .then(camera_transform),
                 );
 
@@ -215,7 +216,7 @@ struct Config {
 async fn app(
     window: Window,
     mut gfx: Graphics,
-    mut events: EventStream,
+    mut input: Input,
 ) -> quicksilver::Result<()> {
     info!("Starting up");
 
@@ -228,7 +229,7 @@ async fn app(
             game_id: None,
             player_name: "Pioneer".to_string(),
         },
-        &mut events,
+        &mut input,
     )
     .await
     .unwrap();
@@ -244,7 +245,7 @@ async fn app(
     let mut show_stats = false;
 
     loop {
-        while let Some(event) = events.next_event().await {
+        while let Some(event) = input.next_event().await {
             match event {
                 Event::KeyboardInput(event) => {
                     if !pressed_keys.contains(&event.key()) {

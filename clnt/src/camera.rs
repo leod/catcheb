@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
-use quicksilver::{geom::Transform, lifecycle::Key};
+use quicksilver::{geom::Transform, input::Key};
 
 use comn::geom;
 
@@ -70,6 +70,6 @@ impl Camera {
 
     pub fn transform(&self) -> Transform {
         let offset: mint::Vector2<f32> = (-self.centered_pos.coords).into();
-        Transform::translate(offset)
+        Transform::translate(offset.into())
     }
 }
