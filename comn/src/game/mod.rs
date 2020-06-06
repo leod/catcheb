@@ -171,8 +171,8 @@ impl Game {
     pub fn initial_entities(_settings: &Settings) -> Vec<Entity> {
         vec![
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(100.0, 100.0),
-                end_pos: Point::new(400.0, 100.0),
+                start_pos: Point::new(700.0, 100.0),
+                end_pos: Point::new(1000.0, 100.0),
                 size: Vector::new(160.0, 160.0),
                 speed: 100.0,
                 wait_time: 3.0,

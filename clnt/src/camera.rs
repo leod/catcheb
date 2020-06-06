@@ -39,7 +39,7 @@ impl Camera {
             centered_pos: comn::Point::origin(),
             target: comn::Point::origin(),
             map_size,
-            scale: 0.7,
+            scale: 0.6,
         }
     }
 
@@ -51,13 +51,11 @@ impl Camera {
         game_time: comn::GameTime,
         window_size: comn::Vector,
     ) {
+        let offset = window_size / (2.0 * self.scale);
+
         self.target = follow_entity.map_or(self.target, |entity| entity.pos(game_time));
-        /*self.target.x = self.target.x
-            .max(0.0)
-            .min(self.map_size.x);
-        self.target.y = self.target.y
-            .max(0.0)
-            .min(self.map_size.y);*/
+        self.target.x = self.target.x.max(offset.x).min(self.map_size.x - offset.x);
+        self.target.y = self.target.y.max(offset.y).min(self.map_size.y - offset.y);
 
         self.pos = if (self.pos - self.target).norm() <= self.config.max_smooth_dist {
             geom::smooth_to_target_point(
@@ -70,7 +68,7 @@ impl Camera {
             // Camera is too far away, just snap to the target position.
             self.target
         };
-        self.centered_pos = self.pos - window_size / (2.0 * self.scale);
+        self.centered_pos = self.pos - offset;
     }
 
     pub fn transform(&self) -> Transform {
