@@ -1,16 +1,16 @@
 mod camera;
 mod event_list;
 mod game;
+mod join;
 mod prediction;
 mod webrtc;
 
 use std::collections::{BTreeMap, HashSet};
 
-use instant::Instant;
-use log::{info, warn};
+use wasm_bindgen::prelude::wasm_bindgen;
 
-use wasm_bindgen::{prelude::*, JsCast};
-use wasm_bindgen_futures::JsFuture;
+use instant::Instant;
+use log::info;
 
 use quicksilver::{
     geom::{Circle, Rectangle, Transform, Vector},
@@ -223,42 +223,15 @@ async fn app(
     let mut resources = Resources::load(&mut gfx).await?;
 
     // TODO: Graceful error handling in client
-    let join_reply = join_request(comn::JoinRequest {
-        game_id: None,
-        player_name: "Pioneer".to_string(),
-    })
+    let mut game = join::join_and_connect(
+        comn::JoinRequest {
+            game_id: None,
+            player_name: "Pioneer".to_string(),
+        },
+        &mut events,
+    )
     .await
     .unwrap();
-
-    // TODO: Graceful error handling in client
-    let join_success = join_reply.expect("Failed to join game");
-
-    // TODO: Graceful error handling in client
-    let my_token = join_success.your_token;
-    let on_message = Box::new(
-        move |client_data: &webrtc::Data, message: &comn::ServerMessage| {
-            on_message(my_token, client_data, message)
-        },
-    );
-    let webrtc_client = webrtc::Client::connect(Default::default(), on_message)
-        .await
-        .unwrap();
-
-    while webrtc_client.status() == webrtc::Status::Connecting {
-        info!("waiting...");
-        webrtc_client.debug_ready_state();
-        events.next_event().await;
-    }
-
-    if webrtc_client.status() != webrtc::Status::Open {
-        // TODO: Graceful error handling in client
-        panic!(
-            "Failed to establish WebRTC connection: {:?}",
-            webrtc_client.status()
-        );
-    }
-
-    let mut game = game::Game::new(join_success, webrtc_client);
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
@@ -416,55 +389,5 @@ async fn app(
         stats
             .frame_ms
             .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);
-    }
-}
-
-pub async fn join_request(request: comn::JoinRequest) -> Result<comn::JoinReply, JsValue> {
-    let request_json = format!(
-        "{{\"game_id\":{},\"player_name\":\"{}\"}}",
-        request
-            .game_id
-            .map_or("null".to_owned(), |comn::GameId(id)| "\"".to_owned()
-                + &id.to_string()
-                + "\""),
-        request.player_name,
-    );
-
-    let mut opts = web_sys::RequestInit::new();
-    opts.method("POST");
-    opts.mode(web_sys::RequestMode::SameOrigin);
-    opts.body(Some(&JsValue::from_str(&request_json)));
-
-    info!("Requesting to join game: {} ...", request_json);
-
-    let request = web_sys::Request::new_with_str_and_init(&"/join", &opts)?;
-    request.headers().set("Accept", "application/json")?;
-
-    let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    assert!(resp_value.is_instance_of::<web_sys::Response>());
-    let resp: web_sys::Response = resp_value.dyn_into().unwrap();
-
-    // Convert this other `Promise` into a rust `Future`.
-    let reply = JsFuture::from(resp.json()?).await?;
-
-    info!("Join reply: {:?}", reply);
-
-    // Use serde to parse the JSON into a struct.
-    Ok(reply.into_serde().unwrap())
-}
-
-pub fn on_message(
-    my_token: comn::PlayerToken,
-    client_data: &webrtc::Data,
-    message: &comn::ServerMessage,
-) {
-    if let comn::ServerMessage::Ping(sequence_num) = message {
-        let reply = comn::ClientMessage::Pong(*sequence_num);
-        let signed_message = comn::SignedClientMessage(my_token, reply);
-        let data = signed_message.serialize();
-        if let Err(err) = client_data.send(&data) {
-            warn!("Failed to send message: {:?}", err);
-        }
     }
 }
