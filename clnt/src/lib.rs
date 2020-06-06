@@ -13,10 +13,10 @@ use instant::Instant;
 use log::info;
 
 use quicksilver::{
-    Window, Settings,
     geom::{Circle, Rectangle, Transform, Vector},
-    graphics::{Color, FontRenderer, Graphics, VectorFont},
+    graphics::{Color, FontRenderer, Graphics, ResizeHandler, VectorFont},
     input::{Event, Input, Key},
+    Settings, Window,
 };
 
 use comn::{
@@ -27,6 +27,8 @@ use comn::{
     util::stats,
 };
 
+const SCREEN_SIZE: Vector = Vector { x: 800.0, y: 600.0 };
+
 #[wasm_bindgen(start)]
 pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
@@ -34,9 +36,9 @@ pub fn main() {
 
     quicksilver::run(
         Settings {
-            size: Vector::new(800.0, 600.0).into(),
-            fullscreen: true,
+            size: SCREEN_SIZE,
             title: "Play Catcheb",
+            resizable: true,
             ..Settings::default()
         },
         app,
@@ -86,8 +88,6 @@ pub fn render_game(
     my_player_id: comn::PlayerId,
     camera_transform: Transform,
 ) -> quicksilver::Result<()> {
-    gfx.clear(Color::WHITE);
-
     let state_time = state.tick_game_time(state.tick_num);
 
     for (_, entity) in state.entities.iter() {
@@ -129,7 +129,8 @@ pub fn render_game(
                 let angle: Option<f32> = None; //player.angle
                 let (transform, size) = if let Some(angle) = angle {
                     (
-                        Transform::rotate(angle.to_degrees()).then(Transform::translate(pos.into())),
+                        Transform::rotate(angle.to_degrees())
+                            .then(Transform::translate(pos.into())),
                         Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
                     )
                 } else {
@@ -213,11 +214,7 @@ struct Config {
     camera: camera::Config,
 }
 
-async fn app(
-    window: Window,
-    mut gfx: Graphics,
-    mut input: Input,
-) -> quicksilver::Result<()> {
+async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver::Result<()> {
     info!("Starting up");
 
     let config = Config::default();
@@ -238,6 +235,12 @@ async fn app(
     let mut last_time = Instant::now();
 
     let mut camera = camera::Camera::new(config.camera, game.settings().size);
+    let resize_handler = ResizeHandler::Fit {
+        aspect_width: 4.0,
+        aspect_height: 3.0,
+    };
+    let screen = Rectangle::new_sized(SCREEN_SIZE);
+    let projection = Transform::orthographic(screen);
 
     let mut event_list = event_list::EventList::new(config.event_list);
 
@@ -259,6 +262,11 @@ async fn app(
                     } else {
                         pressed_keys.remove(&event.key());
                     }
+                }
+                Event::Resized(event) => {
+                    let letterbox = resize_handler.projection(event.size());
+                    gfx.set_projection(letterbox * projection);
+                    info!("Resizing to {:?}", event.size());
                 }
                 _ => (),
             }
@@ -293,6 +301,9 @@ async fn app(
                 comn::Vector::new(window.size().x, window.size().y) * window.scale_factor(),
             );
         }
+
+        gfx.clear(Color::BLACK);
+        gfx.fill_rect(&screen, Color::WHITE);
 
         if let Some(state) = game.state() {
             render_game(
