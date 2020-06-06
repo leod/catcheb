@@ -1,5 +1,7 @@
 // Increase recursion_limit for `futures::select` macro
 #![recursion_limit = "1024"]
+// Needed for pareen stuff
+#![type_length_limit = "600000000"]
 
 mod fake_bad_net;
 mod game;

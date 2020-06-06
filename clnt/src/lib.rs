@@ -14,11 +14,13 @@ use log::info;
 
 use quicksilver::{
     geom::{Circle, Rectangle, Transform, Vector},
+    golem::TextureFilter,
     graphics::{
         //blend::{BlendEquation, BlendFunction, BlendMode, BlendOperation, BlendFactor, BlendChannel, BlendInput},
         Color,
         FontRenderer,
         Graphics,
+        Image,
         ResizeHandler,
         VectorFont,
     },
@@ -68,6 +70,7 @@ pub struct Resources {
     pub font_small: FontRenderer,
     pub font: FontRenderer,
     pub font_large: FontRenderer,
+    pub hirsch: Image,
 }
 
 impl Resources {
@@ -76,12 +79,16 @@ impl Resources {
         let font_small = ttf.to_renderer(gfx, 9.0)?;
         let font = ttf.to_renderer(gfx, 18.0)?;
         let font_large = ttf.to_renderer(gfx, 40.0)?;
+        let hirsch = Image::load(gfx, "hirsch.png").await?;
+        hirsch.set_magnification(TextureFilter::Nearest)?;
+        hirsch.set_minification(TextureFilter::Nearest)?;
 
         Ok(Self {
             ttf,
             font_small,
             font,
             font_large,
+            hirsch,
         })
     }
 }
@@ -191,8 +198,39 @@ pub fn render_game(
                 let size: mint::Vector2<f32> = danger_guy.size.into();
                 let rect = Rectangle::new(origin.into(), size.into());
                 gfx.set_transform(camera_transform);
-                gfx.fill_rect(&rect, Color::RED);
-                gfx.stroke_rect(&rect, Color::BLACK);
+
+                let frame = pareen::constant(0)
+                    .switch(danger_guy.wait_time - 0.6, 1)
+                    .switch(danger_guy.wait_time - 0.4, 2)
+                    .switch(danger_guy.wait_time - 0.2, 3)
+                    .seq(
+                        danger_guy.wait_time,
+                        pareen::fun(|tau| 3 + (tau * danger_guy.speed / 40.0) as usize % 4),
+                    )
+                    .repeat(danger_guy.period() / 2.0)
+                    .eval(danger_guy.tau(time)) as f32;
+
+                let flip = danger_guy
+                    .dir(time)
+                    .normalize()
+                    .dot(&comn::Vector::new(1.0, 0.0))
+                    > 0.7;
+                let sub_rect = if flip {
+                    Rectangle::new(
+                        Vector::new(17.0, 16.0 * frame + 1.0),
+                        Vector::new(-16.0, 16.0),
+                    )
+                } else {
+                    Rectangle::new(
+                        Vector::new(1.0, 16.0 * frame + 1.0),
+                        Vector::new(16.0, 16.0),
+                    )
+                };
+
+                gfx.draw_subimage(&resources.hirsch, sub_rect, rect);
+
+                /*gfx.fill_rect(&rect, Color::RED);
+                gfx.stroke_rect(&rect, Color::BLACK);*/
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
