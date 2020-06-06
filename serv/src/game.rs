@@ -193,11 +193,7 @@ impl Game {
         // Sanity checks
         assert!(!self.state.entities.contains_key(&entity_id));
         if let comn::Entity::Player(entity) = &entity {
-            assert!(self
-                .state
-                .get_player_entity(entity.owner)
-                .unwrap()
-                .is_none());
+            assert!(self.state.get_player_entity(entity.owner).is_none());
         }
 
         self.state.entities.insert(entity_id, entity);
@@ -217,7 +213,7 @@ impl Game {
 
         player.state = PlayerState::Dead;
 
-        if let Some((player_entity_id, _)) = self.state.get_player_entity(player_id).unwrap() {
+        if let Some((player_entity_id, _)) = self.state.get_player_entity(player_id) {
             self.remove_entity(player_entity_id);
         }
     }
