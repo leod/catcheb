@@ -17,14 +17,14 @@ pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
 pub const PLAYER_ACCEL_FACTOR: f32 = 9.0;
 pub const PLAYER_DASH_DURATION: GameTime = 1.5;
 
-pub const BULLET_MOVE_SPEED: f32 = 500.0;
+pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 
 pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 400.0;
-pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
+pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
 

@@ -300,6 +300,9 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                     gfx.set_projection(letterbox * projection);
                     info!("Resizing to {:?}", event.size());
                 }
+                Event::FocusChanged(event) if !event.is_focused() => {
+                    pressed_keys.clear();
+                }
                 _ => (),
             }
         }
