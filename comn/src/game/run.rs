@@ -2,8 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::entities::Bullet;
 use crate::{
-    geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime,
-    Input, PlayerEntity, PlayerId, Vector,
+    geom::{self, AaRect},
+    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Input,
+    PlayerEntity, PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 250.0;
@@ -13,7 +14,7 @@ pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
-pub const PLAYER_ACCEL_FACTOR: f32 = 0.4;
+pub const PLAYER_ACCEL_FACTOR: f32 = 9.0;
 pub const BULLET_MOVE_SPEED: f32 = 500.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
@@ -120,7 +121,7 @@ impl Game {
         input_state: Option<&Game>,
         context: &mut RunContext,
     ) -> GameResult<()> {
-        let delta_s = self.settings.tick_period();
+        let dt = self.settings.tick_period();
         let time = self.current_game_time();
         let input_time = input_state
             .map(|input_state| input_state.current_game_time())
@@ -143,8 +144,13 @@ impl Game {
                 delta.y += 1.0;
             }
 
-            ent.vel += ((delta * PLAYER_MOVE_SPEED) - ent.vel) * PLAYER_ACCEL_FACTOR;
-            ent.pos += ent.vel * delta_s;
+            ent.vel = geom::smooth_to_target_vector(
+                PLAYER_ACCEL_FACTOR,
+                ent.vel,
+                delta * PLAYER_MOVE_SPEED,
+                dt,
+            );
+            ent.pos += ent.vel * dt;
 
             if delta.norm() > 0.0 {
                 ent.angle = Some(delta.y.atan2(delta.x));
