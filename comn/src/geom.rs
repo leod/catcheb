@@ -25,3 +25,13 @@ impl AaRect {
             && point.y <= self.top_left.y + self.size.y
     }
 }
+
+pub fn smooth_to_target_point(factor: f32, start: Point, target: Point, dt: f32) -> Point {
+    // p'(t) = factor * (target - p(t)), p(0) = start
+
+    target - (target - start) * (-factor * dt).exp()
+}
+
+pub fn smooth_to_target_vector(factor: f32, start: Vector, target: Vector, dt: f32) -> Vector {
+    target - (target - start) * (-factor * dt).exp()
+}
