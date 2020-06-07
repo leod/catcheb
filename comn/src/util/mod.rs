@@ -3,6 +3,7 @@ pub mod loss;
 pub mod ping;
 pub mod stats;
 pub mod timer;
+pub mod join;
 
 pub use game_time::GameTimeEstimation;
 pub use loss::LossEstimation;
