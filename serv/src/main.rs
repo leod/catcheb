@@ -76,17 +76,17 @@ async fn main() {
 
     let fake_bad_net_config = Some((
         fake_bad_net::Config {
-            lag_mean: Duration::from_millis(25),
-            lag_std_dev: 5.0,
-            loss: 0.05,
+            lag_mean: Duration::from_millis(125),
+            lag_std_dev: 0.0,
+            loss: 0.00,
         },
         fake_bad_net::Config {
-            lag_mean: Duration::from_millis(50),
-            lag_std_dev: 15.0,
+            lag_mean: Duration::from_millis(125),
+            lag_std_dev: 0.0,
             loss: 0.00,
         },
     ));
-    let fake_bad_net_config = None;
+    //let fake_bad_net_config = None;
 
     let (recv_message_rx, send_message_rx) = if let Some((config_in, config_out)) =
         fake_bad_net_config

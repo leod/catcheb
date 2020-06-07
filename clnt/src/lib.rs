@@ -48,6 +48,7 @@ pub fn main() {
             size: SCREEN_SIZE,
             title: "Play Catcheb",
             resizable: true,
+            log_level: log::Level::Debug,
             ..Settings::default()
         },
         app,

@@ -438,7 +438,7 @@ impl Game {
 
                     received_state
                 } else {
-                    // The states is encoded from scratch.
+                    // The state is encoded from scratch.
                     comn::Game::new(self.settings.clone())
                 };
 
@@ -450,6 +450,11 @@ impl Game {
                             .filter(|(tick_num, _)| *tick_num > cur_tick_num),
                     );
                 }
+
+                info!(
+                    "got delta: {:?} {:?} {:?}",
+                    tick.diff.entities.insert, tick.diff.entities.remove, tick.diff.entities.update,
+                );
 
                 if let Err(e) = tick.diff.apply(&mut new_state) {
                     warn!(
