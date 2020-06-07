@@ -72,20 +72,24 @@ pub struct SignedClientMessage(pub PlayerToken, pub ClientMessage);
 
 impl ServerMessage {
     pub fn serialize(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+        //bincode::serialize(self).unwrap()
+        rmp_serde::to_vec(self).unwrap()
     }
 
     pub fn deserialize(data: &[u8]) -> Option<Self> {
-        bincode::deserialize(data).ok()
+        //bincode::deserialize(data).ok()
+        rmp_serde::from_read_ref(data).ok()
     }
 }
 
 impl SignedClientMessage {
     pub fn serialize(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+        //bincode::serialize(self).unwrap()
+        rmp_serde::to_vec(self).unwrap()
     }
 
     pub fn deserialize(data: &[u8]) -> Option<Self> {
-        bincode::deserialize(data).ok()
+        //bincode::deserialize(data).ok()
+        rmp_serde::from_read_ref(data).ok()
     }
 }
