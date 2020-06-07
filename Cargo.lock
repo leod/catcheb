@@ -160,6 +160,7 @@ dependencies = [
  "gilrs",
  "glow",
  "glutin",
+ "image",
  "mint",
  "rustc-hash",
  "wasm-bindgen",
@@ -265,6 +266,7 @@ dependencies = [
  "js-sys",
  "log",
  "mint",
+ "pareen",
  "quicksilver",
  "serde",
  "serde_derive",
@@ -1414,6 +1416,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pareen"
+version = "0.2.3"
+source = "git+https://github.com/leod/pareen.git#d8c5442d202f14abaf562bd51353d4d42206eb68"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "parking_lot"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1570,9 +1580,9 @@ checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quicksilver"
-version = "0.4.0-alpha0.3"
+version = "0.4.0-alpha0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d074a1363ecf8bf115321235310857ca5f23928ff253fb48a3fa20f2c1b43e4"
+checksum = "eb205a4429c2ca003455a9fa3edabd570cc6bdb136ff63cb364dc591564b8a33"
 dependencies = [
  "blinds",
  "bytemuck",
