@@ -85,6 +85,7 @@ async fn service(
         }
         (&Method::GET, "/Munro-2LYe.ttf") => send_file(config, "Munro-2LYe.ttf", "font/ttf").await,
         (&Method::GET, "/kongtext.ttf") => send_file(config, "kongtext.ttf", "font/ttf").await,
+        (&Method::GET, "/hirsch.png") => send_file(config, "hirsch.png", "image/png").await,
 
         // Establish a WebRTC connection
         (&Method::POST, "/connect_webrtc") => {

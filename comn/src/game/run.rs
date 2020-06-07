@@ -2,8 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::entities::Bullet;
 use crate::{
-    geom::AaRect, DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime,
-    Input, PlayerEntity, PlayerId, Vector,
+    geom::{self, AaRect},
+    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Input,
+    PlayerEntity, PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 250.0;
@@ -13,16 +14,19 @@ pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
-pub const PLAYER_ACCEL_FACTOR: f32 = 0.4;
-pub const BULLET_MOVE_SPEED: f32 = 500.0;
+pub const PLAYER_ACCEL_FACTOR: f32 = 9.0;
+pub const PLAYER_DASH_DURATION: GameTime = 1.5;
+
+pub const BULLET_MOVE_SPEED: f32 = 300.0;
+pub const BULLET_RADIUS: f32 = 8.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
+
 pub const TURRET_RADIUS: f32 = 30.0;
-pub const TURRET_RANGE: f32 = 250.0;
-pub const TURRET_SHOOT_PERIOD: GameTime = 0.7;
+pub const TURRET_RANGE: f32 = 400.0;
+pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
-pub const BULLET_RADIUS: f32 = 8.0;
-pub const MAX_TURRET_TURN_SPEED: f32 = 2.0;
+pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -89,8 +93,8 @@ impl Game {
                         let angle_dist = ((target_angle - turret.angle).sin())
                             .atan2((target_angle - turret.angle).cos());
                         turret.angle += angle_dist * 0.1;
-                        //.min(MAX_TURRET_TURN_SPEED * tick_period)
-                        //.max(-MAX_TURRET_TURN_SPEED * tick_period);
+                        //.min(TURRET_MAX_TURN_SPEED * tick_period)
+                        //.max(TURRET_MAX_TURN_SPEED * tick_period);
 
                         if time >= turret.next_shot_time && angle_dist.abs() < TURRET_SHOOT_ANGLE {
                             turret.next_shot_time = time + TURRET_SHOOT_PERIOD;
@@ -120,14 +124,14 @@ impl Game {
         input_state: Option<&Game>,
         context: &mut RunContext,
     ) -> GameResult<()> {
-        let delta_s = self.settings.tick_period();
+        let dt = self.settings.tick_period();
         let time = self.current_game_time();
         let input_time = input_state
             .map(|input_state| input_state.current_game_time())
             .unwrap_or(time);
         let map_size = self.settings.size;
 
-        if let Some((_entity_id, ent)) = self.get_player_entity_mut(player_id)? {
+        if let Some((_entity_id, ent)) = self.get_player_entity_mut(player_id) {
             let mut delta = Vector::new(0.0, 0.0);
 
             if input.move_left {
@@ -143,14 +147,13 @@ impl Game {
                 delta.y += 1.0;
             }
 
-            let delta = if delta.norm() > 0.0 {
-                delta.normalize()
-            } else {
-                Vector::zeros()
-            };
-
-            ent.vel += (delta * PLAYER_MOVE_SPEED - ent.vel) * PLAYER_ACCEL_FACTOR;
-            ent.pos += ent.vel * delta_s;
+            ent.vel = geom::smooth_to_target_vector(
+                PLAYER_ACCEL_FACTOR,
+                ent.vel,
+                delta.normalize() * PLAYER_MOVE_SPEED,
+                dt,
+            );
+            ent.pos += ent.vel * dt;
 
             if delta.norm() > 0.0 {
                 ent.angle = Some(delta.y.atan2(delta.x));
@@ -231,12 +234,8 @@ impl Game {
             .ok_or_else(|| GameError::InvalidEntityId(entity_id))
     }
 
-    pub fn get_player_entity(
-        &self,
-        player_id: PlayerId,
-    ) -> GameResult<Option<(EntityId, &PlayerEntity)>> {
-        Ok(self
-            .entities
+    pub fn get_player_entity(&self, player_id: PlayerId) -> Option<(EntityId, &PlayerEntity)> {
+        self.entities
             .iter()
             .filter_map(|(&id, e)| {
                 if let Entity::Player(ref e) = e {
@@ -249,15 +248,14 @@ impl Game {
                     None
                 }
             })
-            .next())
+            .next()
     }
 
     pub fn get_player_entity_mut(
         &mut self,
         player_id: PlayerId,
-    ) -> GameResult<Option<(EntityId, &mut PlayerEntity)>> {
-        Ok(self
-            .entities
+    ) -> Option<(EntityId, &mut PlayerEntity)> {
+        self.entities
             .iter_mut()
             .filter_map(|(&id, e)| {
                 if let Entity::Player(ref mut e) = e {
@@ -270,6 +268,6 @@ impl Game {
                     None
                 }
             })
-            .next())
+            .next()
     }
 }
