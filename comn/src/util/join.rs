@@ -1,9 +1,6 @@
 use std::iter::Peekable;
 
-pub fn full_join<Left, Right, K, T, U>(
-    left: Left,
-    right: Right,
-) -> FullJoinIter<Left, Right>
+pub fn full_join<Left, Right, K, T, U>(left: Left, right: Right) -> FullJoinIter<Left, Right>
 where
     Left: Iterator<Item = (K, T)>,
     Right: Iterator<Item = (K, U)>,
@@ -49,20 +46,18 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         // Advance the iterator which has the element with the smaller key.
         match (self.left.peek(), self.right.peek()) {
-            (Some((left_k, _)), Some((right_k, _))) => {
-                Some(if left_k < right_k {
-                    let (left_k, left_v) = self.left.next().unwrap();
-                    Item::Left(left_k, left_v)
-                } else if left_k > right_k {
-                    let (right_k, right_v) = self.right.next().unwrap();
-                    Item::Right(right_k, right_v)
-                } else {
-                    let (left_k, left_v) = self.left.next().unwrap();
-                    let (right_k, right_v) = self.right.next().unwrap();
-                    assert!(left_k == right_k);
-                    Item::Both(left_k, left_v, right_v)
-                })
-            }
+            (Some((left_k, _)), Some((right_k, _))) => Some(if left_k < right_k {
+                let (left_k, left_v) = self.left.next().unwrap();
+                Item::Left(left_k, left_v)
+            } else if left_k > right_k {
+                let (right_k, right_v) = self.right.next().unwrap();
+                Item::Right(right_k, right_v)
+            } else {
+                let (left_k, left_v) = self.left.next().unwrap();
+                let (right_k, right_v) = self.right.next().unwrap();
+                assert!(left_k == right_k);
+                Item::Both(left_k, left_v, right_v)
+            }),
             (Some(_), None) => {
                 let (left_k, left_v) = self.left.next().unwrap();
                 Some(Item::Left(left_k, left_v))
@@ -71,10 +66,7 @@ where
                 let (right_k, right_v) = self.right.next().unwrap();
                 Some(Item::Right(right_k, right_v))
             }
-            (None, None) => {
-                None
-            }
+            (None, None) => None,
         }
     }
 }
-

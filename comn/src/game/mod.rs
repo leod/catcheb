@@ -9,7 +9,11 @@ use nalgebra as na;
 
 use entities::{DangerGuy, Turret};
 
-use crate::{geom, GameTime};
+use crate::{
+    geom,
+    util::diff::{ApplyError, BTreeMapDiff, Diff, Diffable},
+    GameTime,
+};
 
 pub use entities::Entity;
 pub use run::RunContext;
@@ -128,18 +132,20 @@ pub enum Event {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PlayerState {
     Alive,
     Dead,
     Respawning { respawn_time: GameTime },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Player {
     pub name: String,
     pub state: PlayerState,
 }
+
+impl_opaque_diff!(Player);
 
 pub type PlayerMap = BTreeMap<PlayerId, Player>;
 pub type EntityMap = BTreeMap<EntityId, Entity>;
@@ -226,4 +232,31 @@ pub struct Tick {
     pub state: Game,
     pub events: Vec<Event>,
     pub your_last_input: Option<TickNum>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameDiff {
+    pub players: BTreeMapDiff<PlayerId, Player>,
+    pub entities: BTreeMapDiff<EntityId, Entity>,
+}
+
+impl Diffable for Game {
+    type Diff = GameDiff;
+
+    fn diff(&self, other: &Self) -> Self::Diff {
+        Self::Diff {
+            players: self.players.diff(&other.players),
+            entities: self.entities.diff(&other.entities),
+        }
+    }
+}
+
+impl Diff for GameDiff {
+    type Value = Game;
+
+    fn apply(self, value: &mut Self::Value) -> std::result::Result<(), ApplyError> {
+        self.players.apply(&mut value.players)?;
+        self.entities.apply(&mut value.entities)?;
+        Ok(())
+    }
 }

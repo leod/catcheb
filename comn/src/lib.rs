@@ -1,9 +1,10 @@
 // Needed for pareen stuff
 #![type_length_limit = "600000000"]
 
+#[macro_use]
+pub mod util;
 pub mod game;
 pub mod geom;
-pub mod util;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
