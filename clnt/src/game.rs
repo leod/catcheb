@@ -358,21 +358,25 @@ impl Game {
                 }
             }
             comn::ServerMessage::Tick(tick) => {
+                // Keep some statistics for debugging...
                 self.stats
                     .loss
                     .record_received(tick.state.tick_num.0 as usize);
-
-                let recv_game_time = tick.state.current_game_time();
-
-                // Keep some statistics for debugging...
                 if let Some(my_last_input) = tick.your_last_input.as_ref() {
                     self.stats
                         .input_delay
                         .record((tick.state.tick_num.0 - my_last_input.0) as f32 - 1.0);
                 }
+
                 if !self.received_ticks.contains_key(&tick.state.tick_num) {
                     self.stats.received_ticks.record(1.0);
                 }
+
+                // Let the server know which ticks we actually received, so
+                // that this can be used as the basis for delta encoding.
+                self.send(comn::ClientMessage::AckTick(tick.state.tick_num));
+
+                let recv_game_time = tick.state.current_game_time();
 
                 if recv_game_time < self.interp_game_time {
                     debug!(

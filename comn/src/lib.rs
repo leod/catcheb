@@ -63,6 +63,7 @@ pub enum ClientMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
     Input(Vec<(TickNum, Input)>),
+    AckTick(TickNum),
 }
 
 pub const MAX_INPUTS_PER_MESSAGE: usize = 5;

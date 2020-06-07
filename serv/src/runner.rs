@@ -34,6 +34,7 @@ pub struct Player {
     pub last_input: Option<(comn::TickNum, comn::Input)>,
     pub inputs: Vec<(comn::TickNum, comn::Input)>,
     pub recv_input_time: GameTimeEstimation,
+    pub last_ack_tick: Option<comn::TickNum>,
 }
 
 impl Player {
@@ -46,6 +47,7 @@ impl Player {
             last_input: None,
             inputs: Vec::new(),
             recv_input_time: GameTimeEstimation::new(input_period),
+            last_ack_tick: None,
         }
     }
 }
@@ -416,6 +418,23 @@ impl Runner {
                                 game.tick_game_time(tick_num),
                             );
                         }
+                    }
+                }
+                comn::ClientMessage::AckTick(tick_num) => {
+                    let game = &self.games[&player.game_id].state();
+
+                    if tick_num > game.tick_num {
+                        warn!(
+                            "Received AckTick from {:?} which is ahead of us ({:?} vs {:?}), ignoring",
+                            message.0,
+                            game.tick_num,
+                            tick_num,
+                        );
+                    } else if player
+                        .last_ack_tick
+                        .map_or(true, |last_tick_num| tick_num > last_tick_num)
+                    {
+                        player.last_ack_tick = Some(tick_num)
                     }
                 }
             }
