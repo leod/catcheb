@@ -147,10 +147,16 @@ impl Game {
                 delta.y += 1.0;
             }
 
+            let delta = if delta.norm() > 0.0 {
+                delta.normalize()
+            } else {
+                delta
+            };
+
             ent.vel = geom::smooth_to_target_vector(
                 PLAYER_ACCEL_FACTOR,
                 ent.vel,
-                delta.normalize() * PLAYER_MOVE_SPEED,
+                delta * PLAYER_MOVE_SPEED,
                 dt,
             );
             ent.pos += ent.vel * dt;
