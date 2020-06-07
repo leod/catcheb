@@ -208,23 +208,21 @@ impl Game {
         // Iterate over all the ticks that we have crossed, also including
         // those for which we did not anything from the server.
         let mut events = Vec::new();
-        let mut last_server_state_num = None;
 
-        // TODO: Limit number of ticks to cross, and inputs to send per update
         for tick_num in crossed_tick_nums.iter() {
+            // For debugging, keep track of how many ticks we do not
+            // receive server data on time.
             if let Some(_) = self.received_states.get(tick_num) {
-                last_server_state_num = Some(*tick_num);
-
-                // For debugging, keep track of how many ticks we do not
-                // receive server data on time.
                 self.stats.skip_loss.record_received(tick_num.0 as usize);
             }
 
+            // Start server events of crossed ticks.
             if let Some(tick_events) = self.received_events.get(tick_num) {
                 events.extend(tick_events.clone().into_iter());
                 self.received_events.remove(tick_num);
             }
 
+            // Send inputs for server ticks we cross.
             self.last_inputs.push_back((*tick_num, input.clone()));
             while self.last_inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
                 self.last_inputs.pop_front();
@@ -234,6 +232,7 @@ impl Game {
                 self.last_inputs.iter().cloned().collect(),
             ));
 
+            // Predict effects of our own input locally.
             if let Some(prediction) = self.prediction.as_mut() {
                 prediction.record_tick_input(
                     *tick_num,
@@ -243,14 +242,10 @@ impl Game {
             }
         }
 
-        if let Some(last_server_state_num) = last_server_state_num {
-            if self.next_tick_num.map_or(false, |next_tick_num| {
-                next_tick_num <= last_server_state_num
-            }) {
-                // We have reached the tick that we were interpolating into, so
-                // we'll need to look for the next interpolation target.
-                self.next_tick_num = None;
-            }
+        if self.next_tick_num <= Some(self.tick_num()) {
+            // We have reached the tick that we were interpolating into, so
+            // we'll need to look for the next interpolation target.
+            self.next_tick_num = None;
         }
 
         // Do we have a tick to interpolate into ready?
