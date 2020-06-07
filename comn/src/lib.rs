@@ -1,3 +1,6 @@
+// Needed for pareen stuff
+#![type_length_limit = "600000000"]
+
 pub mod game;
 pub mod geom;
 pub mod util;
