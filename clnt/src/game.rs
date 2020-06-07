@@ -168,7 +168,7 @@ impl Game {
             0.0
         };
 
-        // lOok at all the intermediate ticks. We will have one of the
+        // Look at all the intermediate ticks. We will have one of the
         // following cases:
         //
         // 1. In this update call, the tick number did not change, so

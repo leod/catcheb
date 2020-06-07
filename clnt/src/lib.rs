@@ -1,20 +1,31 @@
+mod camera;
 mod event_list;
 mod game;
+mod join;
 mod prediction;
 mod webrtc;
 
 use std::collections::{BTreeMap, HashSet};
 
-use instant::Instant;
-use log::{info, warn};
+use wasm_bindgen::prelude::wasm_bindgen;
 
-use wasm_bindgen::{prelude::*, JsCast};
-use wasm_bindgen_futures::JsFuture;
+use instant::Instant;
+use log::info;
 
 use quicksilver::{
     geom::{Circle, Rectangle, Transform, Vector},
-    graphics::{Color, FontRenderer, Graphics, VectorFont},
-    lifecycle::{run, Event, EventStream, Key, Settings, Window},
+    golem::TextureFilter,
+    graphics::{
+        //blend::{BlendEquation, BlendFunction, BlendMode, BlendOperation, BlendFactor, BlendChannel, BlendInput},
+        Color,
+        FontRenderer,
+        Graphics,
+        Image,
+        ResizeHandler,
+        VectorFont,
+    },
+    input::{Event, Input, Key},
+    Settings, Window,
 };
 
 use comn::{
@@ -25,16 +36,18 @@ use comn::{
     util::stats,
 };
 
+const SCREEN_SIZE: Vector = Vector { x: 800.0, y: 600.0 };
+
 #[wasm_bindgen(start)]
 pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
 
-    run(
+    quicksilver::run(
         Settings {
-            size: Vector::new(800.0, 600.0).into(),
-            fullscreen: true,
+            size: SCREEN_SIZE,
             title: "Play Catcheb",
+            resizable: true,
             ..Settings::default()
         },
         app,
@@ -57,6 +70,7 @@ pub struct Resources {
     pub font_small: FontRenderer,
     pub font: FontRenderer,
     pub font_large: FontRenderer,
+    pub hirsch: Image,
 }
 
 impl Resources {
@@ -65,12 +79,16 @@ impl Resources {
         let font_small = ttf.to_renderer(gfx, 9.0)?;
         let font = ttf.to_renderer(gfx, 18.0)?;
         let font_large = ttf.to_renderer(gfx, 40.0)?;
+        let hirsch = Image::load(gfx, "hirsch.png").await?;
+        hirsch.set_magnification(TextureFilter::Nearest)?;
+        hirsch.set_minification(TextureFilter::Nearest)?;
 
         Ok(Self {
             ttf,
             font_small,
             font,
             font_large,
+            hirsch,
         })
     }
 }
@@ -82,26 +100,50 @@ pub fn render_game(
     next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
     time: comn::GameTime,
     my_player_id: comn::PlayerId,
+    camera_transform: Transform,
 ) -> quicksilver::Result<()> {
-    gfx.clear(Color::WHITE);
-
     let state_time = state.tick_game_time(state.tick_num);
 
-    for (_, entity) in state.entities.iter() {
-        match entity {
-            comn::Entity::Turret(turret) => {
-                let origin: mint::Vector2<f32> = turret.pos.coords.into();
-                let circle = Circle::new(origin, TURRET_RANGE);
-                gfx.fill_circle(&circle, Color::from_rgba(255, 204, 203, 1.0));
-            }
-            _ => (),
-        }
+    {
+        gfx.set_transform(camera_transform);
+        let map_size: mint::Vector2<f32> = state.settings.size.into();
+        let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
+        gfx.fill_rect(&map_rect, Color::from_rgba(142, 182, 155, 1.0));
+        gfx.stroke_rect(&map_rect, Color::BLACK);
     }
 
-    /*let screen_rect = Rectangle::new(
-        Vector::new(0.0, 0.0),
-        state.settings.size.into(),
-    );*/
+    {
+        /*gfx.set_blend_mode(Some(BlendMode {
+            equation: BlendEquation::Same(BlendOperation::Add),
+            function: BlendFunction::Same {
+                source: BlendFactor::Color {
+                    input: BlendInput::Source,
+                    channel: BlendChannel::Alpha,
+                    is_inverse: false,
+                },
+                destination: BlendFactor::Color {
+                    input: BlendInput::Source,
+                    channel: BlendChannel::Alpha,
+                    is_inverse: true,
+                },
+            },
+            ..BlendMode::default()
+        }));*/
+
+        /*for (_, entity) in state.entities.iter() {
+            match entity {
+                comn::Entity::Turret(turret) => {
+                    let origin: mint::Vector2<f32> = turret.pos.coords.into();
+                    let circle = Circle::new(origin.into(), TURRET_RANGE);
+                    gfx.set_transform(camera_transform);
+                    gfx.stroke_circle(&circle, Color::from_rgba(255, 0, 0, 1.0));
+                }
+                _ => (),
+            }
+        }*/
+
+        gfx.set_blend_mode(Some(Default::default()));
+    }
 
     for (entity_id, entity) in state.entities.iter() {
         match entity {
@@ -121,66 +163,110 @@ pub fn render_game(
                 let pos: mint::Vector2<f32> = pos.into();
 
                 let angle: Option<f32> = None; //player.angle
-                let size = if let Some(angle) = angle {
-                    gfx.set_transform(
-                        Transform::rotate(angle.to_degrees()).then(Transform::translate(pos)),
-                    );
-                    Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L)
+                let (transform, size) = if let Some(angle) = angle {
+                    (
+                        Transform::rotate(angle.to_degrees())
+                            .then(Transform::translate(pos.into())),
+                        Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
+                    )
                 } else {
-                    gfx.set_transform(Transform::translate(pos));
-                    Vector::new(PLAYER_SIT_W, PLAYER_SIT_L)
+                    (
+                        Transform::translate(pos.into()),
+                        Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
+                    )
                 };
                 let rect = Rectangle::new(-size / 2.0, size);
 
                 let color = if player.owner == my_player_id {
-                    Color::GREEN
-                } else {
                     Color::BLUE
+                } else {
+                    Color::from_rgba(148, 0, 211, 1.0)
                 };
 
+                gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);
-                //gfx.stroke_rect(&rect, Color::GREEN);
+                gfx.stroke_rect(&rect, Color::BLACK);
 
-                gfx.set_transform(Transform::IDENTITY);
+                gfx.set_transform(camera_transform);
                 resources
                     .font
-                    .draw(gfx, &player.owner.0.to_string(), Color::BLACK, pos.into())?;
+                    .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;
             }
             comn::Entity::DangerGuy(danger_guy) => {
                 let origin: mint::Vector2<f32> =
                     (danger_guy.pos(time) - danger_guy.size / 2.0).coords.into();
                 let size: mint::Vector2<f32> = danger_guy.size.into();
-                let rect = Rectangle::new(origin, size);
-                gfx.fill_rect(&rect, Color::RED);
+                let rect = Rectangle::new(origin.into(), size.into());
+                gfx.set_transform(camera_transform);
+
+                let frame = pareen::constant(0)
+                    .switch(danger_guy.wait_time - 0.6, 1)
+                    .switch(danger_guy.wait_time - 0.4, 2)
+                    .switch(danger_guy.wait_time - 0.2, 3)
+                    .seq(
+                        danger_guy.wait_time,
+                        pareen::fun(|tau| 3 + (tau * danger_guy.speed / 40.0) as usize % 4),
+                    )
+                    .repeat(danger_guy.period() / 2.0)
+                    .eval(danger_guy.tau(time)) as f32;
+
+                let flip = danger_guy
+                    .dir(time)
+                    .normalize()
+                    .dot(&comn::Vector::new(1.0, 0.0))
+                    > 0.7;
+                let sub_rect = if flip {
+                    Rectangle::new(
+                        Vector::new(17.0, 16.0 * frame + 1.0),
+                        Vector::new(-16.0, 16.0),
+                    )
+                } else {
+                    Rectangle::new(
+                        Vector::new(1.0, 16.0 * frame + 1.0),
+                        Vector::new(16.0, 16.0),
+                    )
+                };
+
+                gfx.draw_subimage(&resources.hirsch, sub_rect, rect);
+
+                /*gfx.fill_rect(&rect, Color::RED);
+                gfx.stroke_rect(&rect, Color::BLACK);*/
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
-                let circle = Circle::new(origin, BULLET_RADIUS);
+                let circle = Circle::new(origin.into(), BULLET_RADIUS);
                 let color = if bullet.owner == Some(my_player_id) {
                     Color::ORANGE
                 } else {
                     Color::MAGENTA
                 };
+                gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, color);
+                gfx.stroke_circle(&circle, Color::BLACK);
             }
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
-                let circle = Circle::new(origin, TURRET_RADIUS);
+                let circle = Circle::new(origin.into(), TURRET_RADIUS);
+                gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
+                gfx.stroke_circle(&circle, Color::BLACK);
 
                 let angle = turret.angle;
 
                 gfx.set_transform(
-                    Transform::rotate(angle.to_degrees()).then(Transform::translate(origin)),
+                    Transform::rotate(angle.to_degrees())
+                        .then(Transform::translate(origin.into()))
+                        .then(camera_transform),
                 );
 
                 let rect = Rectangle::new(Vector::new(0.0, -5.0), Vector::new(40.0, 10.0));
 
                 gfx.fill_rect(&rect, Color::BLACK);
-                gfx.set_transform(Transform::IDENTITY);
             }
         }
     }
+
+    gfx.set_transform(Transform::IDENTITY);
 
     Ok(())
 }
@@ -195,58 +281,36 @@ struct Stats {
 #[derive(Debug, Clone, Default)]
 struct Config {
     event_list: event_list::Config,
+    camera: camera::Config,
 }
 
-async fn app(
-    window: Window,
-    mut gfx: Graphics,
-    mut events: EventStream,
-) -> quicksilver::Result<()> {
+async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver::Result<()> {
     info!("Starting up");
 
     let config = Config::default();
     let mut resources = Resources::load(&mut gfx).await?;
 
     // TODO: Graceful error handling in client
-    let join_reply = join_request(comn::JoinRequest {
-        game_id: None,
-        player_name: "Pioneer".to_string(),
-    })
+    let mut game = join::join_and_connect(
+        comn::JoinRequest {
+            game_id: None,
+            player_name: "Pioneer".to_string(),
+        },
+        &mut input,
+    )
     .await
     .unwrap();
 
-    // TODO: Graceful error handling in client
-    let join_success = join_reply.expect("Failed to join game");
-
-    // TODO: Graceful error handling in client
-    let my_token = join_success.your_token;
-    let on_message = Box::new(
-        move |client_data: &webrtc::Data, message: &comn::ServerMessage| {
-            on_message(my_token, client_data, message)
-        },
-    );
-    let webrtc_client = webrtc::Client::connect(Default::default(), on_message)
-        .await
-        .unwrap();
-
-    while webrtc_client.status() == webrtc::Status::Connecting {
-        info!("waiting...");
-        webrtc_client.debug_ready_state();
-        events.next_event().await;
-    }
-
-    if webrtc_client.status() != webrtc::Status::Open {
-        // TODO: Graceful error handling in client
-        panic!(
-            "Failed to establish WebRTC connection: {:?}",
-            webrtc_client.status()
-        );
-    }
-
-    let mut game = game::Game::new(join_success, webrtc_client);
-
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
+
+    let mut camera = camera::Camera::new(config.camera, game.settings().size);
+    let resize_handler = ResizeHandler::Fit {
+        aspect_width: 4.0,
+        aspect_height: 3.0,
+    };
+    let screen = Rectangle::new_sized(SCREEN_SIZE);
+    let projection = Transform::orthographic(screen);
 
     let mut event_list = event_list::EventList::new(config.event_list);
 
@@ -254,7 +318,7 @@ async fn app(
     let mut show_stats = false;
 
     loop {
-        while let Some(event) = events.next_event().await {
+        while let Some(event) = input.next_event().await {
             match event {
                 Event::KeyboardInput(event) => {
                     if !pressed_keys.contains(&event.key()) {
@@ -268,6 +332,14 @@ async fn app(
                     } else {
                         pressed_keys.remove(&event.key());
                     }
+                }
+                Event::Resized(event) => {
+                    let letterbox = resize_handler.projection(event.size());
+                    gfx.set_projection(letterbox * projection);
+                    info!("Resizing to {:?}", event.size());
+                }
+                Event::FocusChanged(event) if !event.is_focused() => {
+                    pressed_keys.clear();
                 }
                 _ => (),
             }
@@ -288,6 +360,24 @@ async fn app(
             event_list.push(event);
         }
 
+        {
+            let follow_entity = game.state().and_then(|state| {
+                state
+                    .get_player_entity(game.my_player_id())
+                    .map(|(_id, e)| comn::Entity::Player(e.clone()))
+            });
+            camera.update(
+                dt,
+                &pressed_keys,
+                follow_entity,
+                game.interp_game_time(),
+                comn::Vector::new(window.size().x, window.size().y) * window.scale_factor(),
+            );
+        }
+
+        gfx.clear(Color::BLACK);
+        gfx.fill_rect(&screen, Color::WHITE);
+
         if let Some(state) = game.state() {
             render_game(
                 &mut gfx,
@@ -296,6 +386,7 @@ async fn app(
                 &game.next_entities(),
                 game.interp_game_time(),
                 game.my_player_id(),
+                camera.transform(),
             )?;
         }
 
@@ -308,12 +399,7 @@ async fn app(
             Ok(())
         };
 
-        debug(&format!(
-            "ping:         {:>3.1}",
-            game.ping().estimate().as_secs_f32() * 1000.0
-        ))?;
-
-        if let Some((_, my_entity)) = game
+        /*if let Some((_, my_entity)) = game
             .state()
             .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
         {
@@ -324,58 +410,55 @@ async fn app(
             // lol
             debug("")?;
             debug("")?;
-        }
+        }*/
 
         if show_stats {
-            for _ in 0..33 {
+            for _ in 0..34 {
                 debug("")?;
             }
+
             debug(&format!(
-                "recv std dev:         {:>7.3}",
+                "ping:               {:>7.3}",
+                game.ping().estimate().as_secs_f32() * 1000.0
+            ))?;
+            debug(&format!(
+                "recv stddev:        {:>7.3}",
                 1000.0 * game.stats().recv_delay_std_dev,
             ))?;
             debug(&format!(
-                "loss (%):             {:>7.3}",
+                "loss (%):           {:>7.3}",
                 game.stats().loss.estimate().map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
-                "skip loss (%):        {:>7.3}",
+                "skip loss (%):      {:>7.3}",
                 game.stats()
                     .skip_loss
                     .estimate()
                     .map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
-                "recv rate (kB/s):     {:>7.3}",
+                "recv rate (kB/s):   {:>7.3}",
                 game.stats().recv_rate / 1000.0
             ))?;
             debug(&format!(
-                "send rate (kB/s):     {:>7.3}",
+                "send rate (kB/s):   {:>7.3}",
                 game.stats().send_rate / 1000.0
             ))?;
             debug("")?;
-            debug(&format!("dt (ms):             {}", stats.dt_ms))?;
-            debug(&format!("frame (ms):          {}", stats.frame_ms))?;
+            debug("                        cur      min      max     mean   stddev")?;
+            debug(&format!("dt (ms):           {}", stats.dt_ms))?;
+            debug(&format!("frame (ms):        {}", stats.frame_ms))?;
+            debug(&format!("time lag (ms):     {}", game.stats().time_lag_ms))?;
             debug(&format!(
-                "time lag (ms):       {}",
-                game.stats().time_lag_ms
-            ))?;
-            debug(&format!(
-                "time lag dev (ms):   {}",
+                "time lag dev (ms): {}",
                 game.stats().time_lag_deviation_ms
             ))?;
             debug(&format!(
-                "time warp:           {}",
+                "time warp:         {}",
                 game.stats().time_warp_factor
             ))?;
-            debug(&format!(
-                "tick interp:         {}",
-                game.stats().tick_interp
-            ))?;
-            debug(&format!(
-                "input delay:         {}",
-                game.stats().input_delay
-            ))?;
+            debug(&format!("tick interp:       {}", game.stats().tick_interp))?;
+            debug(&format!("input delay:       {}", game.stats().input_delay))?;
         }
 
         event_list.render(
@@ -391,55 +474,5 @@ async fn app(
         stats
             .frame_ms
             .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);
-    }
-}
-
-pub async fn join_request(request: comn::JoinRequest) -> Result<comn::JoinReply, JsValue> {
-    let request_json = format!(
-        "{{\"game_id\":{},\"player_name\":\"{}\"}}",
-        request
-            .game_id
-            .map_or("null".to_owned(), |comn::GameId(id)| "\"".to_owned()
-                + &id.to_string()
-                + "\""),
-        request.player_name,
-    );
-
-    let mut opts = web_sys::RequestInit::new();
-    opts.method("POST");
-    opts.mode(web_sys::RequestMode::SameOrigin);
-    opts.body(Some(&JsValue::from_str(&request_json)));
-
-    info!("Requesting to join game: {} ...", request_json);
-
-    let request = web_sys::Request::new_with_str_and_init(&"/join", &opts)?;
-    request.headers().set("Accept", "application/json")?;
-
-    let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-    assert!(resp_value.is_instance_of::<web_sys::Response>());
-    let resp: web_sys::Response = resp_value.dyn_into().unwrap();
-
-    // Convert this other `Promise` into a rust `Future`.
-    let reply = JsFuture::from(resp.json()?).await?;
-
-    info!("Join reply: {:?}", reply);
-
-    // Use serde to parse the JSON into a struct.
-    Ok(reply.into_serde().unwrap())
-}
-
-pub fn on_message(
-    my_token: comn::PlayerToken,
-    client_data: &webrtc::Data,
-    message: &comn::ServerMessage,
-) {
-    if let comn::ServerMessage::Ping(sequence_num) = message {
-        let reply = comn::ClientMessage::Pong(*sequence_num);
-        let signed_message = comn::SignedClientMessage(my_token, reply);
-        let data = signed_message.serialize();
-        if let Err(err) = client_data.send(&data) {
-            warn!("Failed to send message: {:?}", err);
-        }
     }
 }
