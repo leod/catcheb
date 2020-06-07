@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     net::SocketAddr,
     time::{Duration, Instant},
 };
@@ -13,7 +13,7 @@ use tokio::sync::{
 use uuid::Uuid;
 
 use comn::{
-    util::{stats, GameTimeEstimation, PingEstimation, Timer},
+    util::{diff::Diffable, stats, GameTimeEstimation, PingEstimation, Timer},
     GameTime,
 };
 
@@ -24,17 +24,45 @@ use crate::{
 
 pub const PLAYER_INPUT_BUFFER: usize = 2;
 pub const MAX_PLAYER_INPUT_AGE: f32 = 1.0;
+pub const MAX_DIFF_TICKS: u32 = 50;
 
 #[derive(Debug, Clone)]
 pub struct Player {
+    /// Each player is in exactly one running game.
     pub game_id: comn::GameId,
+
+    /// The player id is unique only in the game.
     pub player_id: comn::PlayerId,
+
+    /// WebRTC peer address.
     pub peer: Option<SocketAddr>,
+
+    /// Ping estimation.
     pub ping: PingEstimation,
+
+    /// The last input that the player executed, if any. We remember this so
+    /// that we can re-execute the input if we do not receive the packet for
+    /// some tick.
     pub last_input: Option<(comn::TickNum, comn::Input)>,
+
+    /// Inputs that we received from this player recently. The TickNum key is
+    /// the tick that the player *saw* while it executed the input. In our
+    /// server time, this tick will be somewhere in the past. Note that we try
+    /// to buffer the inputs slightly (see `PLAYER_INPUT_BUFFER`), so that we
+    /// can try to hide network jitter.
     pub inputs: Vec<(comn::TickNum, comn::Input)>,
+
+    /// We estimate a function which maps from our `GameTime` to the input
+    /// stream `GameTime`. This is used for buffering `inputs`.
     pub recv_input_time: GameTimeEstimation,
+
+    /// Last tick that the player has acknowledged receiving from us. Used as
+    /// the basis for delta encoding.
     pub last_ack_tick: Option<comn::TickNum>,
+
+    /// Last states that we have sent to the player, ordered by the tick number
+    /// ascending.
+    pub last_sent: VecDeque<(Vec<comn::Event>, comn::Game)>,
 }
 
 impl Player {
@@ -48,6 +76,7 @@ impl Player {
             inputs: Vec::new(),
             recv_input_time: GameTimeEstimation::new(input_period),
             last_ack_tick: None,
+            last_sent: VecDeque::new(),
         }
     }
 }
@@ -73,6 +102,7 @@ pub struct Stats {
     pub num_games: stats::Var,
     pub num_inputs_per_player_tick: stats::Var,
     pub input_delay: stats::Var,
+    pub last_sent_len: stats::Var,
 }
 
 pub struct JoinMessage {
@@ -212,7 +242,8 @@ impl Runner {
                     "inputs per game tick: {}",
                     self.stats.num_inputs_per_player_tick
                 );
-                debug!("input delay:          {}", self.stats.input_delay,);
+                debug!("input delay:          {}", self.stats.input_delay);
+                debug!("last sent len:        {}", self.stats.last_sent_len);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -420,21 +451,31 @@ impl Runner {
                         }
                     }
                 }
-                comn::ClientMessage::AckTick(tick_num) => {
+                comn::ClientMessage::AckTick(ack_num) => {
                     let game = &self.games[&player.game_id].state();
 
-                    if tick_num > game.tick_num {
+                    if ack_num > game.tick_num {
                         warn!(
                             "Received AckTick from {:?} which is ahead of us ({:?} vs {:?}), ignoring",
                             message.0,
                             game.tick_num,
-                            tick_num,
+                            ack_num,
                         );
                     } else if player
                         .last_ack_tick
-                        .map_or(true, |last_tick_num| tick_num > last_tick_num)
+                        .map_or(true, |last_ack_num| ack_num > last_ack_num)
                     {
-                        player.last_ack_tick = Some(tick_num)
+                        player.last_ack_tick = Some(ack_num);
+
+                        // We can now forget all the states that are older than
+                        // the one whose acknowledgment we just received.
+                        while player
+                            .last_sent
+                            .front()
+                            .map_or(false, |(_events, state)| state.tick_num < ack_num)
+                        {
+                            player.last_sent.pop_front();
+                        }
                     }
                 }
             }
@@ -453,12 +494,10 @@ impl Runner {
         // Collect player inputs to run.
         for (player_token, player) in self.players.iter_mut() {
             let game = &self.games[&player.game_id].state();
+            let lag = (PLAYER_INPUT_BUFFER as GameTime + 0.5) * game.settings.tick_period();
             let buffered_input_time = player
                 .recv_input_time
-                .estimate(
-                    game.current_game_time()
-                        - (PLAYER_INPUT_BUFFER as GameTime + 0.5) * game.settings.tick_period(),
-                )
+                .estimate(game.current_game_time() - lag)
                 .unwrap_or(0.0);
 
             /*info!(
@@ -471,17 +510,15 @@ impl Runner {
             let mut player_tick_inputs = Vec::new();
             while let Some((oldest_tick_num, oldest_input)) = player.inputs.last().cloned() {
                 if buffered_input_time >= game.tick_game_time(oldest_tick_num) {
+                    self.stats
+                        .input_delay
+                        .record((game.tick_num.0 - oldest_tick_num.0) as f32);
+
                     player_tick_inputs.push((oldest_tick_num, oldest_input));
                     player.inputs.pop();
                 } else {
                     break;
                 }
-            }
-
-            for (input_num, _) in player_tick_inputs.iter() {
-                self.stats
-                    .input_delay
-                    .record((game.tick_num.0 - input_num.0) as f32);
             }
 
             if player_tick_inputs.is_empty() {
@@ -520,15 +557,87 @@ impl Runner {
 
         // Send out tick messages.
         let mut messages = Vec::new();
-        for player in self.players.values() {
+        for (player_token, player) in self.players.iter_mut() {
             if let Some(peer) = player.peer {
-                // TODO: Delta encode tick state.
                 let game = &self.games[&player.game_id];
-                let tick = comn::Tick {
-                    state: game.state.clone(),
-                    events: game.last_events.clone(),
-                    your_last_input: player.last_input.clone().map(|(tick_num, _)| tick_num),
+
+                let mut events = vec![(game.state.tick_num, game.last_events.clone())];
+
+                // Attempt to do delta encoding w.r.t. a previous state if
+                // possible.
+                let (diff_base, diff) = if let (Some(ack_num), Some((_, sent_state))) =
+                    (player.last_ack_tick, player.last_sent.front().as_ref())
+                {
+                    if ack_num == sent_state.tick_num
+                        && ack_num.0 + MAX_DIFF_TICKS > game.state.tick_num.0
+                    {
+                        // Re-send all the events that happened since the base
+                        // tick.
+                        for (sent_events, sent_state) in player.last_sent.iter() {
+                            if !sent_events.is_empty() {
+                                events.push((sent_state.tick_num, sent_events.clone()));
+                            }
+                        }
+
+                        // Okay, we know that the player has acknowledged a tick
+                        // for which we also still have the state. We can use
+                        // this state as the basis for delta encoding.
+                        (Some(ack_num), sent_state.diff(&game.state))
+                    } else {
+                        info!(
+                            "Sending tick {:?} from scratch to {:?} (last ack: {:?})",
+                            game.state.tick_num, player_token, player.last_ack_tick,
+                        );
+                        let base_state = comn::Game::new(game.state.settings.clone());
+                        (None, base_state.diff(&game.state))
+                    }
+                } else {
+                    info!(
+                        "Sending tick {:?} from scratch to {:?} (last ack: {:?})",
+                        game.state.tick_num, player_token, player.last_ack_tick,
+                    );
+                    let base_state = comn::Game::new(game.state.settings.clone());
+                    (None, base_state.diff(&game.state))
                 };
+
+                // Remember the state we're sending, so that we may use it as
+                // the basis for delta encoding in the future (assuming that we
+                // will receive the client's receival acknowledgement).
+                player
+                    .last_sent
+                    .push_back((game.last_events.clone(), game.state.clone()));
+
+                self.stats
+                    .last_sent_len
+                    .record(player.last_sent.len() as f32);
+
+                // Prune the state memory. This should be rarely necessary,
+                // since we already prune states when we receive
+                // acknowledgements.
+                if player.last_sent.len() > MAX_DIFF_TICKS as usize {
+                    warn!(
+                        "Player {:?}'s state memory grew too long ({}), pruning",
+                        player_token,
+                        player.last_sent.len(),
+                    );
+
+                    player.last_sent.pop_front();
+                }
+
+                let tick = comn::Tick {
+                    diff_base,
+                    diff,
+                    events,
+                    your_last_input: player.last_input.clone().map(|(num, _)| num),
+                };
+
+                // FIXME: Here, we will run into a problem as soon as a state
+                // update is larger than the MTU of WebRTC (1200 Bytes, AFAIK).
+                // We'll need to do one of two things:
+                // 1. Make the tick smaller by removing the least important
+                //    updates. For example, remove the oldest events, or the
+                //    entities that are the farthest away.
+                // 2. Implement sending fragmented packets.
 
                 messages.push((peer, comn::ServerMessage::Tick(tick)));
             }

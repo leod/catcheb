@@ -6,9 +6,14 @@ use std::{
 use instant::Instant;
 use log::{debug, info, warn};
 
-use comn::util::{stats, GameTimeEstimation, LossEstimation, PingEstimation};
+use comn::util::{diff::Diff, stats, GameTimeEstimation, LossEstimation, PingEstimation};
 
 use crate::{prediction::Prediction, webrtc};
+
+pub struct ReceivedState {
+    pub game: comn::Game,
+    pub my_last_input: Option<comn::TickNum>,
+}
 
 /// Statistics for debugging.
 #[derive(Default)]
@@ -27,6 +32,7 @@ pub struct Stats {
 }
 
 const MAX_TICKS_PER_UPDATE: usize = 5;
+const KEEP_STATES_BUFFER: u32 = 5;
 
 pub struct Game {
     settings: comn::Settings,
@@ -37,7 +43,8 @@ pub struct Game {
 
     last_inputs: VecDeque<(comn::TickNum, comn::Input)>,
 
-    received_ticks: BTreeMap<comn::TickNum, comn::Tick>,
+    received_states: BTreeMap<comn::TickNum, ReceivedState>,
+    received_events: BTreeMap<comn::TickNum, Vec<comn::Event>>,
     prediction: Option<Prediction>,
 
     interp_game_time: comn::GameTime,
@@ -55,13 +62,15 @@ impl Game {
     pub fn new(join: comn::JoinSuccess, webrtc_client: webrtc::Client) -> Self {
         let prediction = Some(Prediction::new(join.your_player_id));
         let recv_tick_time = GameTimeEstimation::new(join.game_settings.tick_period());
+
         Self {
             settings: join.game_settings,
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
             last_inputs: VecDeque::new(),
-            received_ticks: BTreeMap::new(),
+            received_states: BTreeMap::new(),
+            received_events: BTreeMap::new(),
             prediction,
             interp_game_time: 0.0,
             next_tick_num: None,
@@ -127,7 +136,7 @@ impl Game {
         // This is here so that we stop local time if the server drops or
         // starts lagging heavily.
         let max_tick_num = self
-            .received_ticks
+            .received_states
             .keys()
             .rev()
             .next()
@@ -199,17 +208,21 @@ impl Game {
         // Iterate over all the ticks that we have crossed, also including
         // those for which we did not anything from the server.
         let mut events = Vec::new();
-        let mut last_server_tick_num = None;
+        let mut last_server_state_num = None;
 
         // TODO: Limit number of ticks to cross, and inputs to send per update
         for tick_num in crossed_tick_nums.iter() {
-            if let Some(tick) = self.received_ticks.get(tick_num) {
-                events.extend(tick.events.clone().into_iter());
-                last_server_tick_num = Some(*tick_num);
+            if let Some(_) = self.received_states.get(tick_num) {
+                last_server_state_num = Some(*tick_num);
 
                 // For debugging, keep track of how many ticks we do not
                 // receive server data on time.
                 self.stats.skip_loss.record_received(tick_num.0 as usize);
+            }
+
+            if let Some(tick_events) = self.received_events.get(tick_num) {
+                events.extend(tick_events.clone().into_iter());
+                self.received_events.remove(tick_num);
             }
 
             self.last_inputs.push_back((*tick_num, input.clone()));
@@ -225,16 +238,15 @@ impl Game {
                 prediction.record_tick_input(
                     *tick_num,
                     input.clone(),
-                    self.received_ticks.get(tick_num),
+                    self.received_states.get(tick_num),
                 );
             }
         }
 
-        if let Some(last_server_tick_num) = last_server_tick_num {
-            if self
-                .next_tick_num
-                .map_or(false, |next_tick_num| next_tick_num <= last_server_tick_num)
-            {
+        if let Some(last_server_state_num) = last_server_state_num {
+            if self.next_tick_num.map_or(false, |next_tick_num| {
+                next_tick_num <= last_server_state_num
+            }) {
                 // We have reached the tick that we were interpolating into, so
                 // we'll need to look for the next interpolation target.
                 self.next_tick_num = None;
@@ -243,7 +255,7 @@ impl Game {
 
         // Do we have a tick to interpolate into ready?
         if self.next_tick_num.is_none() {
-            let min_ready_num = self.received_ticks.keys().find(|tick_num| {
+            let min_ready_num = self.received_states.keys().find(|tick_num| {
                 **tick_num > self.tick_num() && tick_num.0 - self.tick_num().0 <= 3
             });
 
@@ -252,16 +264,20 @@ impl Game {
             }
         }
 
-        // Prune received ticks that are no longer needed.
-        let remove_tick_nums: Vec<comn::TickNum> = self
-            .received_ticks
-            .keys()
-            .copied()
-            .filter(|tick_num| *tick_num < self.tick_num())
-            .collect();
+        // Remove events for older ticks, we will no longer need them. Note,
+        // however, that the same cannot be said about the received states,
+        // since we may still need them as the basis for delta decoding.
+        {
+            let remove_tick_nums: Vec<comn::TickNum> = self
+                .received_events
+                .keys()
+                .copied()
+                .filter(|tick_num| *tick_num < self.tick_num())
+                .collect();
 
-        for tick_num in remove_tick_nums {
-            self.received_ticks.remove(&tick_num);
+            for tick_num in remove_tick_nums {
+                self.received_events.remove(&tick_num);
+            }
         }
 
         // Keep some statistics for debugging...
@@ -297,24 +313,24 @@ impl Game {
         } else {
             // TODO: If prediction is disabled, loss in tick packages leads to
             // obvious flickering, since states will be None.
-            self.received_ticks
+            self.received_states
                 .get(&self.tick_num())
-                .map(|tick| &tick.state)
+                .map(|state| &state.game)
         }
     }
 
     pub fn next_entities(&self) -> BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)> {
         let mut entities = BTreeMap::new();
 
-        if let Some((recv_tick_num, recv_tick)) = self
+        if let Some((recv_tick_num, recv_state)) = self
             .next_tick_num
-            .and_then(|key| self.received_ticks.get(&key).map(|value| (key, value)))
+            .and_then(|key| self.received_states.get(&key).map(|value| (key, value)))
         {
             let recv_game_time = self.settings.tick_game_time(recv_tick_num);
 
             entities.extend(
-                recv_tick
-                    .state
+                recv_state
+                    .game
                     .entities
                     .clone()
                     .into_iter()
@@ -358,48 +374,117 @@ impl Game {
                 }
             }
             comn::ServerMessage::Tick(tick) => {
+                let recv_tick_num = tick.diff.tick_num;
+                let recv_game_time = self.settings.tick_game_time(recv_tick_num);
+
                 // Keep some statistics for debugging...
-                self.stats
-                    .loss
-                    .record_received(tick.state.tick_num.0 as usize);
+                self.stats.loss.record_received(recv_tick_num.0 as usize);
                 if let Some(my_last_input) = tick.your_last_input.as_ref() {
                     self.stats
                         .input_delay
-                        .record((tick.state.tick_num.0 - my_last_input.0) as f32 - 1.0);
+                        .record((recv_tick_num.0 - my_last_input.0) as f32 - 1.0);
                 }
-
-                if !self.received_ticks.contains_key(&tick.state.tick_num) {
-                    self.stats.received_ticks.record(1.0);
-                }
-
-                // Let the server know which ticks we actually received, so
-                // that this can be used as the basis for delta encoding.
-                self.send(comn::ClientMessage::AckTick(tick.state.tick_num));
-
-                let recv_game_time = tick.state.current_game_time();
 
                 if recv_game_time < self.interp_game_time {
                     debug!(
                         "Ignoring old tick of time {} vs our interp_game_time={}",
                         recv_game_time, self.interp_game_time,
                     );
-                } else {
-                    if !self.recv_tick_time.has_started() {
-                        // If this is the first tick we have recevied from the server, reset
-                        // to the correct time
-                        self.interp_game_time = recv_game_time;
-
-                        // TODO: Run events?
-
-                        info!("Starting tick stream at recv_game_time={}", recv_game_time);
-                    }
-
-                    self.received_ticks.insert(tick.state.tick_num, tick);
+                    return;
                 }
 
-                let time_since_start = recv_time.duration_since(self.start_time).as_secs_f32();
-                self.recv_tick_time
-                    .record_tick(time_since_start, recv_game_time);
+                if !self.recv_tick_time.has_started() {
+                    // If this is the first tick we have recevied from the server, reset
+                    // to the correct time
+                    self.interp_game_time = recv_game_time;
+
+                    // TODO: Run events?
+
+                    info!("Starting tick stream at recv_game_time={}", recv_game_time);
+                }
+
+                let mut new_state = if let Some(diff_base_num) = tick.diff_base {
+                    // This tick has been delta encoded w.r.t. some tick
+                    // that we have acknowledged receiving.
+                    let received_state = if let Some(received_state) =
+                        self.received_states.get(&diff_base_num)
+                    {
+                        received_state.game.clone()
+                    } else {
+                        // This should only happen if packets are severely
+                        // reordered and delayed.
+                        warn!(
+                            "Received state {:?} encoded w.r.t. tick num {:?}, which we do not have (our oldest is {:?})",
+                            recv_tick_num,
+                            diff_base_num,
+                            self.received_states.keys().next(),
+                        );
+                        return;
+                    };
+
+                    // The fact that we received a tick encoded w.r.t. this
+                    // base, it means that we can forgot any older ticks --
+                    // the server will never again send a new tick encoded
+                    // w.r.t. an older tick.
+                    //
+                    // However, there may still be some packets in transit
+                    // that rely on those older tickets. Thus, we add some
+                    // delta here to keep a few more states around.
+                    let remove_state_nums: Vec<comn::TickNum> = self
+                        .received_states
+                        .keys()
+                        .copied()
+                        .filter(|tick_num| tick_num.0 + KEEP_STATES_BUFFER < diff_base_num.0)
+                        .collect();
+
+                    for tick_num in remove_state_nums {
+                        self.received_states.remove(&tick_num);
+                    }
+
+                    received_state
+                } else {
+                    // The states is encoded from scratch.
+                    comn::Game::new(self.settings.clone())
+                };
+
+                {
+                    let cur_tick_num = self.tick_num();
+                    self.received_events.extend(
+                        tick.events
+                            .into_iter()
+                            .filter(|(tick_num, _)| *tick_num > cur_tick_num),
+                    );
+                }
+
+                if let Err(e) = tick.diff.apply(&mut new_state) {
+                    warn!(
+                        "Failed to delta decode tick {:?}, ignoring: {:?}",
+                        recv_tick_num, e
+                    );
+                } else {
+                    // Statistics for debugging...
+                    if !self.received_states.contains_key(&recv_tick_num) {
+                        self.stats.received_ticks.record(1.0);
+                    }
+
+                    self.received_states.insert(
+                        recv_tick_num,
+                        ReceivedState {
+                            game: new_state,
+                            my_last_input: tick.your_last_input,
+                        },
+                    );
+
+                    // Let the server know which ticks we actually received, so
+                    // that this can be used as the basis for delta encoding.
+                    self.send(comn::ClientMessage::AckTick(recv_tick_num));
+
+                    // Keep updating our estimate for when we expect to receive
+                    // ticks. This is an attempt to counter network jitter.
+                    let time_since_start = recv_time.duration_since(self.start_time).as_secs_f32();
+                    self.recv_tick_time
+                        .record_tick(time_since_start, recv_game_time);
+                }
             }
         }
     }
