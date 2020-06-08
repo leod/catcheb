@@ -15,7 +15,10 @@ pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
 pub const PLAYER_ACCEL_FACTOR: f32 = 40.0;
-pub const PLAYER_DASH_DURATION: GameTime = 1.5;
+pub const PLAYER_DASH_COOLDOWN: f32 = 5.0;
+pub const PLAYER_DASH_DURATION: GameTime = 0.45;
+pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
+pub const PLAYER_DASH_SPEED: f32 = 700.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -132,40 +135,60 @@ impl Game {
         let map_size = self.settings.size;
 
         if let Some((_entity_id, ent)) = self.get_player_entity_mut(player_id) {
+            let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
+                input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
+            });
+
+            // TODO: Redundant state needed for display
+            ent.is_dashing = cur_dash.is_some();
+
             let mut delta = Vector::new(0.0, 0.0);
 
-            if input.move_left {
-                delta.x -= 1.0;
-            }
-            if input.move_right {
-                delta.x += 1.0;
-            }
-            if input.move_up {
-                delta.y -= 1.0;
-            }
-            if input.move_down {
-                delta.y += 1.0;
-            }
-
-            let delta = if delta.norm() > 0.0 {
-                delta.normalize()
+            if let Some((_dash_time, dash_dir)) = cur_dash {
+                // Movement is constricted while dashing.
+                let target_vel = dash_dir * PLAYER_DASH_SPEED;
+                ent.vel = geom::smooth_to_target_vector(
+                    PLAYER_DASH_ACCEL_FACTOR,
+                    ent.vel,
+                    target_vel,
+                    dt,
+                );
             } else {
-                delta
-            };
+                // Normal movement when not dashing.
+                if input.move_left {
+                    delta.x -= 1.0;
+                }
+                if input.move_right {
+                    delta.x += 1.0;
+                }
+                if input.move_up {
+                    delta.y -= 1.0;
+                }
+                if input.move_down {
+                    delta.y += 1.0;
+                }
 
-            let target_vel = delta * PLAYER_MOVE_SPEED;
-            ent.vel = geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
-            if (ent.vel - target_vel).norm() < 0.01 {
-                ent.vel = target_vel;
+                delta = if delta.norm() > 0.0 {
+                    delta.normalize()
+                } else {
+                    delta
+                };
+
+                let target_vel = delta * PLAYER_MOVE_SPEED;
+                ent.vel =
+                    geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
+                if (ent.vel - target_vel).norm() < 0.01 {
+                    ent.vel = target_vel;
+                }
             }
 
             ent.pos += ent.vel * dt;
 
-            if delta.norm() > 0.0 {
+            /*if delta.norm() > 0.0 {
                 ent.angle = Some(delta.y.atan2(delta.x));
             } else {
                 ent.angle = None;
-            }
+            }*/
 
             ent.pos.x = ent
                 .pos
@@ -177,6 +200,15 @@ impl Game {
                 .y
                 .min(map_size.y - PLAYER_SIT_W / 2.0)
                 .max(PLAYER_SIT_W / 2.0);
+
+            if input.use_item
+                && ent.last_dash.map_or(true, |(dash_time, _)| {
+                    dash_time + PLAYER_DASH_COOLDOWN <= input_time
+                })
+                && delta.norm() > 0.1
+            {
+                ent.last_dash = Some((input_time, delta));
+            }
 
             /*if input_time >= ent.next_shot_time {
                 if ent.shots_left == 0 {

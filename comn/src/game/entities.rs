@@ -49,7 +49,10 @@ pub struct PlayerEntity {
     pub angle: Option<f32>,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
-    pub last_dash_time: Option<GameTime>,
+    pub last_dash: Option<(GameTime, Vector)>,
+
+    // TODO: Redundant state needed for display
+    pub is_dashing: bool,
 }
 
 impl PlayerEntity {
@@ -61,7 +64,8 @@ impl PlayerEntity {
             angle: Some(0.0),
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
-            last_dash_time: None,
+            last_dash: None,
+            is_dashing: false,
         }
     }
 }

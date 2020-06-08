@@ -163,19 +163,19 @@ pub fn render_game(
                 };
                 let pos: mint::Vector2<f32> = pos.into();
 
-                let angle: Option<f32> = None; //player.angle
-                let (transform, size) = if let Some(angle) = angle {
-                    (
-                        Transform::rotate(angle.to_degrees())
-                            .then(Transform::translate(pos.into())),
-                        Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
-                    )
-                } else {
-                    (
-                        Transform::translate(pos.into()),
-                        Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
-                    )
-                };
+                let (transform, size) =
+                    if let Some((_, dash_dir)) = player.last_dash.filter(|_| player.is_dashing) {
+                        (
+                            Transform::rotate(dash_dir.y.atan2(dash_dir.x).to_degrees())
+                                .then(Transform::translate(pos.into())),
+                            Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
+                        )
+                    } else {
+                        (
+                            Transform::translate(pos.into()),
+                            Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
+                        )
+                    };
                 let rect = Rectangle::new(-size / 2.0, size);
 
                 let color = if player.owner == my_player_id {
