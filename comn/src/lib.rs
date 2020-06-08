@@ -1,9 +1,10 @@
 // Needed for pareen stuff
 #![type_length_limit = "600000000"]
 
+#[macro_use]
+pub mod util;
 pub mod game;
 pub mod geom;
-pub mod util;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -63,6 +64,7 @@ pub enum ClientMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
     Input(Vec<(TickNum, Input)>),
+    AckTick(TickNum),
 }
 
 pub const MAX_INPUTS_PER_MESSAGE: usize = 5;
@@ -72,20 +74,24 @@ pub struct SignedClientMessage(pub PlayerToken, pub ClientMessage);
 
 impl ServerMessage {
     pub fn serialize(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+        //bincode::serialize(self).unwrap()
+        rmp_serde::to_vec(self).unwrap()
     }
 
     pub fn deserialize(data: &[u8]) -> Option<Self> {
-        bincode::deserialize(data).ok()
+        //bincode::deserialize(data).ok()
+        rmp_serde::from_read_ref(data).ok()
     }
 }
 
 impl SignedClientMessage {
     pub fn serialize(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+        //bincode::serialize(self).unwrap()
+        rmp_serde::to_vec(self).unwrap()
     }
 
     pub fn deserialize(data: &[u8]) -> Option<Self> {
-        bincode::deserialize(data).ok()
+        //bincode::deserialize(data).ok()
+        rmp_serde::from_read_ref(data).ok()
     }
 }
