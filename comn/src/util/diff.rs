@@ -95,8 +95,8 @@ macro_rules! impl_opaque_diff {
         impl $crate::util::diff::Diffable for $ty {
             type Diff = $ty;
 
-            fn diff(&self, _: &Self) -> Self::Diff {
-                self.clone()
+            fn diff(&self, new: &Self) -> Self::Diff {
+                new.clone()
             }
         }
 

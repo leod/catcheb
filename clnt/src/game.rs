@@ -451,11 +451,6 @@ impl Game {
                     );
                 }
 
-                info!(
-                    "got delta: {:?} {:?} {:?}",
-                    tick.diff.entities.insert, tick.diff.entities.remove, tick.diff.entities.update,
-                );
-
                 if let Err(e) = tick.diff.apply(&mut new_state) {
                     warn!(
                         "Failed to delta decode tick {:?}, ignoring: {:?}",
