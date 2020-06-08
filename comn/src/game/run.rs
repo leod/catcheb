@@ -14,7 +14,7 @@ pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
-pub const PLAYER_ACCEL_FACTOR: f32 = 9.0;
+pub const PLAYER_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_DURATION: GameTime = 1.5;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
