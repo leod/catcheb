@@ -4,6 +4,8 @@ use log::{info, warn};
 
 use comn::game::RunContext;
 
+use crate::game::ReceivedState;
+
 #[derive(Debug, Clone)]
 struct Record {
     state: comn::Game,
@@ -28,7 +30,7 @@ impl Prediction {
         &mut self,
         tick_num: comn::TickNum,
         my_input: comn::Input,
-        server_state: Option<&comn::Tick>,
+        server_state: Option<&ReceivedState>,
     ) -> Vec<comn::Event> {
         // Let's make as few assumptions as possible regarding consistency
         // in calls to `record_tick_input`.
@@ -52,15 +54,15 @@ impl Prediction {
 
         // If we have a server state for the tick, apply corrections for our
         // previous prediction.
-        if let Some((server_state, my_last_input)) = server_state.and_then(|tick| {
-            tick.your_last_input
-                .as_ref()
-                .map(|my_last_input| (tick, my_last_input))
+        if let Some((server_state, my_last_input)) = server_state.and_then(|server_state| {
+            server_state
+                .my_last_input
+                .map(|input| (server_state, input))
         }) {
-            //info!("got {:?} at {:?}", my_last_input, tick_num);
+            info!("got {:?} at {:?}", my_last_input, tick_num);
 
             if let Some(record) = self.log.get_mut(&my_last_input.next()) {
-                Self::correct_prediction(&mut record.state, &server_state.state);
+                Self::correct_prediction(&mut record.state, &server_state.game);
 
                 // TODO: We should probably remove the redundant tick_num
                 // state within game state.
@@ -73,7 +75,7 @@ impl Prediction {
                 .log
                 .clone()
                 .into_iter()
-                .filter(|&(tick_num, _)| tick_num > *my_last_input)
+                .filter(|&(tick_num, _)| tick_num > my_last_input)
                 .collect();
         }
 
@@ -92,7 +94,7 @@ impl Prediction {
         } else if let Some(server_state) = server_state {
             // Our prediction log is empty, but we have a server state that we
             // can use to start prediction.
-            Some(server_state.state.clone())
+            Some(server_state.game.clone())
         } else {
             // We have no state from which we can start prediction.
             None

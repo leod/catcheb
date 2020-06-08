@@ -6,7 +6,7 @@ use crate::{
     GameError, GameResult, GameTime,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Entity {
     Player(PlayerEntity),
     Bullet(Bullet),
@@ -41,7 +41,7 @@ impl Entity {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
@@ -66,7 +66,7 @@ impl PlayerEntity {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DangerGuy {
     pub start_pos: Point,
     pub end_pos: Point,
@@ -125,7 +125,7 @@ impl DangerGuy {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Bullet {
     pub owner: Option<PlayerId>,
     pub start_time: GameTime,
@@ -143,7 +143,7 @@ impl Bullet {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Turret {
     pub pos: Point,
     pub target: Option<EntityId>,
@@ -157,3 +157,9 @@ impl Turret {
         d.y.atan2(d.x)
     }
 }
+
+impl_opaque_diff!(Entity);
+impl_opaque_diff!(Bullet);
+impl_opaque_diff!(PlayerEntity);
+impl_opaque_diff!(DangerGuy);
+impl_opaque_diff!(Turret);

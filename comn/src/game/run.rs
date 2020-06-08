@@ -153,12 +153,12 @@ impl Game {
                 delta
             };
 
-            ent.vel = geom::smooth_to_target_vector(
-                PLAYER_ACCEL_FACTOR,
-                ent.vel,
-                delta * PLAYER_MOVE_SPEED,
-                dt,
-            );
+            let target_vel = delta * PLAYER_MOVE_SPEED;
+            ent.vel = geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
+            if (ent.vel - target_vel).norm() < 0.01 {
+                ent.vel = target_vel;
+            }
+
             ent.pos += ent.vel * dt;
 
             if delta.norm() > 0.0 {
