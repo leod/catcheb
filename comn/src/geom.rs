@@ -32,8 +32,8 @@ impl AaRect {
             center: self.top_left + self.size / 2.0,
             size: self.size,
             angle,
-            x_axis: self.size.x * Vector::new(angle.cos(), angle.sin()),
-            y_axis: self.size.y * Vector::new(-angle.sin(), angle.cos()),
+            x_edge: self.size.x * Vector::new(angle.cos(), angle.sin()),
+            y_edge: self.size.y * Vector::new(-angle.sin(), angle.cos()),
         }
     }
 
@@ -42,8 +42,8 @@ impl AaRect {
             center: self.top_left + self.size / 2.0,
             size: self.size,
             angle: 0.0,
-            x_axis: Vector::new(self.size.x, 0.0),
-            y_axis: Vector::new(0.0, self.size.y),
+            x_edge: Vector::new(self.size.x, 0.0),
+            y_edge: Vector::new(0.0, self.size.y),
         }
     }
 }
@@ -83,30 +83,30 @@ pub struct Rect {
     pub center: Point,
     pub size: Vector,
     pub angle: f32,
-    pub x_axis: Vector,
-    pub y_axis: Vector,
+    pub x_edge: Vector,
+    pub y_edge: Vector,
 }
 
 impl Rect {
     pub fn iter_points(&self) -> impl Iterator<Item = Point> {
-        once(self.center - self.x_axis / 2.0 - self.y_axis / 2.0)
-            .chain(once(self.center + self.x_axis / 2.0 - self.y_axis / 2.0))
-            .chain(once(self.center - self.x_axis / 2.0 + self.y_axis / 2.0))
-            .chain(once(self.center + self.x_axis / 2.0 + self.y_axis / 2.0))
+        once(self.center - self.x_edge / 2.0 - self.y_edge / 2.0)
+            .chain(once(self.center + self.x_edge / 2.0 - self.y_edge / 2.0))
+            .chain(once(self.center - self.x_edge / 2.0 + self.y_edge / 2.0))
+            .chain(once(self.center + self.x_edge / 2.0 + self.y_edge / 2.0))
     }
 
-    pub fn project_to_axis(&self, axis: Vector) -> AxisProjection {
+    pub fn project_to_edge(&self, edge: Vector) -> AxisProjection {
         use std::cmp::Ordering::Equal;
 
         AxisProjection {
             min: self
                 .iter_points()
-                .map(|p| axis.dot(&p.coords))
+                .map(|p| edge.dot(&p.coords))
                 .min_by(|d1, d2| d1.partial_cmp(d2).unwrap_or(Equal))
                 .unwrap(),
             max: self
                 .iter_points()
-                .map(|p| axis.dot(&p.coords))
+                .map(|p| edge.dot(&p.coords))
                 .max_by(|d1, d2| d1.partial_cmp(d2).unwrap_or(Equal))
                 .unwrap(),
         }
@@ -115,14 +115,15 @@ impl Rect {
 
 pub struct Collision {
     pub resolution_vector: Vector,
+    pub axis: Vector,
 }
 
 pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
-    let axes = once(a.x_axis)
-        .chain(once(a.y_axis))
-        .chain(once(b.x_axis))
-        .chain(once(b.y_axis))
-        .map(|axis| axis.normalize());
+    let edges = once(a.x_edge)
+        .chain(once(a.y_edge))
+        .chain(once(b.x_edge))
+        .chain(once(b.y_edge))
+        .map(|edge| edge.normalize());
 
     let mut intersecting = true;
     let mut will_intersect = true;
@@ -130,10 +131,13 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
     let mut min_interval_distance = std::f32::INFINITY;
     let mut translation_axis = Vector::zeros();
 
-    for axis in axes {
+    for edge in edges {
+        //let axis = Vector::new(-edge.y, edge.x);
+        let axis = edge;
+
         // Are the polygons currently intersecting?
-        let mut a_projection = a.project_to_axis(axis);
-        let b_projection = b.project_to_axis(axis);
+        let mut a_projection = a.project_to_edge(axis);
+        let b_projection = b.project_to_edge(axis);
 
         if a_projection.interval_distance(&b_projection) > 0.0 {
             // By the separating axis theorem, the polygons do not overlap.
@@ -177,6 +181,7 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
     if will_intersect {
         Some(Collision {
             resolution_vector: translation_axis * min_interval_distance,
+            axis: translation_axis,
         })
     } else {
         None
