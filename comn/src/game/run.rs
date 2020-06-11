@@ -127,6 +127,31 @@ impl Game {
         input_state: Option<&Game>,
         context: &mut RunContext,
     ) -> GameResult<()> {
+        if let Some((entity_id, ent)) = self.get_player_entity(player_id) {
+            let mut ent = ent.clone();
+
+            self.run_player_entity_input(
+                player_id,
+                input,
+                input_state,
+                context,
+                &mut ent,
+            )?;
+
+            self.entities.insert(entity_id, Entity::Player(ent));
+        }
+
+        Ok(())
+    }
+
+    pub fn run_player_entity_input(
+        &mut self,
+        player_id: PlayerId,
+        input: &Input,
+        input_state: Option<&Game>,
+        context: &mut RunContext,
+        ent: &mut PlayerEntity,
+    ) -> GameResult<()> {
         let dt = self.settings.tick_period();
         let time = self.current_game_time();
         let input_time = input_state
@@ -134,132 +159,130 @@ impl Game {
             .unwrap_or(time);
         let map_size = self.settings.size;
 
-        if let Some((_entity_id, ent)) = self.get_player_entity_mut(player_id) {
-            let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
-                input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
-            });
+        let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
+            input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
+        });
 
-            // TODO: Redundant state needed for display
-            ent.is_dashing = cur_dash.is_some();
+        // TODO: Redundant state needed for display
+        ent.is_dashing = cur_dash.is_some();
 
-            let mut delta = Vector::new(0.0, 0.0);
+        let mut delta = Vector::new(0.0, 0.0);
 
-            if let Some((_dash_time, dash_dir)) = cur_dash {
-                // Movement is constricted while dashing.
-                let target_vel = dash_dir * PLAYER_DASH_SPEED;
-                ent.vel = geom::smooth_to_target_vector(
-                    PLAYER_DASH_ACCEL_FACTOR,
-                    ent.vel,
-                    target_vel,
-                    dt,
-                );
-            } else {
-                // Normal movement when not dashing.
-                if input.move_left {
-                    delta.x -= 1.0;
-                }
-                if input.move_right {
-                    delta.x += 1.0;
-                }
-                if input.move_up {
-                    delta.y -= 1.0;
-                }
-                if input.move_down {
-                    delta.y += 1.0;
-                }
-
-                delta = if delta.norm() > 0.0 {
-                    delta.normalize()
-                } else {
-                    delta
-                };
-
-                let target_vel = delta * PLAYER_MOVE_SPEED;
-                ent.vel =
-                    geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
-                if (ent.vel - target_vel).norm() < 0.01 {
-                    ent.vel = target_vel;
-                }
+        if let Some((_dash_time, dash_dir)) = cur_dash {
+            // Movement is constricted while dashing.
+            let target_vel = dash_dir * PLAYER_DASH_SPEED;
+            ent.vel = geom::smooth_to_target_vector(
+                PLAYER_DASH_ACCEL_FACTOR,
+                ent.vel,
+                target_vel,
+                dt,
+            );
+        } else {
+            // Normal movement when not dashing.
+            if input.move_left {
+                delta.x -= 1.0;
+            }
+            if input.move_right {
+                delta.x += 1.0;
+            }
+            if input.move_up {
+                delta.y -= 1.0;
+            }
+            if input.move_down {
+                delta.y += 1.0;
             }
 
-            ent.pos += ent.vel * dt;
-
-            /*if delta.norm() > 0.0 {
-                ent.angle = Some(delta.y.atan2(delta.x));
+            delta = if delta.norm() > 0.0 {
+                delta.normalize()
             } else {
-                ent.angle = None;
-            }*/
+                delta
+            };
 
-            ent.pos.x = ent
-                .pos
-                .x
-                .min(map_size.x - PLAYER_SIT_W / 2.0)
-                .max(PLAYER_SIT_W / 2.0);
-            ent.pos.y = ent
-                .pos
-                .y
-                .min(map_size.y - PLAYER_SIT_W / 2.0)
-                .max(PLAYER_SIT_W / 2.0);
+            let target_vel = delta * PLAYER_MOVE_SPEED;
+            ent.vel =
+                geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
+            if (ent.vel - target_vel).norm() < 0.01 {
+                ent.vel = target_vel;
+            }
+        }
 
-            if input.use_item
-                && ent.last_dash.map_or(true, |(dash_time, _)| {
-                    dash_time + PLAYER_DASH_COOLDOWN <= input_time
-                })
-                && delta.norm() > 0.1
-            {
-                ent.last_dash = Some((input_time, delta));
+        ent.pos += ent.vel * dt;
+
+        /*if delta.norm() > 0.0 {
+            ent.angle = Some(delta.y.atan2(delta.x));
+        } else {
+            ent.angle = None;
+        }*/
+
+        ent.pos.x = ent
+            .pos
+            .x
+            .min(map_size.x - PLAYER_SIT_W / 2.0)
+            .max(PLAYER_SIT_W / 2.0);
+        ent.pos.y = ent
+            .pos
+            .y
+            .min(map_size.y - PLAYER_SIT_W / 2.0)
+            .max(PLAYER_SIT_W / 2.0);
+
+        if input.use_item
+            && ent.last_dash.map_or(true, |(dash_time, _)| {
+                dash_time + PLAYER_DASH_COOLDOWN <= input_time
+            })
+            && delta.norm() > 0.1
+        {
+            ent.last_dash = Some((input_time, delta));
+        }
+
+        /*if input_time >= ent.next_shot_time {
+            if ent.shots_left == 0 {
+                ent.shots_left = MAGAZINE_SIZE;
             }
 
-            /*if input_time >= ent.next_shot_time {
+            if delta.norm() > 0.0 && input.use_item {
+                context.new_entities.push(Entity::Bullet(Bullet {
+                    owner: Some(player_id),
+                    start_time: input_time,
+                    start_pos: ent.pos,
+                    vel: delta.normalize() * BULLET_MOVE_SPEED,
+                }));
+
+                ent.shots_left -= 1;
+
                 if ent.shots_left == 0 {
-                    ent.shots_left = MAGAZINE_SIZE;
+                    ent.next_shot_time = input_time + RELOAD_DURATION;
+                } else {
+                    ent.next_shot_time = input_time + PLAYER_SHOOT_PERIOD;
                 }
+            }
+        }*/
 
-                if delta.norm() > 0.0 && input.use_item {
-                    context.new_entities.push(Entity::Bullet(Bullet {
-                        owner: Some(player_id),
-                        start_time: input_time,
-                        start_pos: ent.pos,
-                        vel: delta.normalize() * BULLET_MOVE_SPEED,
-                    }));
+        let pos = ent.pos;
+        let input_state = input_state.unwrap_or(self);
 
-                    ent.shots_left -= 1;
-
-                    if ent.shots_left == 0 {
-                        ent.next_shot_time = input_time + RELOAD_DURATION;
-                    } else {
-                        ent.next_shot_time = input_time + PLAYER_SHOOT_PERIOD;
+        for (entity_id, entity) in input_state.entities.iter() {
+            match entity {
+                Entity::DangerGuy(danger_guy) => {
+                    // TODO: Player geometry
+                    if danger_guy.aa_rect(input_time).contains_point(pos) {
+                        context
+                            .killed_players
+                            .insert(player_id, DeathReason::TouchedTheDanger);
                     }
                 }
-            }*/
+                Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
+                    // TODO: Player geometry
+                    let aa_rect =
+                        AaRect::new_center(pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
 
-            let pos = ent.pos;
-            let input_state = input_state.unwrap_or(self);
-
-            for (entity_id, entity) in input_state.entities.iter() {
-                match entity {
-                    Entity::DangerGuy(danger_guy) => {
-                        // TODO: Player geometry
-                        if danger_guy.aa_rect(input_time).contains_point(pos) {
-                            context
-                                .killed_players
-                                .insert(player_id, DeathReason::TouchedTheDanger);
-                        }
+                    if aa_rect.contains_point(bullet.pos(input_time)) {
+                        context.removed_entities.insert(*entity_id);
+                        context
+                            .killed_players
+                            .insert(player_id, DeathReason::ShotBy(bullet.owner));
                     }
-                    Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
-                        // TODO: Player geometry
-                        let aa_rect =
-                            AaRect::new_center(pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
-
-                        if aa_rect.contains_point(bullet.pos(input_time)) {
-                            context.removed_entities.insert(*entity_id);
-                            context
-                                .killed_players
-                                .insert(player_id, DeathReason::ShotBy(bullet.owner));
-                        }
-                    }
-                    _ => (),
                 }
+                _ => (),
             }
         }
 
@@ -277,26 +300,6 @@ impl Game {
             .iter()
             .filter_map(|(&id, e)| {
                 if let Entity::Player(ref e) = e {
-                    if e.owner == player_id {
-                        Some((id, e))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .next()
-    }
-
-    pub fn get_player_entity_mut(
-        &mut self,
-        player_id: PlayerId,
-    ) -> Option<(EntityId, &mut PlayerEntity)> {
-        self.entities
-            .iter_mut()
-            .filter_map(|(&id, e)| {
-                if let Entity::Player(ref mut e) = e {
                     if e.owner == player_id {
                         Some((id, e))
                     } else {
