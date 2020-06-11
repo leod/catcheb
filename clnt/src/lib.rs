@@ -161,19 +161,17 @@ pub fn render_game(
     for (entity_id, entity) in state.entities.iter() {
         match entity {
             comn::Entity::Player(player) => {
-                let pos = if let Some((next_time, next_entity)) = next_entities.get(entity_id) {
-                    let tau = (time - state_time) / (next_time - state_time);
-
-                    if let Ok(next_player) = next_entity.player() {
-                        let delta = next_player.pos - player.pos;
-                        (player.pos + tau * delta).coords
-                    } else {
-                        player.pos.coords
-                    }
-                } else {
-                    player.pos.coords
-                };
-                let pos: mint::Vector2<f32> = pos.into();
+                let interp_player = next_entities
+                    .get(entity_id)
+                    .and_then(|(next_time, next_entity)| {
+                        let tau = (time - state_time) / (next_time - state_time);
+                        next_entity
+                            .player()
+                            .ok()
+                            .map(|next_entity| player.interp(next_entity, tau))
+                    })
+                    .unwrap_or(player.clone());
+                let pos: mint::Vector2<f32> = interp_player.pos.coords.into();
 
                 let color = if player.owner == my_player_id {
                     Color::BLUE
@@ -181,7 +179,7 @@ pub fn render_game(
                     Color::from_rgba(148, 0, 211, 1.0)
                 };
 
-                let transform = rect_to_transform(&player.rect());
+                let transform = rect_to_transform(&interp_player.rect());
                 info!("angle: {}", player.rect().angle);
                 //let rect = Rectangle::new(Vector::new(0.0, 0.0), Vector::new(1.0, 1.0));
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
