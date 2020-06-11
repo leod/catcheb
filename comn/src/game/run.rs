@@ -267,8 +267,13 @@ impl Game {
         for (entity_id, entity) in input_state.entities.iter() {
             match entity {
                 Entity::DangerGuy(danger_guy) => {
-                    // TODO: Player geometry
-                    if danger_guy.aa_rect(input_time).contains_point(ent.pos) {
+                    if geom::rect_collision(
+                        &danger_guy.aa_rect(input_time).to_rect(),
+                        &ent.rect(),
+                        Vector::zeros(),
+                    )
+                    .is_some()
+                    {
                         context
                             .killed_players
                             .insert(player_id, DeathReason::TouchedTheDanger);
