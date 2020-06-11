@@ -199,6 +199,7 @@ impl Game {
         }
 
         let mut offset = ent.vel * dt;
+        let mut flip = None;
 
         for (_, entity) in input_state.entities.iter() {
             match entity {
@@ -207,9 +208,18 @@ impl Game {
                         geom::rect_collision(&ent.rect(), &other_ent.rect(), offset)
                     {
                         offset += collision.resolution_vector;
+                        flip = Some(collision.axis);
                     }
                 }
                 _ => (),
+            }
+        }
+
+        for wall in input_state.walls() {
+            if let Some(collision) = geom::rect_collision(&ent.rect(), &wall.rect.to_rect(), offset)
+            {
+                offset += collision.resolution_vector;
+                flip = Some(collision.axis);
             }
         }
 
