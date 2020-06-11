@@ -32,6 +32,7 @@ pub struct Stats {
 }
 
 const MAX_TICKS_PER_UPDATE: usize = 5;
+const MAX_LAG_TIME: f32 = 1.0;
 const KEEP_STATES_BUFFER: u32 = 5;
 
 pub struct Game {
@@ -264,6 +265,7 @@ impl Game {
         // Remove events for older ticks, we will no longer need them. Note,
         // however, that the same cannot be said about the received states,
         // since we may still need them as the basis for delta decoding.
+        // Received states are only pruned when we receive new states.
         {
             let remove_tick_nums: Vec<comn::TickNum> = self
                 .received_events
@@ -431,7 +433,8 @@ impl Game {
                         .received_states
                         .keys()
                         .copied()
-                        .filter(|tick_num| tick_num.0 + KEEP_STATES_BUFFER < diff_base_num.0)
+                        .filter(|tick_num| tick_num.0 + KEEP_STATES_BUFFER < diff_base_num.0
+                            && *tick_num < self.tick_num())
                         .collect();
 
                     for tick_num in remove_state_nums {
