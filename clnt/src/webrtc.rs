@@ -235,7 +235,8 @@ impl Data {
     }
 
     pub fn on_message(&mut self, event: &MessageEvent) {
-        let recv_time = self.now.1 + Instant::now().duration_since(self.now.0);
+        //let recv_time = self.now.1 + Instant::now().duration_since(self.now.0);
+        let recv_time = Instant::now();
         let message = if event.data().is_instance_of::<js_sys::ArrayBuffer>() {
             let abuf = event.data().dyn_into::<js_sys::ArrayBuffer>().unwrap();
             let array = js_sys::Uint8Array::new(&abuf);

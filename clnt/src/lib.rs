@@ -322,7 +322,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
-    let mut dt_smoothing = stats::Var::new(Duration::from_millis(10000));
+    let mut dt_smoothing = stats::Var::new(Duration::from_millis(100));
     let mut now = last_time;
     //let mut dt_smoothing = 16.6666667;
 
@@ -368,8 +368,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
         // TODO: dt smoothing is just not a good idea
         dt_smoothing.record(last_dt.as_secs_f32());
-        let smoothed_dt =
-            Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
+        let smoothed_dt = last_dt;
+        //Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
         now += smoothed_dt;
 
         let events = game.update(now, smoothed_dt, &current_input(&pressed_keys));
