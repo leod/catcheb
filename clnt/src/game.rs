@@ -51,6 +51,7 @@ pub struct Game {
     next_tick_num: Option<comn::TickNum>,
 
     start_time: Instant,
+
     recv_tick_time: GameTimeEstimation,
     next_time_warp_factor: f32,
 
@@ -114,12 +115,13 @@ impl Game {
         comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
     }
 
-    pub fn update(&mut self, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
+    pub fn update(&mut self, now: Instant, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
+        self.webrtc_client.set_now((Instant::now(), now));
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             self.handle_message(recv_time, message);
         }
 
-        if let Some(sequence_num) = self.ping.next_ping_sequence_num() {
+        if let Some(sequence_num) = self.ping.next_ping_sequence_num(now) {
             self.send(comn::ClientMessage::Ping(sequence_num));
         }
 
@@ -152,7 +154,7 @@ impl Game {
         let new_tick_num = self.tick_num();
 
         // Determine the time warp factor to be used in the next update call.
-        let time_since_start = Instant::now().duration_since(self.start_time).as_secs_f32();
+        let time_since_start = now.duration_since(self.start_time).as_secs_f32();
         let recv_game_time = self.recv_tick_time.estimate(time_since_start);
         self.next_time_warp_factor = if let Some(recv_game_time) = recv_game_time {
             let current_time_lag = recv_game_time - self.interp_game_time;
@@ -170,9 +172,9 @@ impl Game {
                 k
             }*/
 
-            //0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
+            0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
 
-            0.5 * ((-time_lag_deviation).tanh() + 2.0)
+        //0.5 * ((-time_lag_deviation).tanh() + 2.0)
         } else {
             0.0
         };
