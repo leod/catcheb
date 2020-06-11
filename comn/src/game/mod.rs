@@ -257,6 +257,18 @@ impl Game {
                     Vector::new(20.0, self.settings.size.y),
                 ),
             },
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 200.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            },
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 1500.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            },
         ]
     }
 }

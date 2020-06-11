@@ -45,6 +45,7 @@ impl Game {
 
         // TODO: clone
         let entities = self.entities.clone();
+        let walls = self.walls();
 
         for (entity_id, entity) in self.entities.iter_mut() {
             match entity {

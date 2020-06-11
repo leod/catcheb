@@ -123,7 +123,10 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
         .chain(once(a.y_edge))
         .chain(once(b.x_edge))
         .chain(once(b.y_edge))
-        .map(|edge| edge.normalize());
+        .chain(once(-a.x_edge))
+        .chain(once(-a.y_edge))
+        .chain(once(-b.x_edge))
+        .chain(once(-b.y_edge));
 
     let mut intersecting = true;
     let mut will_intersect = true;
@@ -132,8 +135,8 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
     let mut translation_axis = Vector::zeros();
 
     for edge in edges {
-        //let axis = Vector::new(-edge.y, edge.x);
-        let axis = edge;
+        let axis = Vector::new(-edge.y, edge.x).normalize();
+        //let axis = edge;
 
         // Are the polygons currently intersecting?
         let mut a_projection = a.project_to_edge(axis);
