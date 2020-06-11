@@ -59,8 +59,6 @@ impl Prediction {
                 .my_last_input
                 .map(|input| (server_state, input))
         }) {
-            info!("got {:?} at {:?}", my_last_input, tick_num);
-
             if let Some(record) = self.log.get_mut(&my_last_input.next()) {
                 Self::correct_prediction(&mut record.state, &server_state.game);
 
