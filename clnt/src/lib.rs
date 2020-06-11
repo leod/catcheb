@@ -32,10 +32,8 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{
-        BULLET_RADIUS, PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RADIUS,
-        TURRET_RANGE,
-    },
+    game::run::{BULLET_RADIUS, TURRET_RADIUS, TURRET_RANGE},
+    geom,
     util::stats,
 };
 
@@ -56,6 +54,17 @@ pub fn main() {
         },
         app,
     );
+}
+
+pub fn rect_to_transform(rect: &geom::Rect) -> Transform {
+    let size: mint::Vector2<f32> = rect.size.into();
+    let offset: mint::Vector2<f32> = (rect.size / 2.0).into();
+    let origin: mint::Vector2<f32> = rect.origin.coords.into();
+
+    Transform::translate(origin.into())
+        * Transform::translate(offset.into())
+        * Transform::rotate(rect.angle.to_degrees())
+        * Transform::scale(size.into())
 }
 
 pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
@@ -166,26 +175,16 @@ pub fn render_game(
                 };
                 let pos: mint::Vector2<f32> = pos.into();
 
-                let (transform, size) =
-                    if let Some((_, dash_dir)) = player.last_dash.filter(|_| player.is_dashing) {
-                        (
-                            Transform::rotate(dash_dir.y.atan2(dash_dir.x).to_degrees())
-                                .then(Transform::translate(pos.into())),
-                            Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
-                        )
-                    } else {
-                        (
-                            Transform::translate(pos.into()),
-                            Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
-                        )
-                    };
-                let rect = Rectangle::new(-size / 2.0, size);
-
                 let color = if player.owner == my_player_id {
                     Color::BLUE
                 } else {
                     Color::from_rgba(148, 0, 211, 1.0)
                 };
+
+                let transform = rect_to_transform(&player.rect());
+                info!("angle: {}", player.rect().angle);
+                //let rect = Rectangle::new(Vector::new(0.0, 0.0), Vector::new(1.0, 1.0));
+                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
 
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);

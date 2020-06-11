@@ -130,13 +130,7 @@ impl Game {
         if let Some((entity_id, ent)) = self.get_player_entity(player_id) {
             let mut ent = ent.clone();
 
-            self.run_player_entity_input(
-                player_id,
-                input,
-                input_state,
-                context,
-                &mut ent,
-            )?;
+            self.run_player_entity_input(player_id, input, input_state, context, &mut ent)?;
 
             self.entities.insert(entity_id, Entity::Player(ent));
         }
@@ -153,11 +147,8 @@ impl Game {
         ent: &mut PlayerEntity,
     ) -> GameResult<()> {
         let dt = self.settings.tick_period();
-        let time = self.current_game_time();
-        let input_time = input_state
-            .map(|input_state| input_state.current_game_time())
-            .unwrap_or(time);
-        let map_size = self.settings.size;
+        let input_state = input_state.unwrap_or(self);
+        let input_time = input_state.current_game_time();
 
         let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
@@ -171,12 +162,11 @@ impl Game {
         if let Some((_dash_time, dash_dir)) = cur_dash {
             // Movement is constricted while dashing.
             let target_vel = dash_dir * PLAYER_DASH_SPEED;
-            ent.vel = geom::smooth_to_target_vector(
-                PLAYER_DASH_ACCEL_FACTOR,
-                ent.vel,
-                target_vel,
-                dt,
-            );
+            ent.vel =
+                geom::smooth_to_target_vector(PLAYER_DASH_ACCEL_FACTOR, ent.vel, target_vel, dt);
+
+            // TODO: State redundancy
+            ent.angle = Some(dash_dir.y.atan2(dash_dir.x));
         } else {
             // Normal movement when not dashing.
             if input.move_left {
@@ -199,14 +189,31 @@ impl Game {
             };
 
             let target_vel = delta * PLAYER_MOVE_SPEED;
-            ent.vel =
-                geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
+            ent.vel = geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
             if (ent.vel - target_vel).norm() < 0.01 {
                 ent.vel = target_vel;
             }
+
+            // TODO: State redundancy
+            ent.angle = None;
         }
 
-        ent.pos += ent.vel * dt;
+        let mut offset = ent.vel * dt;
+
+        for (_, entity) in input_state.entities.iter() {
+            match entity {
+                Entity::Player(other_ent) if other_ent.owner != player_id => {
+                    if let Some(collision) =
+                        geom::rect_collision(&ent.rect(), &other_ent.rect(), offset)
+                    {
+                        offset += collision.resolution_vector;
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        ent.pos += offset;
 
         /*if delta.norm() > 0.0 {
             ent.angle = Some(delta.y.atan2(delta.x));
@@ -217,12 +224,12 @@ impl Game {
         ent.pos.x = ent
             .pos
             .x
-            .min(map_size.x - PLAYER_SIT_W / 2.0)
+            .min(self.settings.size.x - PLAYER_SIT_W / 2.0)
             .max(PLAYER_SIT_W / 2.0);
         ent.pos.y = ent
             .pos
             .y
-            .min(map_size.y - PLAYER_SIT_W / 2.0)
+            .min(self.settings.size.y - PLAYER_SIT_W / 2.0)
             .max(PLAYER_SIT_W / 2.0);
 
         if input.use_item
@@ -257,14 +264,11 @@ impl Game {
             }
         }*/
 
-        let pos = ent.pos;
-        let input_state = input_state.unwrap_or(self);
-
         for (entity_id, entity) in input_state.entities.iter() {
             match entity {
                 Entity::DangerGuy(danger_guy) => {
                     // TODO: Player geometry
-                    if danger_guy.aa_rect(input_time).contains_point(pos) {
+                    if danger_guy.aa_rect(input_time).contains_point(ent.pos) {
                         context
                             .killed_players
                             .insert(player_id, DeathReason::TouchedTheDanger);
@@ -273,7 +277,7 @@ impl Game {
                 Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
                     // TODO: Player geometry
                     let aa_rect =
-                        AaRect::new_center(pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
+                        AaRect::new_center(ent.pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
 
                     if aa_rect.contains_point(bullet.pos(input_time)) {
                         context.removed_entities.insert(*entity_id);
