@@ -29,7 +29,7 @@ impl AaRect {
 
     pub fn rotate(&self, angle: f32) -> Rect {
         Rect {
-            origin: self.top_left,
+            center: self.top_left + self.size / 2.0,
             size: self.size,
             angle,
             x_axis: self.size.x * Vector::new(angle.cos(), angle.sin()),
@@ -39,7 +39,7 @@ impl AaRect {
 
     pub fn to_rect(&self) -> Rect {
         Rect {
-            origin: self.top_left,
+            center: self.top_left + self.size / 2.0,
             size: self.size,
             angle: 0.0,
             x_axis: Vector::new(self.size.x, 0.0),
@@ -80,7 +80,7 @@ impl AxisProjection {
 
 #[derive(Debug, Clone)]
 pub struct Rect {
-    pub origin: Point,
+    pub center: Point,
     pub size: Vector,
     pub angle: f32,
     pub x_axis: Vector,
@@ -89,14 +89,10 @@ pub struct Rect {
 
 impl Rect {
     pub fn iter_points(&self) -> impl Iterator<Item = Point> {
-        once(self.origin)
-            .chain(once(self.origin + self.x_axis))
-            .chain(once(self.origin + self.y_axis))
-            .chain(once(self.origin + self.x_axis + self.y_axis))
-    }
-
-    pub fn center(&self) -> Point {
-        self.origin + self.x_axis * 0.5 + self.y_axis * 0.5
+        once(self.center - self.x_axis / 2.0 - self.y_axis / 2.0)
+            .chain(once(self.center + self.x_axis / 2.0 - self.y_axis / 2.0))
+            .chain(once(self.center - self.x_axis / 2.0 + self.y_axis / 2.0))
+            .chain(once(self.center + self.x_axis / 2.0 + self.y_axis / 2.0))
     }
 
     pub fn project_to_axis(&self, axis: Vector) -> AxisProjection {
@@ -170,7 +166,7 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
         if interval_distance < min_interval_distance {
             min_interval_distance = interval_distance;
 
-            translation_axis = if (a.center() - b.center()).dot(&axis) < 0.0 {
+            translation_axis = if (a.center - b.center).dot(&axis) < 0.0 {
                 -axis
             } else {
                 axis
