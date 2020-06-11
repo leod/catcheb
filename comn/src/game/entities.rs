@@ -15,17 +15,17 @@ pub enum Entity {
 }
 
 impl Entity {
-    pub fn player(&self) -> GameResult<PlayerEntity> {
+    pub fn player(&self) -> GameResult<&PlayerEntity> {
         if let Entity::Player(e) = self {
-            Ok(e.clone())
+            Ok(e)
         } else {
             Err(GameError::UnexpectedEntityType)
         }
     }
 
-    pub fn danger_guy(&self) -> GameResult<DangerGuy> {
+    pub fn danger_guy(&self) -> GameResult<&DangerGuy> {
         if let Entity::DangerGuy(e) = self {
-            Ok(e.clone())
+            Ok(e)
         } else {
             Err(GameError::UnexpectedEntityType)
         }
@@ -79,6 +79,14 @@ impl PlayerEntity {
         } else {
             AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
                 .to_rect()
+        }
+    }
+
+    pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
+        // TODO: Interpolate player properties other than just the position
+        PlayerEntity {
+            pos: self.pos + alpha * (other.pos - self.pos),
+            ..self.clone()
         }
     }
 }
