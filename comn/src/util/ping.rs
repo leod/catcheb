@@ -45,9 +45,7 @@ impl PingEstimation {
         self.estimate
     }
 
-    pub fn next_ping_sequence_num(&mut self) -> Option<SequenceNum> {
-        let now = Instant::now();
-
+    pub fn next_ping_sequence_num(&mut self, now: Instant) -> Option<SequenceNum> {
         if self.last_send_time.map_or(true, |last_time| {
             now - last_time > Duration::from_millis(PING_PERIOD_MS)
         }) {
@@ -92,8 +90,8 @@ impl PingEstimation {
         }
     }
 
-    pub fn is_timeout(&self) -> bool {
-        Instant::now() - self.last_received_pong_time >= Duration::from_millis(TIMEOUT_MS)
+    pub fn is_timeout(&self, now: Instant) -> bool {
+        now - self.last_received_pong_time >= Duration::from_millis(TIMEOUT_MS)
     }
 
     fn calculate_estimate(&self) -> Duration {

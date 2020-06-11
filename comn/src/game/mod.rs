@@ -176,25 +176,25 @@ impl Game {
 
     pub fn initial_entities(_settings: &Settings) -> Vec<Entity> {
         vec![
-            Entity::DangerGuy(DangerGuy {
+            /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(700.0, 100.0),
                 end_pos: Point::new(1000.0, 100.0),
                 size: Vector::new(160.0, 160.0),
                 speed: 100.0,
                 wait_time: 3.0,
-            }),
+            }),*/
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(100.0, 1100.0),
-                end_pos: Point::new(1500.0, 1100.0),
-                size: Vector::new(160.0, 160.0),
-                speed: 600.0,
+                start_pos: Point::new(100.0, 1200.0),
+                end_pos: Point::new(1500.0, 1200.0),
+                size: Vector::new(30.0, 100.0),
+                speed: 1000.0,
                 wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(1500.0, 1160.0),
-                end_pos: Point::new(100.0, 1160.0),
-                size: Vector::new(160.0, 160.0),
-                speed: 600.0,
+                start_pos: Point::new(1500.0, 1400.0),
+                end_pos: Point::new(100.0, 1400.0),
+                size: Vector::new(30.0, 100.0),
+                speed: 1000.0,
                 wait_time: 2.0,
             }),
             Entity::Turret(Turret {
