@@ -58,11 +58,9 @@ pub fn main() {
 
 pub fn rect_to_transform(rect: &geom::Rect) -> Transform {
     let size: mint::Vector2<f32> = rect.size.into();
-    let offset: mint::Vector2<f32> = (rect.size / 2.0).into();
-    let origin: mint::Vector2<f32> = rect.origin.coords.into();
+    let center: mint::Vector2<f32> = rect.center.coords.into();
 
-    Transform::translate(origin.into())
-        * Transform::translate(offset.into())
+    Transform::translate(center.into())
         * Transform::rotate(rect.angle.to_degrees())
         * Transform::scale(size.into())
 }
