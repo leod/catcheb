@@ -366,6 +366,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         //dt_smoothing += 0.1 * (last_dt.as_secs_f32() - dt_smoothing);
         //let dt = Duration::from_secs_f32(dt_smoothing);
 
+        // TODO: dt smoothing is just not a good idea
         dt_smoothing.record(last_dt.as_secs_f32());
         let smoothed_dt =
             Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
