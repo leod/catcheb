@@ -31,6 +31,7 @@ impl Entity {
         }
     }
 
+
     pub fn pos(&self, time: GameTime) -> Point {
         match self {
             Entity::Player(entity) => entity.pos,
@@ -42,6 +43,11 @@ impl Entity {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Hook {
+    fix: Option<(EntityId, Vector)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
@@ -50,6 +56,7 @@ pub struct PlayerEntity {
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
+    pub hook: Option<Hook>,
 
     // TODO: Redundant state needed for display
     pub is_dashing: bool,
