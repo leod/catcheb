@@ -111,6 +111,12 @@ impl Rect {
                 .unwrap(),
         }
     }
+
+    /*pub fn contains_point(&self, point: Point) -> bool {
+        let uv = nalgebra::Matrix2::from_columns(&[self.x_edge, self.y_edge]).invert() * (self.center - point);
+
+        uv.x >= -0.5 && uv.x <= 0.5 && uv.y >= -0.5 && uv.y <= 0.5
+    }*/
 }
 
 pub struct Collision {
