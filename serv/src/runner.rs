@@ -303,7 +303,7 @@ impl Runner {
             .players
             .iter()
             .filter_map(|(player_token, player)| {
-                if player.ping.is_timeout() {
+                if player.ping.is_timeout(Instant::now()) {
                     Some(*player_token)
                 } else {
                     None
@@ -324,7 +324,7 @@ impl Runner {
         let mut messages = Vec::new();
 
         for player in self.players.values_mut() {
-            if let Some(sequence_num) = player.ping.next_ping_sequence_num() {
+            if let Some(sequence_num) = player.ping.next_ping_sequence_num(Instant::now()) {
                 if let Some(peer) = player.peer {
                     messages.push((peer, comn::ServerMessage::Ping(sequence_num)));
                 }

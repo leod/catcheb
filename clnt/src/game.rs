@@ -32,6 +32,7 @@ pub struct Stats {
 }
 
 const MAX_TICKS_PER_UPDATE: usize = 5;
+const MAX_TIME_LAG_DEVIATION: f32 = 0.075;
 const KEEP_STATES_BUFFER: u32 = 5;
 
 pub struct Game {
@@ -51,6 +52,7 @@ pub struct Game {
     next_tick_num: Option<comn::TickNum>,
 
     start_time: Instant,
+
     recv_tick_time: GameTimeEstimation,
     next_time_warp_factor: f32,
 
@@ -114,12 +116,13 @@ impl Game {
         comn::TickNum((self.interp_game_time / self.settings.tick_period()) as u32)
     }
 
-    pub fn update(&mut self, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
+    pub fn update(&mut self, now: Instant, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
+        self.webrtc_client.set_now((Instant::now(), now));
         while let Some((recv_time, message)) = self.webrtc_client.take_message() {
             self.handle_message(recv_time, message);
         }
 
-        if let Some(sequence_num) = self.ping.next_ping_sequence_num() {
+        if let Some(sequence_num) = self.ping.next_ping_sequence_num(now) {
             self.send(comn::ClientMessage::Ping(sequence_num));
         }
 
@@ -129,8 +132,44 @@ impl Game {
         //
         // If we are off too far from our lag target, slow down or speed up
         // playback time.
-        let new_interp_game_time =
-            self.interp_game_time + dt.as_secs_f32() * self.next_time_warp_factor;
+        let time_since_start = now.duration_since(self.start_time).as_secs_f32();
+        let recv_game_time = self.recv_tick_time.estimate(time_since_start);
+        let new_interp_game_time = if let Some(recv_game_time) = recv_game_time {
+            let current_time_lag = recv_game_time - (self.interp_game_time + dt.as_secs_f32());
+            let time_lag_deviation = self.target_time_lag() - current_time_lag;
+
+            self.stats
+                .time_lag_deviation_ms
+                .record(time_lag_deviation * 1000.0);
+
+            if time_lag_deviation.abs() < MAX_TIME_LAG_DEVIATION {
+                /*let k = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp());
+
+                if time_lag_deviation > 0.0 {
+                    1.0 / k
+                } else {
+                    k
+                }*/
+                //0.5 * ((-time_lag_deviation).tanh() + 2.0)
+                self.next_time_warp_factor =
+                    0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.005).exp());
+
+                self.interp_game_time + self.next_time_warp_factor * dt.as_secs_f32()
+            } else {
+                // Our playback time is too far off, just jump directly to the
+                // target time.
+                let target_time = recv_game_time - self.target_time_lag();
+                info!(
+                    "Time is off by {}, jumping to {}",
+                    time_lag_deviation, target_time
+                );
+                target_time
+            }
+        } else {
+            // We have no knowledge of the tick receive time, probably didn't
+            // receive the first tick packet yet.
+            self.interp_game_time
+        };
 
         // Don't let time run further than the ticks that we have received.
         // This is here so that we stop local time if the server drops or
@@ -150,32 +189,6 @@ impl Game {
         self.interp_game_time =
             new_interp_game_time.min(self.settings.tick_game_time(max_tick_num));
         let new_tick_num = self.tick_num();
-
-        // Determine the time warp factor to be used in the next update call.
-        let time_since_start = Instant::now().duration_since(self.start_time).as_secs_f32();
-        let recv_game_time = self.recv_tick_time.estimate(time_since_start);
-        self.next_time_warp_factor = if let Some(recv_game_time) = recv_game_time {
-            let current_time_lag = recv_game_time - self.interp_game_time;
-            let time_lag_deviation = self.target_time_lag() - current_time_lag;
-
-            self.stats
-                .time_lag_deviation_ms
-                .record(time_lag_deviation * 1000.0);
-
-            /*let k = 0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp());
-
-            if time_lag_deviation > 0.0 {
-                1.0 / k
-            } else {
-                k
-            }*/
-
-            //0.5 + (2.0 - 0.5) / (1.0 + 2.0 * (time_lag_deviation / 0.05).exp())
-
-            0.5 * ((-time_lag_deviation).tanh() + 2.0)
-        } else {
-            0.0
-        };
 
         // Look at all the intermediate ticks. We will have one of the
         // following cases:
@@ -206,7 +219,7 @@ impl Game {
         }
 
         // Iterate over all the ticks that we have crossed, also including
-        // those for which we did not anything from the server.
+        // those for which we did not receive anything from the server.
         let mut events = Vec::new();
 
         for tick_num in crossed_tick_nums.iter() {
@@ -262,6 +275,7 @@ impl Game {
         // Remove events for older ticks, we will no longer need them. Note,
         // however, that the same cannot be said about the received states,
         // since we may still need them as the basis for delta decoding.
+        // Received states are only pruned when we receive new states.
         {
             let remove_tick_nums: Vec<comn::TickNum> = self
                 .received_events
@@ -429,7 +443,10 @@ impl Game {
                         .received_states
                         .keys()
                         .copied()
-                        .filter(|tick_num| tick_num.0 + KEEP_STATES_BUFFER < diff_base_num.0)
+                        .filter(|tick_num| {
+                            tick_num.0 + KEEP_STATES_BUFFER < diff_base_num.0
+                                && *tick_num < self.tick_num()
+                        })
                         .collect();
 
                     for tick_num in remove_state_nums {

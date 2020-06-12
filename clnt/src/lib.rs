@@ -5,7 +5,10 @@ mod join;
 mod prediction;
 mod webrtc;
 
-use std::collections::{BTreeMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashSet},
+    time::Duration,
+};
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -29,10 +32,8 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{
-        BULLET_RADIUS, PLAYER_MOVE_L, PLAYER_MOVE_W, PLAYER_SIT_L, PLAYER_SIT_W, TURRET_RADIUS,
-        TURRET_RANGE,
-    },
+    game::run::{BULLET_RADIUS, TURRET_RADIUS, TURRET_RANGE},
+    geom,
     util::stats,
 };
 
@@ -53,6 +54,15 @@ pub fn main() {
         },
         app,
     );
+}
+
+pub fn rect_to_transform(rect: &geom::Rect) -> Transform {
+    let size: mint::Vector2<f32> = rect.size.into();
+    let center: mint::Vector2<f32> = rect.center.coords.into();
+
+    Transform::translate(center.into())
+        * Transform::rotate(rect.angle.to_degrees())
+        * Transform::scale(size.into())
 }
 
 pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
@@ -146,43 +156,38 @@ pub fn render_game(
         gfx.set_blend_mode(Some(Default::default()));
     }
 
+    for wall in state.walls().iter() {
+        let transform = rect_to_transform(&wall.rect.to_rect());
+        let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+        gfx.set_transform(transform.then(camera_transform));
+        gfx.fill_rect(&rect, Color::BLACK);
+    }
+
     for (entity_id, entity) in state.entities.iter() {
         match entity {
             comn::Entity::Player(player) => {
-                let pos = if let Some((next_time, next_entity)) = next_entities.get(entity_id) {
-                    let tau = (time - state_time) / (next_time - state_time);
-
-                    if let Ok(next_player) = next_entity.player() {
-                        let delta = next_player.pos - player.pos;
-                        (player.pos + tau * delta).coords
-                    } else {
-                        player.pos.coords
-                    }
-                } else {
-                    player.pos.coords
-                };
-                let pos: mint::Vector2<f32> = pos.into();
-
-                let angle: Option<f32> = None; //player.angle
-                let (transform, size) = if let Some(angle) = angle {
-                    (
-                        Transform::rotate(angle.to_degrees())
-                            .then(Transform::translate(pos.into())),
-                        Vector::new(PLAYER_MOVE_W, PLAYER_MOVE_L),
-                    )
-                } else {
-                    (
-                        Transform::translate(pos.into()),
-                        Vector::new(PLAYER_SIT_W, PLAYER_SIT_L),
-                    )
-                };
-                let rect = Rectangle::new(-size / 2.0, size);
+                let interp_player = next_entities
+                    .get(entity_id)
+                    .and_then(|(next_time, next_entity)| {
+                        let tau = (time - state_time) / (next_time - state_time);
+                        next_entity
+                            .player()
+                            .ok()
+                            .map(|next_entity| player.interp(next_entity, tau))
+                    })
+                    .unwrap_or(player.clone());
+                let pos: mint::Vector2<f32> = interp_player.pos.coords.into();
 
                 let color = if player.owner == my_player_id {
                     Color::BLUE
                 } else {
                     Color::from_rgba(148, 0, 211, 1.0)
                 };
+
+                let transform = rect_to_transform(&interp_player.rect());
+                info!("angle: {}", player.rect().angle);
+                //let rect = Rectangle::new(Vector::new(0.0, 0.0), Vector::new(1.0, 1.0));
+                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
 
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);
@@ -200,7 +205,8 @@ pub fn render_game(
                 let rect = Rectangle::new(origin.into(), size.into());
                 gfx.set_transform(camera_transform);
 
-                let frame = pareen::constant(0)
+                // Awesome Hirsch, add back in once we have more images!
+                /*let frame = pareen::constant(0)
                     .switch(danger_guy.wait_time - 0.6, 1)
                     .switch(danger_guy.wait_time - 0.4, 2)
                     .switch(danger_guy.wait_time - 0.2, 3)
@@ -228,10 +234,10 @@ pub fn render_game(
                     )
                 };
 
-                gfx.draw_subimage(&resources.hirsch, sub_rect, rect);
+                gfx.draw_subimage(&resources.hirsch, sub_rect, rect);*/
 
-                /*gfx.fill_rect(&rect, Color::RED);
-                gfx.stroke_rect(&rect, Color::BLACK);*/
+                gfx.fill_rect(&rect, Color::RED);
+                gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
@@ -276,6 +282,7 @@ pub fn render_game(
 #[derive(Default)]
 struct Stats {
     dt_ms: stats::Var,
+    smoothed_dt_ms: stats::Var,
     frame_ms: stats::Var,
 }
 
@@ -302,9 +309,6 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
     .await
     .unwrap();
 
-    let mut pressed_keys: HashSet<Key> = HashSet::new();
-    let mut last_time = Instant::now();
-
     let mut camera = camera::Camera::new(config.camera, game.settings().size);
     let resize_handler = ResizeHandler::Fit {
         aspect_width: 4.0,
@@ -317,6 +321,12 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
     let mut stats = Stats::default();
     let mut show_stats = false;
+
+    let mut pressed_keys: HashSet<Key> = HashSet::new();
+    let mut last_time = Instant::now();
+    let mut dt_smoothing = stats::Var::new(Duration::from_millis(100));
+    let mut now = last_time;
+    //let mut dt_smoothing = 16.6666667;
 
     loop {
         while let Some(event) = input.next_event().await {
@@ -352,13 +362,22 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         }
 
         let start_time = Instant::now();
-        let dt = start_time.duration_since(last_time);
+        let last_dt = start_time.duration_since(last_time);
         last_time = start_time;
 
-        let events = game.update(dt, &current_input(&pressed_keys));
+        //dt_smoothing += 0.1 * (last_dt.as_secs_f32() - dt_smoothing);
+        //let dt = Duration::from_secs_f32(dt_smoothing);
+
+        // TODO: dt smoothing is just not a good idea
+        dt_smoothing.record(last_dt.as_secs_f32());
+        let smoothed_dt = last_dt;
+        //Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
+        now += smoothed_dt;
+
+        let events = game.update(now, smoothed_dt, &current_input(&pressed_keys));
 
         for event in events {
-            event_list.push(event);
+            event_list.push(now, event);
         }
 
         {
@@ -368,7 +387,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                     .map(|(_id, e)| comn::Entity::Player(e.clone()))
             });
             camera.update(
-                dt,
+                smoothed_dt,
                 &pressed_keys,
                 follow_entity,
                 game.interp_game_time(),
@@ -414,7 +433,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         }*/
 
         if show_stats {
-            for _ in 0..34 {
+            for _ in 0..33 {
                 debug("")?;
             }
 
@@ -448,6 +467,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             debug("")?;
             debug("                        cur      min      max     mean   stddev")?;
             debug(&format!("dt (ms):           {}", stats.dt_ms))?;
+            debug(&format!("smoothed dt (ms):  {}", stats.smoothed_dt_ms))?;
             debug(&format!("frame (ms):        {}", stats.frame_ms))?;
             debug(&format!("time lag (ms):     {}", game.stats().time_lag_ms))?;
             debug(&format!(
@@ -463,15 +483,19 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         }
 
         event_list.render(
+            now,
             &mut gfx,
             &mut resources.font_small,
-            Vector::new(600.0, 15.0),
+            Vector::new(600.0, 30.0),
         )?;
 
         gfx.present(&window)?;
 
         // Keep some statistics for debugging...
-        stats.dt_ms.record(dt.as_secs_f32() * 1000.0);
+        stats.dt_ms.record(last_dt.as_secs_f32() * 1000.0);
+        stats
+            .smoothed_dt_ms
+            .record(smoothed_dt.as_secs_f32() * 1000.0);
         stats
             .frame_ms
             .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);

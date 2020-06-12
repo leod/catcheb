@@ -37,18 +37,18 @@ impl EventList {
         }
     }
 
-    pub fn push(&mut self, event: Event) {
-        self.events.push_back((Instant::now(), event));
+    pub fn push(&mut self, now: Instant, event: Event) {
+        self.events.push_back((now, event));
     }
 
     pub fn render(
         &mut self,
+        now: Instant,
         gfx: &mut Graphics,
         font: &mut FontRenderer,
         mut pos: Vector,
     ) -> quicksilver::Result<()> {
         // Remove events that are too old.
-        let now = Instant::now();
         while let Some((oldest_time, _)) = self.events.front() {
             if now.duration_since(*oldest_time) > self.config.max_age {
                 self.events.pop_front();
