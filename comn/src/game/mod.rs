@@ -42,7 +42,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             max_num_players: 16,
-            ticks_per_second: 60,
+            ticks_per_second: 20,
             size: Vector::new(2400.0, 2400.0),
             spawn_points: vec![Point::new(50.0, 50.0), Point::new(50.0, 1300.0)],
         }
@@ -104,6 +104,11 @@ pub struct Input {
 pub enum Item {
     Gun { shots: u32 },
     StunGun,
+}
+
+#[derive(Debug, Clone)]
+pub struct Wall {
+    pub rect: geom::AaRect,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,25 +181,25 @@ impl Game {
 
     pub fn initial_entities(_settings: &Settings) -> Vec<Entity> {
         vec![
-            Entity::DangerGuy(DangerGuy {
+            /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(700.0, 100.0),
                 end_pos: Point::new(1000.0, 100.0),
                 size: Vector::new(160.0, 160.0),
                 speed: 100.0,
                 wait_time: 3.0,
-            }),
+            }),*/
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(100.0, 1100.0),
-                end_pos: Point::new(1500.0, 1100.0),
-                size: Vector::new(160.0, 160.0),
-                speed: 600.0,
+                start_pos: Point::new(100.0, 1200.0),
+                end_pos: Point::new(1500.0, 1200.0),
+                size: Vector::new(30.0, 100.0),
+                speed: 1000.0,
                 wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(1500.0, 1160.0),
-                end_pos: Point::new(100.0, 1160.0),
-                size: Vector::new(160.0, 160.0),
-                speed: 600.0,
+                start_pos: Point::new(1500.0, 1400.0),
+                end_pos: Point::new(100.0, 1400.0),
+                size: Vector::new(30.0, 100.0),
+                speed: 1000.0,
                 wait_time: 2.0,
             }),
             Entity::Turret(Turret {
@@ -224,6 +229,47 @@ impl Game {
 
     pub fn current_game_time(&self) -> GameTime {
         self.tick_game_time(self.tick_num)
+    }
+
+    pub fn walls(&self) -> Vec<Wall> {
+        vec![
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, 0.0),
+                    Vector::new(self.settings.size.x, 20.0),
+                ),
+            },
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, 0.0),
+                    Vector::new(20.0, self.settings.size.y),
+                ),
+            },
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, self.settings.size.y - 20.0),
+                    Vector::new(self.settings.size.x, 20.0),
+                ),
+            },
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(self.settings.size.x - 20.0, 0.0),
+                    Vector::new(20.0, self.settings.size.y),
+                ),
+            },
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 200.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            },
+            Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 1500.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            },
+        ]
     }
 }
 

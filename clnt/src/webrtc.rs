@@ -66,6 +66,7 @@ pub struct Data {
     channel: RtcDataChannel,
     status: Status,
     received: VecDeque<(Instant, comn::ServerMessage)>,
+    now: (Instant, Instant),
 
     recv_rate: stats::Var,
     send_rate: RefCell<stats::Var>,
@@ -98,6 +99,7 @@ impl Client {
             channel,
             status: Status::Connecting,
             received: VecDeque::new(),
+            now: (Instant::now(), Instant::now()),
             recv_rate: stats::Var::new(Duration::from_secs(10)),
             send_rate: RefCell::new(stats::Var::new(Duration::from_secs(10))),
             _peer: peer.clone(),
@@ -207,6 +209,10 @@ impl Client {
             .sum_per_sec()
             .unwrap_or(0.0)
     }
+
+    pub fn set_now(&self, now: (Instant, Instant)) {
+        self.data.borrow_mut().now = now;
+    }
 }
 
 impl Data {
@@ -229,6 +235,7 @@ impl Data {
     }
 
     pub fn on_message(&mut self, event: &MessageEvent) {
+        //let recv_time = self.now.1 + Instant::now().duration_since(self.now.0);
         let recv_time = Instant::now();
         let message = if event.data().is_instance_of::<js_sys::ArrayBuffer>() {
             let abuf = event.data().dyn_into::<js_sys::ArrayBuffer>().unwrap();

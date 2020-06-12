@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::{run, EntityId, PlayerId, Point, Vector},
-    geom::AaRect,
+    geom::{AaRect, Rect},
     GameError, GameResult, GameTime,
 };
 
@@ -15,17 +15,17 @@ pub enum Entity {
 }
 
 impl Entity {
-    pub fn player(&self) -> GameResult<PlayerEntity> {
+    pub fn player(&self) -> GameResult<&PlayerEntity> {
         if let Entity::Player(e) = self {
-            Ok(e.clone())
+            Ok(e)
         } else {
             Err(GameError::UnexpectedEntityType)
         }
     }
 
-    pub fn danger_guy(&self) -> GameResult<DangerGuy> {
+    pub fn danger_guy(&self) -> GameResult<&DangerGuy> {
         if let Entity::DangerGuy(e) = self {
-            Ok(e.clone())
+            Ok(e)
         } else {
             Err(GameError::UnexpectedEntityType)
         }
@@ -49,7 +49,10 @@ pub struct PlayerEntity {
     pub angle: Option<f32>,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
-    pub last_dash_time: Option<GameTime>,
+    pub last_dash: Option<(GameTime, Vector)>,
+
+    // TODO: Redundant state needed for display
+    pub is_dashing: bool,
 }
 
 impl PlayerEntity {
@@ -61,7 +64,29 @@ impl PlayerEntity {
             angle: Some(0.0),
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
-            last_dash_time: None,
+            last_dash: None,
+            is_dashing: false,
+        }
+    }
+
+    pub fn rect(&self) -> Rect {
+        if let Some(angle) = self.angle {
+            AaRect::new_center(
+                self.pos,
+                Vector::new(run::PLAYER_MOVE_W, run::PLAYER_MOVE_L),
+            )
+            .rotate(angle)
+        } else {
+            AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
+                .to_rect()
+        }
+    }
+
+    pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
+        // TODO: Interpolate player properties other than just the position
+        PlayerEntity {
+            pos: self.pos + alpha * (other.pos - self.pos),
+            ..self.clone()
         }
     }
 }
