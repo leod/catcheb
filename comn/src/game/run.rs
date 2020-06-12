@@ -15,10 +15,10 @@ pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
 pub const PLAYER_ACCEL_FACTOR: f32 = 40.0;
-pub const PLAYER_DASH_COOLDOWN: f32 = 5.0;
-pub const PLAYER_DASH_DURATION: GameTime = 0.45;
-pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
-pub const PLAYER_DASH_SPEED: f32 = 700.0;
+pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
+pub const PLAYER_DASH_DURATION: GameTime = 0.5;
+pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 30.0;
+pub const PLAYER_DASH_SPEED: f32 = 750.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -53,6 +53,13 @@ impl Game {
                     if !self.settings.aa_rect().contains_point(bullet.pos(time)) {
                         context.removed_entities.insert(*entity_id);
                         continue;
+                    }
+
+                    for wall in walls.iter() {
+                        if wall.rect.contains_point(bullet.pos(time)) {
+                            context.removed_entities.insert(*entity_id);
+                            continue;
+                        }
                     }
 
                     for (entity_id_b, entity_b) in entities.iter() {
@@ -228,6 +235,7 @@ impl Game {
             let reflected_dash_dir = dash_dir - 2.0 * dash_dir.dot(&flip_axis) * flip_axis;
             ent.last_dash = Some((dash_time, reflected_dash_dir));
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
+            offset += flip_axis * 0.1;
         }
 
         ent.pos += offset;
