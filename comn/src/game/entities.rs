@@ -39,6 +39,15 @@ impl Entity {
             Entity::Turret(entity) => entity.pos,
         }
     }
+
+    pub fn interp(&self, other: &Entity, alpha: f32) -> Entity {
+        match (self, other) {
+            (Entity::Player(this), Entity::Player(other)) => {
+                Entity::Player(this.interp(other, alpha))
+            }
+            _ => self.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
