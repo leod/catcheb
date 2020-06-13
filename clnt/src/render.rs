@@ -137,13 +137,6 @@ pub fn render_game(
         gfx.set_blend_mode(Some(Default::default()));
     }
 
-    for wall in state.walls().iter() {
-        let transform = rect_to_transform(&wall.rect.to_rect());
-        let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
-        gfx.set_transform(transform.then(camera_transform));
-        gfx.fill_rect(&rect, Color::BLACK);
-    }
-
     for entity in interp_entities(state, next_entities, time) {
         match entity {
             comn::Entity::Player(player) => {
@@ -259,6 +252,12 @@ pub fn render_game(
 
                 let rect = Rectangle::new(Vector::new(0.0, -5.0), Vector::new(40.0, 10.0));
 
+                gfx.fill_rect(&rect, Color::BLACK);
+            }
+            comn::Entity::Wall(wall) => {
+                let transform = rect_to_transform(&wall.rect.to_rect());
+                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+                gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, Color::BLACK);
             }
         }

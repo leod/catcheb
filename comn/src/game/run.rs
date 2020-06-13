@@ -49,7 +49,6 @@ impl Game {
 
         // TODO: clone
         let entities = self.entities.clone();
-        let walls = self.walls();
 
         for (entity_id, entity) in self.entities.iter_mut() {
             match entity {
@@ -57,13 +56,6 @@ impl Game {
                     if !self.settings.aa_rect().contains_point(bullet.pos(time)) {
                         context.removed_entities.insert(*entity_id);
                         continue;
-                    }
-
-                    for wall in walls.iter() {
-                        if wall.rect.contains_point(bullet.pos(time)) {
-                            context.removed_entities.insert(*entity_id);
-                            continue;
-                        }
                     }
 
                     for (entity_id_b, entity_b) in entities.iter() {
@@ -82,6 +74,12 @@ impl Game {
                                     < TURRET_RADIUS + BULLET_RADIUS
                                 {
                                     context.removed_entities.insert(*entity_id);
+                                }
+                            }
+                            Entity::Wall(wall) => {
+                                if wall.rect.contains_point(bullet.pos(time)) {
+                                    context.removed_entities.insert(*entity_id);
+                                    continue;
                                 }
                             }
                             _ => (),
@@ -277,21 +275,14 @@ impl Game {
         let mut flip_axis = None;
 
         for (_, entity) in input_state.entities.iter() {
-            match entity {
-                Entity::Player(other_ent) if other_ent.owner != player_id => {
-                    if let Some(collision) =
-                        geom::rect_collision(&ent.rect(), &other_ent.rect(), offset)
-                    {
-                        offset += collision.resolution_vector;
-                        flip_axis = Some(collision.axis);
-                    }
-                }
-                _ => (),
-            }
-        }
+            let other_shape = match entity {
+                Entity::Player(other_ent) if other_ent.owner != player_id => Some(other_ent.rect()),
+                Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
+                _ => None,
+            };
 
-        for wall in input_state.walls() {
-            if let Some(collision) = geom::rect_collision(&ent.rect(), &wall.rect.to_rect(), offset)
+            if let Some(collision) = other_shape
+                .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset))
             {
                 offset += collision.resolution_vector;
                 flip_axis = Some(collision.axis);

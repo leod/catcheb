@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::{DangerGuy, Turret};
+use entities::{DangerGuy, Turret, Wall};
 
 use crate::{
     geom,
@@ -106,11 +106,6 @@ pub enum Item {
     StunGun,
 }
 
-#[derive(Debug, Clone)]
-pub struct Wall {
-    pub rect: geom::AaRect,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DeathReason {
     ShotBy(Option<PlayerId>),
@@ -179,7 +174,7 @@ impl Game {
         }
     }
 
-    pub fn initial_entities(_settings: &Settings) -> Vec<Entity> {
+    pub fn initial_entities(settings: &Settings) -> Vec<Entity> {
         vec![
             /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(700.0, 100.0),
@@ -220,6 +215,42 @@ impl Game {
                 angle: 0.0,
                 next_shot_time: 0.0,
             }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, 0.0),
+                    Vector::new(settings.size.x, 20.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, 0.0),
+                    Vector::new(20.0, settings.size.y),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, settings.size.y - 20.0),
+                    Vector::new(settings.size.x, 20.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(settings.size.x - 20.0, 0.0),
+                    Vector::new(20.0, settings.size.y),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 200.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 1500.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            }),
         ]
     }
 
@@ -229,47 +260,6 @@ impl Game {
 
     pub fn current_game_time(&self) -> GameTime {
         self.tick_game_time(self.tick_num)
-    }
-
-    pub fn walls(&self) -> Vec<Wall> {
-        vec![
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, 0.0),
-                    Vector::new(self.settings.size.x, 20.0),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, 0.0),
-                    Vector::new(20.0, self.settings.size.y),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, self.settings.size.y - 20.0),
-                    Vector::new(self.settings.size.x, 20.0),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(self.settings.size.x - 20.0, 0.0),
-                    Vector::new(20.0, self.settings.size.y),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(1500.0, 200.0),
-                    Vector::new(150.0, 150.0),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(1500.0, 1500.0),
-                    Vector::new(150.0, 150.0),
-                ),
-            },
-        ]
     }
 }
 

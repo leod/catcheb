@@ -1,7 +1,10 @@
 use std::iter::once;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{Point, Vector};
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Shape {
     AaRect(AaRect),
     Rect(Rect),
@@ -18,7 +21,7 @@ impl Shape {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AaRect {
     pub top_left: Point,
     pub size: Vector,
@@ -36,6 +39,10 @@ impl AaRect {
         }
     }
 
+    pub fn center(&self) -> Point {
+        self.top_left + self.size / 2.0
+    }
+
     pub fn contains_point(&self, point: Point) -> bool {
         point.x >= self.top_left.x
             && point.y >= self.top_left.y
@@ -45,7 +52,7 @@ impl AaRect {
 
     pub fn rotate(&self, angle: f32) -> Rect {
         Rect {
-            center: self.top_left + self.size / 2.0,
+            center: self.center(),
             size: self.size,
             angle,
             x_edge: self.size.x * Vector::new(angle.cos(), angle.sin()),
@@ -55,7 +62,7 @@ impl AaRect {
 
     pub fn to_rect(&self) -> Rect {
         Rect {
-            center: self.top_left + self.size / 2.0,
+            center: self.center(),
             size: self.size,
             angle: 0.0,
             x_edge: Vector::new(self.size.x, 0.0),
@@ -94,7 +101,7 @@ impl AxisProjection {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Rect {
     pub center: Point,
     pub size: Vector,
@@ -217,6 +224,7 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Circle {
     pub center: Point,
     pub radius: f32,
