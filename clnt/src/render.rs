@@ -16,7 +16,10 @@ use quicksilver::{
     Settings, Window,
 };
 
-use comn::{geom, game::run::{BULLET_RADIUS, TURRET_RADIUS}};
+use comn::{
+    game::run::{BULLET_RADIUS, TURRET_RADIUS},
+    geom,
+};
 
 pub struct Resources {
     pub ttf: VectorFont,
