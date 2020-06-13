@@ -31,7 +31,6 @@ impl Entity {
         }
     }
 
-
     pub fn pos(&self, time: GameTime) -> Point {
         match self {
             Entity::Player(entity) => entity.pos,
@@ -43,8 +42,21 @@ impl Entity {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HookState {
+    Shooting {
+        start_time: GameTime,
+        start_pos: Point,
+        vel: Vector,
+    },
+    Attached {
+        target: EntityId,
+        offset: Vector,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Hook {
-    fix: Option<(EntityId, Vector)>,
+    pub state: HookState,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -56,10 +68,9 @@ pub struct PlayerEntity {
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
-    pub hook: Option<Hook>,
-
     // TODO: Redundant state needed for display
     pub is_dashing: bool,
+    pub hook: Option<Hook>,
 }
 
 impl PlayerEntity {
@@ -73,6 +84,7 @@ impl PlayerEntity {
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
             is_dashing: false,
+            hook: None,
         }
     }
 
@@ -139,6 +151,15 @@ impl DangerGuy {
             self.end_pos
                 - (tau - 2.0 * self.wait_time - self.walk_time()) / self.walk_time() * delta
         }
+
+        /*pareen::seq! {
+            self.wait_time => self.start_pos,
+            self.walk_time() => pareen::lerp(self.start_pos, self.end_pos).scale_time(1.0 / self.walk_time()),
+            self.wait_time => self.end_pos,
+            self.walk_time() => pareen::lerp(self.end_pos, self.start_pos).scale_time(1.0 / self.walk_time()),
+        }
+        .repeat(self.period())
+        .eval(t)*/
     }
 
     pub fn dir(&self, t: GameTime) -> Vector {
