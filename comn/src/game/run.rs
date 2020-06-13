@@ -232,7 +232,7 @@ impl Game {
                     let pos = start_pos + (input_time - start_time) * vel;
 
                     if !input.use_action || input_time - start_time > HOOK_MAX_SHOOT_DURATION {
-                        let duration = (pos - ent.pos).norm() * HOOK_CONTRACT_SPEED;
+                        let duration = (pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
                         ent.hook = Some(Hook {
                             state: HookState::Contracting {
                                 start_time: input_time,
@@ -262,7 +262,7 @@ impl Game {
                         let hook_pos = target_entity.pos(input_time) + offset;
 
                         if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE {
-                            let duration = (hook_pos - ent.pos).norm() * HOOK_CONTRACT_SPEED;
+                            let duration = (hook_pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
                             ent.hook = Some(Hook {
                                 state: HookState::Contracting {
                                     start_time: input_time,
