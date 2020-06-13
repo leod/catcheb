@@ -170,6 +170,17 @@ pub fn render_game(
                                 });
                             (player.pos, b)
                         }
+                        comn::HookState::Contracting {
+                            start_time,
+                            duration,
+                            start_pos,
+                        } => {
+                            let delta = player.pos - start_pos;
+                            (
+                                player.pos,
+                                start_pos + ((time - start_time) / duration).min(1.0) * delta,
+                            )
+                        }
                     };
 
                     let a: mint::Vector2<f32> = a.coords.into();

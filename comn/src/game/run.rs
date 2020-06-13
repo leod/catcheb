@@ -21,8 +21,11 @@ pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 30.0;
 pub const PLAYER_DASH_SPEED: f32 = 750.0;
 
 pub const HOOK_SHOOT_SPEED: f32 = 600.0;
-pub const HOOK_MAX_SHOOT_DURATION: f32 = 1.0;
-pub const HOOK_MIN_DISTANCE: f32 = 0.05;
+pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.75;
+pub const HOOK_MIN_DISTANCE: f32 = 5.0;
+pub const HOOK_PULL_SPEED: f32 = 500.0;
+pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
+pub const HOOK_CONTRACT_SPEED: f32 = 1600.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -223,11 +226,18 @@ impl Game {
                     start_pos,
                     vel,
                 } => {
-                    if input_time - start_time > HOOK_MAX_SHOOT_DURATION {
-                        ent.hook = None;
-                    } else {
-                        let pos = start_pos + (input_time - start_time) * vel;
+                    let pos = start_pos + (input_time - start_time) * vel;
 
+                    if !input.use_action || input_time - start_time > HOOK_MAX_SHOOT_DURATION {
+                        let duration = (pos - ent.pos).norm() * HOOK_CONTRACT_SPEED;
+                        ent.hook = Some(Hook {
+                            state: HookState::Contracting {
+                                start_time: input_time,
+                                start_pos: pos,
+                                duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
+                            },
+                        });
+                    } else {
                         for (target_id, target) in input_state.entities.iter() {
                             if entity_id != *target_id
                                 && target.can_hook_attach()
@@ -246,17 +256,30 @@ impl Game {
                 }
                 HookState::Attached { target, offset } => {
                     if let Some(target_entity) = input_state.entities.get(&target) {
-                        let delta_to_target = target_entity.pos(input_time) + offset - ent.pos;
-                        if delta_to_target.norm() < HOOK_MIN_DISTANCE {
-                            ent.hook = None;
+                        let hook_pos = target_entity.pos(input_time) + offset;
+
+                        if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE {
+                            let duration = (hook_pos - ent.pos).norm() * HOOK_CONTRACT_SPEED;
+                            ent.hook = Some(Hook {
+                                state: HookState::Contracting {
+                                    start_time: input_time,
+                                    start_pos: hook_pos,
+                                    duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
+                                },
+                            });
                         } else {
-                            ent.vel += delta_to_target;
+                            ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
                         }
                     } else {
                         ent.hook = None;
                     }
-
-                    if !input.use_action {
+                }
+                HookState::Contracting {
+                    start_time,
+                    duration,
+                    ..
+                } => {
+                    if input_time - start_time >= duration {
                         ent.hook = None;
                     }
                 }
