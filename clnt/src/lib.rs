@@ -48,7 +48,7 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
         move_up: pressed_keys.contains(&Key::W),
         move_down: pressed_keys.contains(&Key::S),
         use_item: pressed_keys.contains(&Key::Space),
-        use_action: false,
+        use_action: pressed_keys.contains(&Key::LShift),
     }
 }
 

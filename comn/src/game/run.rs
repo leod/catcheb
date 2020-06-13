@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::entities::Bullet;
 use crate::{
     geom::{self, AaRect},
-    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Input,
-    PlayerEntity, PlayerId, Vector,
+    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
+    Input, PlayerEntity, PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 250.0;
@@ -19,6 +19,9 @@ pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
 pub const PLAYER_DASH_DURATION: GameTime = 0.5;
 pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 30.0;
 pub const PLAYER_DASH_SPEED: f32 = 750.0;
+
+pub const HOOK_SHOOT_SPEED: f32 = 600.0;
+pub const HOOK_MAX_SHOOT_DURATION: f32 = 1.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -138,7 +141,14 @@ impl Game {
         if let Some((entity_id, ent)) = self.get_player_entity(player_id) {
             let mut ent = ent.clone();
 
-            self.run_player_entity_input(player_id, input, input_state, context, &mut ent)?;
+            self.run_player_entity_input(
+                player_id,
+                input,
+                input_state,
+                context,
+                entity_id,
+                &mut ent,
+            )?;
 
             self.entities.insert(entity_id, Entity::Player(ent));
         }
@@ -146,12 +156,13 @@ impl Game {
         Ok(())
     }
 
-    pub fn run_player_entity_input(
+    fn run_player_entity_input(
         &mut self,
         player_id: PlayerId,
         input: &Input,
         input_state: Option<&Game>,
         context: &mut RunContext,
+        entity_id: EntityId,
         ent: &mut PlayerEntity,
     ) -> GameResult<()> {
         let dt = self.settings.tick_period();
@@ -266,6 +277,46 @@ impl Game {
             ent.last_dash = Some((input_time, delta));
         }
 
+        if let Some(hook) = ent.hook.clone() {
+            match hook.state {
+                HookState::Shooting {
+                    start_time,
+                    start_pos,
+                    vel,
+                } => {
+                    if input_time - start_time > HOOK_MAX_SHOOT_DURATION {
+                        ent.hook = None;
+                    } else {
+                        let pos = start_pos + (input_time - start_time) * vel;
+
+                        for (target_id, target) in input_state.entities.iter() {
+                            if entity_id != *target_id
+                                && target.can_hook_attach()
+                                && target.shape(input_time).contains_point(pos)
+                            {
+                                ent.hook = Some(Hook {
+                                    state: HookState::Attached {
+                                        target: *target_id,
+                                        offset: pos - target.pos(input_time),
+                                    },
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+                HookState::Attached { target, offset } => {}
+            }
+        } else if input.use_action && delta.norm() > 0.0 && ent.hook.is_none() {
+            ent.hook = Some(Hook {
+                state: HookState::Shooting {
+                    start_time: input_time,
+                    start_pos: ent.pos,
+                    vel: delta.normalize() * HOOK_SHOOT_SPEED,
+                },
+            });
+        }
+
         /*if input_time >= ent.next_shot_time {
             if ent.shots_left == 0 {
                 ent.shots_left = MAGAZINE_SIZE;
@@ -305,11 +356,7 @@ impl Game {
                     }
                 }
                 Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
-                    // TODO: Player geometry
-                    let aa_rect =
-                        AaRect::new_center(ent.pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
-
-                    if aa_rect.contains_point(bullet.pos(input_time)) {
+                    if ent.rect().contains_point(bullet.pos(input_time)) {
                         context.removed_entities.insert(*entity_id);
                         context
                             .killed_players
