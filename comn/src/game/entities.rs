@@ -93,8 +93,6 @@ pub struct PlayerEntity {
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
-    // TODO: Redundant state needed for display
-    pub is_dashing: bool,
     pub hook: Option<Hook>,
 }
 
@@ -108,7 +106,6 @@ impl PlayerEntity {
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
-            is_dashing: false,
             hook: None,
         }
     }

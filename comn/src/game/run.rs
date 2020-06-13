@@ -7,7 +7,7 @@ use crate::{
     Input, PlayerEntity, PlayerId, Vector,
 };
 
-pub const PLAYER_MOVE_SPEED: f32 = 250.0;
+pub const PLAYER_MOVE_SPEED: f32 = 300.0;
 pub const PLAYER_SIT_W: f32 = 40.0;
 pub const PLAYER_SIT_L: f32 = 40.0;
 pub const PLAYER_MOVE_W: f32 = 56.6;
@@ -177,9 +177,6 @@ impl Game {
         let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
         });
-
-        // TODO: Redundant state needed for display
-        ent.is_dashing = cur_dash.is_some();
 
         let mut delta = Vector::new(0.0, 0.0);
 
