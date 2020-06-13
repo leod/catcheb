@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 
 use log::{debug, info};
 use rand::seq::SliceRandom;
@@ -9,9 +9,15 @@ pub const FIRST_SPAWN_DURATION: comn::GameTime = 0.5;
 pub const RESPAWN_DURATION: comn::GameTime = 2.0;
 pub const KEEP_PREV_STATES_DURATION: comn::GameTime = 1.0;
 
+pub struct PlayerMeta {
+    pub last_input_num: Option<comn::TickNum>,
+}
+
 pub struct Game {
     pub state: comn::Game,
     pub next_entity_id: comn::EntityId,
+
+    pub players_meta: BTreeMap<comn::PlayerId, PlayerMeta>,
 
     /// Previous states, used for reconciliation.
     pub prev_states: VecDeque<comn::Game>,
@@ -35,6 +41,7 @@ impl Game {
         Self {
             state,
             next_entity_id,
+            players_meta: BTreeMap::new(),
             prev_states: VecDeque::new(),
             last_events: Vec::new(),
         }
@@ -73,12 +80,16 @@ impl Game {
                 respawn_time: spawn_time,
             },
         };
+        let player_meta = PlayerMeta {
+            last_input_num: None,
+        };
         info!(
             "New player {:?} with id {:?} joined game",
             player, player_id
         );
 
         self.state.players.insert(player_id, player);
+        self.players_meta.insert(player_id, player_meta);
 
         player_id
     }
@@ -100,6 +111,10 @@ impl Game {
             self.state
                 .run_player_input(*player_id, input, input_state, &mut context)
                 .unwrap();
+            self.players_meta
+                .get_mut(&player_id)
+                .unwrap()
+                .last_input_num = Some(*input_tick_num);
         }
 
         for (player_id, player) in self.state.players.iter_mut() {
@@ -163,6 +178,7 @@ impl Game {
     pub fn remove_player(&mut self, player_id: comn::PlayerId) {
         debug!("Removing player {:?}", player_id);
         self.state.players.remove(&player_id).unwrap();
+        self.players_meta.remove(&player_id).unwrap();
 
         let remove_ids: Vec<comn::EntityId> = self
             .state
@@ -183,6 +199,34 @@ impl Game {
 
         for entity_id in remove_ids {
             self.remove_entity(entity_id);
+        }
+    }
+
+    pub fn correct_time_for_player(&self, observer_id: comn::PlayerId, state: &mut comn::Game) {
+        let state_time = state.current_game_time();
+        for entity in state.entities.values_mut() {
+            match entity {
+                comn::Entity::Player(player) if player.owner != observer_id => {
+                    if let Some(last_input_num) = self.players_meta[&player.owner].last_input_num {
+                        let time_lag = state_time - self.state.tick_game_time(last_input_num);
+                        if let Some((time, _)) = &mut player.last_dash {
+                            *time += time_lag;
+                        }
+                        if let Some(hook) = &mut player.hook {
+                            match &mut hook.state {
+                                comn::HookState::Shooting { start_time, .. } => {
+                                    *start_time += time_lag;
+                                }
+                                comn::HookState::Attached { .. } => (),
+                                comn::HookState::Contracting { start_time, .. } => {
+                                    *start_time += time_lag;
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            }
         }
     }
 

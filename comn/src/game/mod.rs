@@ -218,25 +218,25 @@ impl Game {
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
                     Point::new(0.0, 0.0),
-                    Vector::new(settings.size.x, 20.0),
+                    Vector::new(settings.size.x, 40.0),
                 ),
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
                     Point::new(0.0, 0.0),
-                    Vector::new(20.0, settings.size.y),
+                    Vector::new(40.0, settings.size.y),
                 ),
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, settings.size.y - 20.0),
-                    Vector::new(settings.size.x, 20.0),
+                    Point::new(0.0, settings.size.y - 40.0),
+                    Vector::new(settings.size.x, 40.0),
                 ),
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
-                    Point::new(settings.size.x - 20.0, 0.0),
-                    Vector::new(20.0, settings.size.y),
+                    Point::new(settings.size.x - 40.0, 0.0),
+                    Vector::new(40.0, settings.size.y),
                 ),
             }),
             Entity::Wall(Wall {

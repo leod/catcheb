@@ -560,6 +560,8 @@ impl Runner {
         for (player_token, player) in self.players.iter_mut() {
             if let Some(peer) = player.peer {
                 let game = &self.games[&player.game_id];
+                let mut state = game.state.clone();
+                game.correct_time_for_player(player.player_id, &mut state);
 
                 let mut events = vec![(game.state.tick_num, game.last_events.clone())];
 
@@ -569,7 +571,7 @@ impl Runner {
                     (player.last_ack_tick, player.last_sent.front().as_ref())
                 {
                     if ack_num == sent_state.tick_num
-                        && ack_num.0 + MAX_DIFF_TICKS > game.state.tick_num.0
+                        && ack_num.0 + MAX_DIFF_TICKS > state.tick_num.0
                     {
                         // Re-send all the events that happened since the base
                         // tick.
@@ -582,14 +584,14 @@ impl Runner {
                         // Okay, we know that the player has acknowledged a tick
                         // for which we also still have the state. We can use
                         // this state as the basis for delta encoding.
-                        (Some(ack_num), sent_state.diff(&game.state))
+                        (Some(ack_num), sent_state.diff(&state))
                     } else {
                         info!(
                             "Sending tick {:?} from scratch to {:?} (last ack: {:?})",
                             game.state.tick_num, player_token, player.last_ack_tick,
                         );
                         let base_state = comn::Game::new(game.state.settings.clone());
-                        (None, base_state.diff(&game.state))
+                        (None, base_state.diff(&state))
                     }
                 } else {
                     info!(
@@ -597,7 +599,7 @@ impl Runner {
                         game.state.tick_num, player_token, player.last_ack_tick,
                     );
                     let base_state = comn::Game::new(game.state.settings.clone());
-                    (None, base_state.diff(&game.state))
+                    (None, base_state.diff(&state))
                 };
 
                 // Remember the state we're sending, so that we may use it as
@@ -605,7 +607,7 @@ impl Runner {
                 // will receive the client's receival acknowledgement).
                 player
                     .last_sent
-                    .push_back((game.last_events.clone(), game.state.clone()));
+                    .push_back((game.last_events.clone(), state.clone()));
 
                 self.stats
                     .last_sent_len
