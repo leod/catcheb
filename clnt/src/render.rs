@@ -19,6 +19,7 @@ use quicksilver::{
 use comn::{
     game::run::{BULLET_RADIUS, TURRET_RADIUS},
     geom,
+    util::join,
 };
 
 pub struct Resources {
@@ -49,6 +50,24 @@ impl Resources {
     }
 }
 
+pub fn interp_entities<'a>(
+    state: &'a comn::Game,
+    next_entities: &'a BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    time: comn::GameTime,
+) -> impl Iterator<Item = comn::Entity> + 'a {
+    join::full_join(state.entities.iter(), next_entities.iter()).filter_map(
+        move |item| match item {
+            join::Item::Left(_, entity) => Some(entity.clone()),
+            join::Item::Right(_, _) => None,
+            join::Item::Both(_, entity, (next_time, next_entity)) => {
+                let tau =
+                    (time - state.current_game_time()) / (next_time - state.current_game_time());
+                Some(entity.interp(next_entity, tau))
+            }
+        },
+    )
+}
+
 pub fn render_game(
     gfx: &mut Graphics,
     resources: &mut Resources,
@@ -58,8 +77,6 @@ pub fn render_game(
     my_player_id: comn::PlayerId,
     camera_transform: Transform,
 ) -> quicksilver::Result<()> {
-    let state_time = state.tick_game_time(state.tick_num);
-
     {
         gfx.set_transform(camera_transform);
         let map_size: mint::Vector2<f32> = state.settings.size.into();
@@ -108,20 +125,10 @@ pub fn render_game(
         gfx.fill_rect(&rect, Color::BLACK);
     }
 
-    for (entity_id, entity) in state.entities.iter() {
+    for entity in interp_entities(state, next_entities, time) {
         match entity {
             comn::Entity::Player(player) => {
-                let interp_player = next_entities
-                    .get(entity_id)
-                    .and_then(|(next_time, next_entity)| {
-                        let tau = (time - state_time) / (next_time - state_time);
-                        next_entity
-                            .player()
-                            .ok()
-                            .map(|next_entity| player.interp(next_entity, tau))
-                    })
-                    .unwrap_or(player.clone());
-                let pos: mint::Vector2<f32> = interp_player.pos.coords.into();
+                let pos: mint::Vector2<f32> = player.pos.coords.into();
 
                 let color = if player.owner == my_player_id {
                     Color::BLUE
@@ -129,9 +136,7 @@ pub fn render_game(
                     Color::from_rgba(148, 0, 211, 1.0)
                 };
 
-                let transform = rect_to_transform(&interp_player.rect());
-                info!("angle: {}", player.rect().angle);
-                //let rect = Rectangle::new(Vector::new(0.0, 0.0), Vector::new(1.0, 1.0));
+                let transform = rect_to_transform(&player.rect());
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
 
                 gfx.set_transform(transform.then(camera_transform));
