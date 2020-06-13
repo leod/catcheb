@@ -407,8 +407,6 @@ impl Game {
                     // to the correct time
                     self.interp_game_time = recv_game_time;
 
-                    // TODO: Run events?
-
                     info!("Starting tick stream at recv_game_time={}", recv_game_time);
                 }
 
