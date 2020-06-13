@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use log::info;
 
 use quicksilver::{
-    geom::{Circle, Rectangle, Transform, Vector},
+    geom::{Circle, Rectangle, Transform, Vector, Line},
     golem::TextureFilter,
     graphics::{
         //blend::{BlendEquation, BlendFunction, BlendMode, BlendOperation, BlendFactor, BlendChannel, BlendInput},
@@ -161,6 +161,36 @@ pub fn render_game(
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);
                 gfx.stroke_rect(&rect, Color::BLACK);
+
+                if let Some(hook) = interp_player.hook.as_ref() {
+                    let (a, b) = match hook.state {
+                        comn::HookState::Shooting {
+                            start_time,
+                            start_pos,
+                            vel,
+                        } => {
+                            (
+                                interp_player.pos,
+                                start_pos + (time - start_time) * vel,
+                            )
+                        }
+                        comn::HookState::Attached {
+                            target,
+                            offset,
+                        } => {
+                            let target_ent = 
+                            if let Some(target_ent) = state.entities.
+                            let b =
+
+                            (interp_player.pos, b)
+                        }
+                    }
+
+                    gfx.stroke_path(
+                        &[a, b],
+                        Color::BLACK,
+                    );
+                }
 
                 gfx.set_transform(camera_transform);
                 resources

@@ -2,6 +2,22 @@ use std::iter::once;
 
 use crate::{Point, Vector};
 
+pub enum Shape {
+    AaRect(AaRect),
+    Rect(Rect),
+    Circle(Circle),
+}
+
+impl Shape {
+    pub fn contains_point(&self, point: Point) -> bool {
+        match self {
+            Shape::AaRect(shape) => shape.contains_point(point),
+            Shape::Rect(shape) => shape.contains_point(point),
+            Shape::Circle(shape) => shape.contains_point(point),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AaRect {
     pub top_left: Point,
@@ -112,11 +128,15 @@ impl Rect {
         }
     }
 
-    /*pub fn contains_point(&self, point: Point) -> bool {
-        let uv = nalgebra::Matrix2::from_columns(&[self.x_edge, self.y_edge]).invert() * (self.center - point);
+    pub fn contains_point(&self, point: Point) -> bool {
+        // TODO: Needlessly inefficient
+        let uv = nalgebra::Matrix2::from_columns(&[self.x_edge, self.y_edge])
+            .try_inverse()
+            .unwrap()
+            * (self.center - point);
 
         uv.x >= -0.5 && uv.x <= 0.5 && uv.y >= -0.5 && uv.y <= 0.5
-    }*/
+    }
 }
 
 pub struct Collision {
@@ -194,5 +214,16 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
         })
     } else {
         None
+    }
+}
+
+pub struct Circle {
+    pub center: Point,
+    pub radius: f32,
+}
+
+impl Circle {
+    pub fn contains_point(&self, point: Point) -> bool {
+        (self.center - point).norm_squared() <= self.radius * self.radius
     }
 }

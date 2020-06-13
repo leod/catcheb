@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::{run, EntityId, PlayerId, Point, Vector},
-    geom::{AaRect, Rect},
+    geom::{AaRect, Rect, Shape, Circle},
     GameError, GameResult, GameTime,
 };
 
@@ -17,14 +17,6 @@ pub enum Entity {
 impl Entity {
     pub fn player(&self) -> GameResult<&PlayerEntity> {
         if let Entity::Player(e) = self {
-            Ok(e)
-        } else {
-            Err(GameError::UnexpectedEntityType)
-        }
-    }
-
-    pub fn danger_guy(&self) -> GameResult<&DangerGuy> {
-        if let Entity::DangerGuy(e) = self {
             Ok(e)
         } else {
             Err(GameError::UnexpectedEntityType)
@@ -46,6 +38,22 @@ impl Entity {
                 Entity::Player(this.interp(other, alpha))
             }
             _ => self.clone(),
+        }
+    }
+
+    pub fn can_hook_attach(&self) -> bool {
+        match self {
+            Entity::Bullet(_) => false,
+            _ => true,
+        }
+    }
+
+    pub fn shape(&self, time: f32) -> Shape {
+        match self {
+            Entity::Player(entity) => entity.shape(),
+            Entity::Bullet(entity) => entity.shape(time),
+            Entity::DangerGuy(entity) => entity.shape(time),
+            Entity::Turret(entity) => entity.shape(),
         }
     }
 }
@@ -108,6 +116,10 @@ impl PlayerEntity {
             AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
                 .to_rect()
         }
+    }
+
+    pub fn shape(&self) -> Shape {
+        Shape::Rect(self.rect())
     }
 
     pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
@@ -185,6 +197,10 @@ impl DangerGuy {
     pub fn aa_rect(&self, t: GameTime) -> AaRect {
         AaRect::new_center(self.pos(t), self.size)
     }
+
+    pub fn shape(&self, t: GameTime) -> Shape {
+        Shape::AaRect(self.aa_rect(t))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -203,6 +219,13 @@ impl Bullet {
             self.start_pos
         }
     }
+
+    pub fn shape(&self, t: GameTime) -> Shape {
+        Shape::Circle(Circle {
+            center: self.pos(t),
+            radius: 1.0,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -217,6 +240,13 @@ impl Turret {
     pub fn angle_to_pos(&self, pos: Point) -> f32 {
         let d = pos - self.pos;
         d.y.atan2(d.x)
+    }
+
+    pub fn shape(&self) -> Shape {
+        Shape::Circle(Circle {
+            center: self.pos,
+            radius: run::TURRET_RADIUS,
+        })
     }
 }
 
