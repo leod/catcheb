@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::{run, EntityId, PlayerId, Point, Vector},
-    geom::{AaRect, Rect, Shape, Circle},
+    geom::{AaRect, Circle, Rect, Shape},
     GameError, GameResult, GameTime,
 };
 

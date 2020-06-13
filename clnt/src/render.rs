@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use log::info;
 
 use quicksilver::{
-    geom::{Circle, Rectangle, Transform, Vector, Line},
+    geom::{Circle, Line, Rectangle, Transform, Vector},
     golem::TextureFilter,
     graphics::{
         //blend::{BlendEquation, BlendFunction, BlendMode, BlendOperation, BlendFactor, BlendChannel, BlendInput},
@@ -161,38 +161,30 @@ pub fn render_game(
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);
                 gfx.stroke_rect(&rect, Color::BLACK);
+                gfx.set_transform(camera_transform);
 
-                if let Some(hook) = interp_player.hook.as_ref() {
+                if let Some(hook) = player.hook.as_ref() {
                     let (a, b) = match hook.state {
                         comn::HookState::Shooting {
                             start_time,
                             start_pos,
                             vel,
-                        } => {
-                            (
-                                interp_player.pos,
-                                start_pos + (time - start_time) * vel,
-                            )
+                        } => (player.pos, start_pos + (time - start_time) * vel),
+                        comn::HookState::Attached { target, offset } => {
+                            let b = interp_entity(state, next_entities, time, target)
+                                .map_or(player.pos, |interp_target| {
+                                    interp_target.pos(time) + offset
+                                });
+                            (player.pos, b)
                         }
-                        comn::HookState::Attached {
-                            target,
-                            offset,
-                        } => {
-                            let target_ent = 
-                            if let Some(target_ent) = state.entities.
-                            let b =
+                    };
 
-                            (interp_player.pos, b)
-                        }
-                    }
-
-                    gfx.stroke_path(
-                        &[a, b],
-                        Color::BLACK,
-                    );
+                    let a: mint::Vector2<f32> = a.coords.into();
+                    let b: mint::Vector2<f32> = b.coords.into();
+                    gfx.stroke_path(&[a.into(), b.into()], Color::BLACK);
+                    gfx.fill_circle(&Circle::new(b.into(), 5.0), Color::BLACK);
                 }
 
-                gfx.set_transform(camera_transform);
                 resources
                     .font
                     .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;
