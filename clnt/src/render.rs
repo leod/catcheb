@@ -68,6 +68,25 @@ pub fn interp_entities<'a>(
     )
 }
 
+pub fn interp_entity(
+    state: &comn::Game,
+    next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    time: comn::GameTime,
+    entity_id: comn::EntityId,
+) -> Option<comn::Entity> {
+    match (
+        state.entities.get(&entity_id),
+        next_entities.get(&entity_id),
+    ) {
+        (Some(entity), None) => Some(entity.clone()),
+        (Some(entity), Some((next_time, next_entity))) => {
+            let tau = (time - state.current_game_time()) / (next_time - state.current_game_time());
+            Some(entity.interp(next_entity, tau))
+        }
+        (None, _) => None,
+    }
+}
+
 pub fn render_game(
     gfx: &mut Graphics,
     resources: &mut Resources,
