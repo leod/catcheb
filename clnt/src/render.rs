@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use log::info;
 
 use quicksilver::{
-    geom::{Circle, Line, Rectangle, Transform, Vector},
+    geom::{Circle, Rectangle, Transform, Vector},
     golem::TextureFilter,
     graphics::{
         //blend::{BlendEquation, BlendFunction, BlendMode, BlendOperation, BlendFactor, BlendChannel, BlendInput},
@@ -157,18 +157,18 @@ pub fn render_game(
                 gfx.set_transform(camera_transform);
 
                 if let Some(hook) = player.hook.as_ref() {
-                    let (a, b) = match hook.state {
+                    let (a, b, dead) = match hook.state {
                         comn::HookState::Shooting {
                             start_time,
                             start_pos,
                             vel,
-                        } => (player.pos, start_pos + (time - start_time) * vel),
+                        } => (player.pos, start_pos + (time - start_time) * vel, false),
                         comn::HookState::Attached { target, offset } => {
                             let b = interp_entity(state, next_entities, time, target)
                                 .map_or(player.pos, |interp_target| {
                                     interp_target.pos(time) + offset
                                 });
-                            (player.pos, b)
+                            (player.pos, b, false)
                         }
                         comn::HookState::Contracting {
                             start_time,
@@ -179,14 +179,26 @@ pub fn render_game(
                             (
                                 player.pos,
                                 start_pos + ((time - start_time) / duration).min(1.0) * delta,
+                                true,
                             )
                         }
                     };
 
                     let a: mint::Vector2<f32> = a.coords.into();
                     let b: mint::Vector2<f32> = b.coords.into();
-                    gfx.stroke_path(&[a.into(), b.into()], Color::BLACK);
-                    gfx.fill_circle(&Circle::new(b.into(), 5.0), Color::BLACK);
+                    if !dead {
+                        gfx.stroke_path(&[a.into(), b.into()], Color::from_rgba(50, 50, 50, 1.0));
+                        gfx.fill_circle(
+                            &Circle::new(b.into(), 7.0),
+                            Color::from_rgba(50, 50, 50, 1.0),
+                        );
+                    } else {
+                        gfx.stroke_path(&[a.into(), b.into()], Color::from_rgba(80, 80, 80, 1.0));
+                        gfx.stroke_circle(
+                            &Circle::new(b.into(), 7.0),
+                            Color::from_rgba(80, 80, 80, 1.0),
+                        );
+                    }
                 }
 
                 resources

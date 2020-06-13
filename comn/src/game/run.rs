@@ -20,12 +20,15 @@ pub const PLAYER_DASH_DURATION: GameTime = 0.5;
 pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 30.0;
 pub const PLAYER_DASH_SPEED: f32 = 750.0;
 
-pub const HOOK_SHOOT_SPEED: f32 = 600.0;
-pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.75;
+pub const HOOK_SHOOT_SPEED: f32 = 900.0;
+//pub const HOOK_MAX_SHOOT_DURATION: f32 = 5.0;
+pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
 pub const HOOK_MIN_DISTANCE: f32 = 5.0;
 pub const HOOK_PULL_SPEED: f32 = 500.0;
+//pub const HOOK_MAX_CONTRACT_DURATION: f32 = 5.0;;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
-pub const HOOK_CONTRACT_SPEED: f32 = 1600.0;
+//pub const HOOK_CONTRACT_SPEED: f32 = 650.0;
+pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -284,12 +287,12 @@ impl Game {
                     }
                 }
             }
-        } else if input.use_action && delta.norm() > 0.0 && ent.hook.is_none() {
+        } else if input.use_action && ent.vel.norm() > 0.0 && ent.hook.is_none() {
             ent.hook = Some(Hook {
                 state: HookState::Shooting {
                     start_time: input_time,
                     start_pos: ent.pos,
-                    vel: delta.normalize() * HOOK_SHOOT_SPEED,
+                    vel: ent.vel.normalize() * HOOK_SHOOT_SPEED,
                 },
             });
         }
