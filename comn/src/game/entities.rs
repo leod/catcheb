@@ -72,6 +72,11 @@ pub enum HookState {
         target: EntityId,
         offset: Vector,
     },
+    Contracting {
+        start_time: GameTime,
+        duration: GameTime,
+        start_pos: Point,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
