@@ -22,6 +22,7 @@ pub const PLAYER_DASH_SPEED: f32 = 750.0;
 
 pub const HOOK_SHOOT_SPEED: f32 = 600.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 1.0;
+pub const HOOK_MIN_DISTANCE: f32 = 0.05;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -217,6 +218,61 @@ impl Game {
             ent.angle = None;
         }
 
+        if let Some(hook) = ent.hook.clone() {
+            match hook.state {
+                HookState::Shooting {
+                    start_time,
+                    start_pos,
+                    vel,
+                } => {
+                    if input_time - start_time > HOOK_MAX_SHOOT_DURATION {
+                        ent.hook = None;
+                    } else {
+                        let pos = start_pos + (input_time - start_time) * vel;
+
+                        for (target_id, target) in input_state.entities.iter() {
+                            if entity_id != *target_id
+                                && target.can_hook_attach()
+                                && target.shape(input_time).contains_point(pos)
+                            {
+                                ent.hook = Some(Hook {
+                                    state: HookState::Attached {
+                                        target: *target_id,
+                                        offset: pos - target.pos(input_time),
+                                    },
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+                HookState::Attached { target, offset } => {
+                    if let Some(target_entity) = input_state.entities.get(&target) {
+                        let delta_to_target = target_entity.pos(input_time) + offset - ent.pos;
+                        if delta_to_target.norm() < HOOK_MIN_DISTANCE {
+                            ent.hook = None;
+                        } else {
+                            ent.vel += delta_to_target;
+                        }
+                    } else {
+                        ent.hook = None;
+                    }
+
+                    if !input.use_action {
+                        ent.hook = None;
+                    }
+                }
+            }
+        } else if input.use_action && delta.norm() > 0.0 && ent.hook.is_none() {
+            ent.hook = Some(Hook {
+                state: HookState::Shooting {
+                    start_time: input_time,
+                    start_pos: ent.pos,
+                    vel: delta.normalize() * HOOK_SHOOT_SPEED,
+                },
+            });
+        }
+
         let mut offset = ent.vel * dt;
         let mut flip_axis = None;
 
@@ -275,46 +331,6 @@ impl Game {
             && delta.norm() > 0.1
         {
             ent.last_dash = Some((input_time, delta));
-        }
-
-        if let Some(hook) = ent.hook.clone() {
-            match hook.state {
-                HookState::Shooting {
-                    start_time,
-                    start_pos,
-                    vel,
-                } => {
-                    if input_time - start_time > HOOK_MAX_SHOOT_DURATION {
-                        ent.hook = None;
-                    } else {
-                        let pos = start_pos + (input_time - start_time) * vel;
-
-                        for (target_id, target) in input_state.entities.iter() {
-                            if entity_id != *target_id
-                                && target.can_hook_attach()
-                                && target.shape(input_time).contains_point(pos)
-                            {
-                                ent.hook = Some(Hook {
-                                    state: HookState::Attached {
-                                        target: *target_id,
-                                        offset: pos - target.pos(input_time),
-                                    },
-                                });
-                                break;
-                            }
-                        }
-                    }
-                }
-                HookState::Attached { target, offset } => {}
-            }
-        } else if input.use_action && delta.norm() > 0.0 && ent.hook.is_none() {
-            ent.hook = Some(Hook {
-                state: HookState::Shooting {
-                    start_time: input_time,
-                    start_pos: ent.pos,
-                    vel: delta.normalize() * HOOK_SHOOT_SPEED,
-                },
-            });
         }
 
         /*if input_time >= ent.next_shot_time {
