@@ -12,6 +12,7 @@ pub enum Entity {
     Bullet(Bullet),
     DangerGuy(DangerGuy),
     Turret(Turret),
+    Wall(Wall),
 }
 
 impl Entity {
@@ -29,6 +30,7 @@ impl Entity {
             Entity::Bullet(entity) => entity.pos(time),
             Entity::DangerGuy(entity) => entity.pos(time),
             Entity::Turret(entity) => entity.pos,
+            Entity::Wall(entity) => entity.pos(),
         }
     }
 
@@ -54,6 +56,7 @@ impl Entity {
             Entity::Bullet(entity) => entity.shape(time),
             Entity::DangerGuy(entity) => entity.shape(time),
             Entity::Turret(entity) => entity.shape(),
+            Entity::Wall(entity) => entity.shape(),
         }
     }
 }
@@ -250,8 +253,24 @@ impl Turret {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Wall {
+    pub rect: AaRect,
+}
+
+impl Wall {
+    pub fn pos(&self) -> Point {
+        self.rect.center()
+    }
+
+    pub fn shape(&self) -> Shape {
+        Shape::AaRect(self.rect)
+    }
+}
+
 impl_opaque_diff!(Entity);
 impl_opaque_diff!(Bullet);
 impl_opaque_diff!(PlayerEntity);
 impl_opaque_diff!(DangerGuy);
 impl_opaque_diff!(Turret);
+impl_opaque_diff!(Wall);
