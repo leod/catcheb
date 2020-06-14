@@ -187,16 +187,22 @@ pub fn render_game(
                     let a: mint::Vector2<f32> = a.coords.into();
                     let b: mint::Vector2<f32> = b.coords.into();
                     if !dead {
-                        gfx.stroke_path(&[a.into(), b.into()], Color::from_rgba(50, 50, 50, 1.0));
+                        gfx.stroke_path(
+                            &[a.into(), b.into()],
+                            Color::from_rgba(100, 100, 100, 1.0),
+                        );
                         gfx.fill_circle(
-                            &Circle::new(b.into(), 7.0),
-                            Color::from_rgba(50, 50, 50, 1.0),
+                            &Circle::new(b.into(), 12.0),
+                            Color::from_rgba(50, 200, 50, 1.0),
                         );
                     } else {
-                        gfx.stroke_path(&[a.into(), b.into()], Color::from_rgba(80, 80, 80, 1.0));
+                        gfx.stroke_path(
+                            &[a.into(), b.into()],
+                            Color::from_rgba(100, 100, 100, 1.0),
+                        );
                         gfx.stroke_circle(
                             &Circle::new(b.into(), 7.0),
-                            Color::from_rgba(80, 80, 80, 1.0),
+                            Color::from_rgba(100, 100, 100, 1.0),
                         );
                     }
                 }
@@ -281,7 +287,8 @@ pub fn render_game(
                 let transform = rect_to_transform(&wall.rect.to_rect());
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
-                gfx.fill_rect(&rect, Color::BLACK);
+                gfx.fill_rect(&rect, Color::from_rgba(70, 70, 70, 1.0));
+                gfx.stroke_rect(&rect, Color::BLACK);
             }
         }
     }

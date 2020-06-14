@@ -16,8 +16,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            smooth_pos_factor: 10.0,
-            max_smooth_dist: 100.0,
+            smooth_pos_factor: 5.0,
+            max_smooth_dist: 300.0,
         }
     }
 }
@@ -39,7 +39,7 @@ impl Camera {
             centered_pos: comn::Point::origin(),
             target: comn::Point::origin(),
             map_size,
-            scale: 0.6,
+            scale: 0.5,
         }
     }
 
