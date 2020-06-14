@@ -175,7 +175,7 @@ impl Game {
     }
 
     pub fn initial_entities(settings: &Settings) -> Vec<Entity> {
-        vec![
+        let mut ents = vec![
             /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(700.0, 100.0),
                 end_pos: Point::new(1000.0, 100.0),
@@ -241,6 +241,18 @@ impl Game {
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
+                    Point::new(2000.0, 600.0),
+                    Vector::new(20.0, 1100.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(2250.0, 600.0),
+                    Vector::new(20.0, 1100.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
                     Point::new(1500.0, 200.0),
                     Vector::new(150.0, 150.0),
                 ),
@@ -251,7 +263,29 @@ impl Game {
                     Vector::new(150.0, 150.0),
                 ),
             }),
-        ]
+        ];
+
+        for i in 0..6 {
+            let y = 200.0 * i as f32 + 650.0;
+            ents.push(Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(2040.0, y),
+                end_pos: Point::new(2230.0, y),
+                size: Vector::new(40.0, 100.0),
+                speed: 400.0,
+                wait_time: 2.0,
+            }));
+            if i % 2 == 0 {
+                ents.push(Entity::DangerGuy(DangerGuy {
+                    start_pos: Point::new(2230.0, y + 100.0),
+                    end_pos: Point::new(2040.0, y + 100.0),
+                    size: Vector::new(40.0, 100.0),
+                    speed: 400.0,
+                    wait_time: 2.0,
+                }));
+            }
+        }
+
+        ents
     }
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {

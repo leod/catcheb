@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use log::{info, warn};
 
-use comn::game::RunContext;
+use comn::{game::RunContext, util::join};
 
 use crate::game::ReceivedState;
 
@@ -156,7 +156,37 @@ impl Prediction {
     }
 
     fn correct_prediction(predicted: &mut comn::Game, server: &comn::Game) {
+        let mut error = 0.0;
+
         // TODO: Smooth correction of positions
+        join::full_join(predicted.entities.iter(), server.entities.iter()).for_each(|item| {
+            match item {
+                join::Item::Both(_, predicted, server) => {
+                    match (predicted, server) {
+                        (comn::Entity::Player(predicted), comn::Entity::Player(server)) => {
+                            //info!("pos: {:?} vs {:?}", predicted.pos, server.pos);
+                            //info!("dash: {:?} vs {:?}", predicted.last_dash, server.last_dash);
+                            error += (predicted.pos.x - server.pos.x).abs();
+                            error += (predicted.pos.y - server.pos.y).abs();
+                            error += match (predicted.last_dash, server.last_dash) {
+                                (Some((t1, d1)), Some((t2, d2))) => {
+                                    (t1 - t2).abs() + (d1.x - d2.x).abs() + (d1.y - d2.y).abs()
+                                }
+                                (None, None) => 0.0,
+                                _ => 100.0,
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => (),
+            }
+        });
+
+        if error > 0.0 {
+            info!("error: {}", error);
+        }
+
         *predicted = server.clone();
     }
 
