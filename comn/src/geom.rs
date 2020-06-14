@@ -1,8 +1,27 @@
 use std::iter::once;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{Point, Vector};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum Shape {
+    AaRect(AaRect),
+    Rect(Rect),
+    Circle(Circle),
+}
+
+impl Shape {
+    pub fn contains_point(&self, point: Point) -> bool {
+        match self {
+            Shape::AaRect(shape) => shape.contains_point(point),
+            Shape::Rect(shape) => shape.contains_point(point),
+            Shape::Circle(shape) => shape.contains_point(point),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AaRect {
     pub top_left: Point,
     pub size: Vector,
@@ -20,6 +39,10 @@ impl AaRect {
         }
     }
 
+    pub fn center(&self) -> Point {
+        self.top_left + self.size / 2.0
+    }
+
     pub fn contains_point(&self, point: Point) -> bool {
         point.x >= self.top_left.x
             && point.y >= self.top_left.y
@@ -29,7 +52,7 @@ impl AaRect {
 
     pub fn rotate(&self, angle: f32) -> Rect {
         Rect {
-            center: self.top_left + self.size / 2.0,
+            center: self.center(),
             size: self.size,
             angle,
             x_edge: self.size.x * Vector::new(angle.cos(), angle.sin()),
@@ -39,7 +62,7 @@ impl AaRect {
 
     pub fn to_rect(&self) -> Rect {
         Rect {
-            center: self.top_left + self.size / 2.0,
+            center: self.center(),
             size: self.size,
             angle: 0.0,
             x_edge: Vector::new(self.size.x, 0.0),
@@ -78,7 +101,7 @@ impl AxisProjection {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Rect {
     pub center: Point,
     pub size: Vector,
@@ -112,11 +135,15 @@ impl Rect {
         }
     }
 
-    /*pub fn contains_point(&self, point: Point) -> bool {
-        let uv = nalgebra::Matrix2::from_columns(&[self.x_edge, self.y_edge]).invert() * (self.center - point);
+    pub fn contains_point(&self, point: Point) -> bool {
+        // TODO: Needlessly inefficient
+        let uv = nalgebra::Matrix2::from_columns(&[self.x_edge, self.y_edge])
+            .try_inverse()
+            .unwrap()
+            * (self.center - point);
 
         uv.x >= -0.5 && uv.x <= 0.5 && uv.y >= -0.5 && uv.y <= 0.5
-    }*/
+    }
 }
 
 pub struct Collision {
@@ -194,5 +221,17 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
         })
     } else {
         None
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Circle {
+    pub center: Point,
+    pub radius: f32,
+}
+
+impl Circle {
+    pub fn contains_point(&self, point: Point) -> bool {
+        (self.center - point).norm_squared() <= self.radius * self.radius
     }
 }

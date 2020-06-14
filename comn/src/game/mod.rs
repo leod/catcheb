@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::{DangerGuy, Turret};
+use entities::{DangerGuy, Turret, Wall};
 
 use crate::{
     geom,
@@ -106,11 +106,6 @@ pub enum Item {
     StunGun,
 }
 
-#[derive(Debug, Clone)]
-pub struct Wall {
-    pub rect: geom::AaRect,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DeathReason {
     ShotBy(Option<PlayerId>),
@@ -179,8 +174,8 @@ impl Game {
         }
     }
 
-    pub fn initial_entities(_settings: &Settings) -> Vec<Entity> {
-        vec![
+    pub fn initial_entities(settings: &Settings) -> Vec<Entity> {
+        let mut ents = vec![
             /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(700.0, 100.0),
                 end_pos: Point::new(1000.0, 100.0),
@@ -191,14 +186,14 @@ impl Game {
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(100.0, 1200.0),
                 end_pos: Point::new(1500.0, 1200.0),
-                size: Vector::new(30.0, 100.0),
+                size: Vector::new(140.0, 40.0),
                 speed: 1000.0,
                 wait_time: 2.0,
             }),
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(1500.0, 1400.0),
                 end_pos: Point::new(100.0, 1400.0),
-                size: Vector::new(30.0, 100.0),
+                size: Vector::new(140.0, 40.0),
                 speed: 1000.0,
                 wait_time: 2.0,
             }),
@@ -220,7 +215,77 @@ impl Game {
                 angle: 0.0,
                 next_shot_time: 0.0,
             }),
-        ]
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, 0.0),
+                    Vector::new(settings.size.x, 40.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, 0.0),
+                    Vector::new(40.0, settings.size.y),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(0.0, settings.size.y - 40.0),
+                    Vector::new(settings.size.x, 40.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(settings.size.x - 40.0, 0.0),
+                    Vector::new(40.0, settings.size.y),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(2000.0, 600.0),
+                    Vector::new(20.0, 1100.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(2250.0, 600.0),
+                    Vector::new(20.0, 1100.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 200.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            }),
+            Entity::Wall(Wall {
+                rect: geom::AaRect::new_top_left(
+                    Point::new(1500.0, 1500.0),
+                    Vector::new(150.0, 150.0),
+                ),
+            }),
+        ];
+
+        for i in 0..6 {
+            let y = 200.0 * i as f32 + 650.0;
+            ents.push(Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(2040.0, y),
+                end_pos: Point::new(2230.0, y),
+                size: Vector::new(40.0, 100.0),
+                speed: 400.0,
+                wait_time: 2.0,
+            }));
+            if i % 2 == 0 {
+                ents.push(Entity::DangerGuy(DangerGuy {
+                    start_pos: Point::new(2230.0, y + 100.0),
+                    end_pos: Point::new(2040.0, y + 100.0),
+                    size: Vector::new(40.0, 100.0),
+                    speed: 400.0,
+                    wait_time: 2.0,
+                }));
+            }
+        }
+
+        ents
     }
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {
@@ -229,47 +294,6 @@ impl Game {
 
     pub fn current_game_time(&self) -> GameTime {
         self.tick_game_time(self.tick_num)
-    }
-
-    pub fn walls(&self) -> Vec<Wall> {
-        vec![
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, 0.0),
-                    Vector::new(self.settings.size.x, 20.0),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, 0.0),
-                    Vector::new(20.0, self.settings.size.y),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, self.settings.size.y - 20.0),
-                    Vector::new(self.settings.size.x, 20.0),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(self.settings.size.x - 20.0, 0.0),
-                    Vector::new(20.0, self.settings.size.y),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(1500.0, 200.0),
-                    Vector::new(150.0, 150.0),
-                ),
-            },
-            Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(1500.0, 1500.0),
-                    Vector::new(150.0, 150.0),
-                ),
-            },
-        ]
     }
 }
 
