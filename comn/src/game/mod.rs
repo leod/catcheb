@@ -42,7 +42,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             max_num_players: 16,
-            ticks_per_second: 20,
+            ticks_per_second: 30,
             size: Vector::new(2400.0, 2400.0),
             spawn_points: vec![Point::new(50.0, 50.0), Point::new(50.0, 1300.0)],
         }
@@ -189,6 +189,7 @@ impl Game {
                 size: Vector::new(140.0, 40.0),
                 speed: 1000.0,
                 wait_time: 2.0,
+                is_hot: true,
             }),
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(1500.0, 1400.0),
@@ -196,6 +197,7 @@ impl Game {
                 size: Vector::new(140.0, 40.0),
                 speed: 1000.0,
                 wait_time: 2.0,
+                is_hot: true,
             }),
             Entity::Turret(Turret {
                 pos: Point::new(600.0, 400.0),
@@ -263,6 +265,14 @@ impl Game {
                     Vector::new(150.0, 150.0),
                 ),
             }),
+            Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(1750.0, 200.0),
+                end_pos: Point::new(1750.0, 1400.0),
+                size: Vector::new(180.0, 40.0),
+                speed: 800.0,
+                wait_time: 2.0,
+                is_hot: false,
+            }),
         ];
 
         for i in 0..6 {
@@ -273,6 +283,7 @@ impl Game {
                 size: Vector::new(40.0, 100.0),
                 speed: 400.0,
                 wait_time: 2.0,
+                is_hot: true,
             }));
             if i % 2 == 0 {
                 ents.push(Entity::DangerGuy(DangerGuy {
@@ -281,6 +292,7 @@ impl Game {
                     size: Vector::new(40.0, 100.0),
                     speed: 400.0,
                     wait_time: 2.0,
+                    is_hot: true,
                 }));
             }
         }
