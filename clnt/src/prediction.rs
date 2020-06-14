@@ -160,11 +160,8 @@ impl Prediction {
         predicted: &mut comn::Game,
         server: &comn::Game,
     ) {
-        //assert!(predicted.tick_num == server.tick_num);
-
         let mut error = 0.0;
 
-        // TODO: Smooth correction of positions
         predicted.entities = join::full_join(predicted.entities.iter(), server.entities.iter())
             .filter_map(|item| {
                 match item {
