@@ -96,6 +96,8 @@ impl Game {
 
     pub fn run_tick(&mut self, inputs: &[(comn::PlayerId, comn::TickNum, comn::Input)]) {
         //debug!("tick with {} inputs", inputs.len());
+        self.state.tick_num = self.state.tick_num.next();
+
         let current_time = self.state.current_game_time();
         let mut context = RunContext::default();
 
@@ -163,7 +165,6 @@ impl Game {
                 .push(comn::Event::PlayerDied { player_id, reason });
         }
 
-        self.state.tick_num = self.state.tick_num.next();
         self.last_events = context.events;
 
         self.prev_states.push_back(self.state.clone());

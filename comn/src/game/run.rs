@@ -301,6 +301,10 @@ impl Game {
             let other_shape = match entity {
                 Entity::Player(other_ent) if other_ent.owner != player_id => Some(other_ent.rect()),
                 Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
+                Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
+                    //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
+                    Some(other_ent.aa_rect(self.current_game_time()).to_rect())
+                }
                 _ => None,
             };
 
@@ -372,7 +376,7 @@ impl Game {
 
         for (entity_id, entity) in input_state.entities.iter() {
             match entity {
-                Entity::DangerGuy(danger_guy) => {
+                Entity::DangerGuy(danger_guy) if danger_guy.is_hot => {
                     if geom::rect_collision(
                         &danger_guy.aa_rect(input_time).to_rect(),
                         &ent.rect(),
