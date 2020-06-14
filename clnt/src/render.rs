@@ -249,7 +249,13 @@ pub fn render_game(
 
                 gfx.draw_subimage(&resources.hirsch, sub_rect, rect);*/
 
-                gfx.fill_rect(&rect, Color::RED);
+                let color = if danger_guy.is_hot {
+                    Color::RED
+                } else {
+                    Color::CYAN
+                };
+
+                gfx.fill_rect(&rect, color);
                 gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::Bullet(bullet) => {
