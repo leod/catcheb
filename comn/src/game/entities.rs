@@ -13,6 +13,7 @@ pub enum Entity {
     DangerGuy(DangerGuy),
     Turret(Turret),
     Wall(Wall),
+    FoodSpawn(FoodSpawn),
 }
 
 impl Entity {
@@ -31,6 +32,7 @@ impl Entity {
             Entity::DangerGuy(entity) => entity.pos(time),
             Entity::Turret(entity) => entity.pos,
             Entity::Wall(entity) => entity.pos(),
+            Entity::FoodSpawn(entity) => entity.pos,
         }
     }
 
@@ -57,6 +59,7 @@ impl Entity {
             Entity::DangerGuy(entity) => entity.shape(time),
             Entity::Turret(entity) => entity.shape(),
             Entity::Wall(entity) => entity.shape(),
+            Entity::FoodSpawn(entity) => entity.shape(),
         }
     }
 }
@@ -271,9 +274,27 @@ impl Wall {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FoodSpawn {
+    pub pos: Point,
+    pub has_food: bool,
+}
+
+impl FoodSpawn {
+    pub fn rect(&self) -> Rect {
+        AaRect::new_center(self.pos, Vector::new(run::FOOD_SIZE, run::FOOD_SIZE))
+            .rotate(std::f32::consts::PI / 2.0)
+    }
+
+    pub fn shape(&self) -> Shape {
+        Shape::Rect(self.rect())
+    }
+}
+
 impl_opaque_diff!(Entity);
 impl_opaque_diff!(Bullet);
 impl_opaque_diff!(PlayerEntity);
 impl_opaque_diff!(DangerGuy);
 impl_opaque_diff!(Turret);
 impl_opaque_diff!(Wall);
+impl_opaque_diff!(FoodSpawn);

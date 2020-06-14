@@ -296,6 +296,15 @@ pub fn render_game(
                 gfx.fill_rect(&rect, Color::from_rgba(70, 70, 70, 1.0));
                 gfx.stroke_rect(&rect, Color::BLACK);
             }
+            comn::Entity::FoodSpawn(spawn) => {
+                if spawn.has_food {
+                    let transform = rect_to_transform(&spawn.rect());
+                    let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+                    gfx.set_transform(transform.then(camera_transform));
+                    gfx.fill_rect(&rect, Color::ORANGE);
+                    gfx.stroke_rect(&rect, Color::BLACK);
+                }
+            }
         }
     }
 

@@ -201,7 +201,7 @@ impl Prediction {
                             _ => Some((*id, server.clone())),
                         }
                     }
-                    join::Item::Left(_, predicted) => None,
+                    join::Item::Left(_, _) => None,
                     join::Item::Right(id, server) => Some((*id, server.clone())),
                 }
             })

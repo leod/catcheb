@@ -41,6 +41,8 @@ pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
 
+pub const FOOD_SIZE: f32 = 10.0;
+
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
     pub events: Vec<Event>,
