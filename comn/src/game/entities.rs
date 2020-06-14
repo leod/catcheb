@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::{run, EntityId, PlayerId, Point, Vector},
-    geom::{AaRect, Rect},
+    geom::{AaRect, Circle, Rect, Shape},
     GameError, GameResult, GameTime,
 };
 
@@ -12,19 +12,12 @@ pub enum Entity {
     Bullet(Bullet),
     DangerGuy(DangerGuy),
     Turret(Turret),
+    Wall(Wall),
 }
 
 impl Entity {
     pub fn player(&self) -> GameResult<&PlayerEntity> {
         if let Entity::Player(e) = self {
-            Ok(e)
-        } else {
-            Err(GameError::UnexpectedEntityType)
-        }
-    }
-
-    pub fn danger_guy(&self) -> GameResult<&DangerGuy> {
-        if let Entity::DangerGuy(e) = self {
             Ok(e)
         } else {
             Err(GameError::UnexpectedEntityType)
@@ -37,8 +30,58 @@ impl Entity {
             Entity::Bullet(entity) => entity.pos(time),
             Entity::DangerGuy(entity) => entity.pos(time),
             Entity::Turret(entity) => entity.pos,
+            Entity::Wall(entity) => entity.pos(),
         }
     }
+
+    pub fn interp(&self, other: &Entity, alpha: f32) -> Entity {
+        match (self, other) {
+            (Entity::Player(this), Entity::Player(other)) => {
+                Entity::Player(this.interp(other, alpha))
+            }
+            _ => self.clone(),
+        }
+    }
+
+    pub fn can_hook_attach(&self) -> bool {
+        match self {
+            Entity::Bullet(_) => false,
+            _ => true,
+        }
+    }
+
+    pub fn shape(&self, time: f32) -> Shape {
+        match self {
+            Entity::Player(entity) => entity.shape(),
+            Entity::Bullet(entity) => entity.shape(time),
+            Entity::DangerGuy(entity) => entity.shape(time),
+            Entity::Turret(entity) => entity.shape(),
+            Entity::Wall(entity) => entity.shape(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum HookState {
+    Shooting {
+        start_time: GameTime,
+        start_pos: Point,
+        vel: Vector,
+    },
+    Attached {
+        target: EntityId,
+        offset: Vector,
+    },
+    Contracting {
+        start_time: GameTime,
+        duration: GameTime,
+        start_pos: Point,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Hook {
+    pub state: HookState,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,9 +93,7 @@ pub struct PlayerEntity {
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
-
-    // TODO: Redundant state needed for display
-    pub is_dashing: bool,
+    pub hook: Option<Hook>,
 }
 
 impl PlayerEntity {
@@ -65,7 +106,7 @@ impl PlayerEntity {
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
-            is_dashing: false,
+            hook: None,
         }
     }
 
@@ -80,6 +121,10 @@ impl PlayerEntity {
             AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
                 .to_rect()
         }
+    }
+
+    pub fn shape(&self) -> Shape {
+        Shape::Rect(self.rect())
     }
 
     pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
@@ -132,6 +177,15 @@ impl DangerGuy {
             self.end_pos
                 - (tau - 2.0 * self.wait_time - self.walk_time()) / self.walk_time() * delta
         }
+
+        /*pareen::seq! {
+            self.wait_time => self.start_pos,
+            self.walk_time() => pareen::lerp(self.start_pos, self.end_pos).scale_time(1.0 / self.walk_time()),
+            self.wait_time => self.end_pos,
+            self.walk_time() => pareen::lerp(self.end_pos, self.start_pos).scale_time(1.0 / self.walk_time()),
+        }
+        .repeat(self.period())
+        .eval(t)*/
     }
 
     pub fn dir(&self, t: GameTime) -> Vector {
@@ -147,6 +201,10 @@ impl DangerGuy {
 
     pub fn aa_rect(&self, t: GameTime) -> AaRect {
         AaRect::new_center(self.pos(t), self.size)
+    }
+
+    pub fn shape(&self, t: GameTime) -> Shape {
+        Shape::AaRect(self.aa_rect(t))
     }
 }
 
@@ -166,6 +224,13 @@ impl Bullet {
             self.start_pos
         }
     }
+
+    pub fn shape(&self, t: GameTime) -> Shape {
+        Shape::Circle(Circle {
+            center: self.pos(t),
+            radius: 1.0,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -181,6 +246,28 @@ impl Turret {
         let d = pos - self.pos;
         d.y.atan2(d.x)
     }
+
+    pub fn shape(&self) -> Shape {
+        Shape::Circle(Circle {
+            center: self.pos,
+            radius: run::TURRET_RADIUS,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Wall {
+    pub rect: AaRect,
+}
+
+impl Wall {
+    pub fn pos(&self) -> Point {
+        self.rect.center()
+    }
+
+    pub fn shape(&self) -> Shape {
+        Shape::AaRect(self.rect)
+    }
 }
 
 impl_opaque_diff!(Entity);
@@ -188,3 +275,4 @@ impl_opaque_diff!(Bullet);
 impl_opaque_diff!(PlayerEntity);
 impl_opaque_diff!(DangerGuy);
 impl_opaque_diff!(Turret);
+impl_opaque_diff!(Wall);

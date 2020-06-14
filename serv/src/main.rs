@@ -86,7 +86,7 @@ async fn main() {
             loss: 0.00,
         },
     ));
-    //let fake_bad_net_config = None;
+    let fake_bad_net_config = None;
 
     let (recv_message_rx, send_message_rx) = if let Some((config_in, config_out)) =
         fake_bad_net_config

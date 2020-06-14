@@ -3,22 +3,32 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::entities::Bullet;
 use crate::{
     geom::{self, AaRect},
-    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Input,
-    PlayerEntity, PlayerId, Vector,
+    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
+    Input, PlayerEntity, PlayerId, Vector,
 };
 
-pub const PLAYER_MOVE_SPEED: f32 = 250.0;
+pub const PLAYER_MOVE_SPEED: f32 = 300.0;
 pub const PLAYER_SIT_W: f32 = 40.0;
 pub const PLAYER_SIT_L: f32 = 40.0;
 pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
-pub const PLAYER_ACCEL_FACTOR: f32 = 40.0;
+pub const PLAYER_ACCEL_FACTOR: f32 = 30.0;
 pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
-pub const PLAYER_DASH_DURATION: GameTime = 0.5;
-pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 30.0;
-pub const PLAYER_DASH_SPEED: f32 = 750.0;
+pub const PLAYER_DASH_DURATION: GameTime = 0.6;
+pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
+pub const PLAYER_DASH_SPEED: f32 = 850.0;
+
+pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
+//pub const HOOK_MAX_SHOOT_DURATION: f32 = 5.0;
+pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
+pub const HOOK_MIN_DISTANCE: f32 = 5.0;
+pub const HOOK_PULL_SPEED: f32 = 700.0;
+//pub const HOOK_MAX_CONTRACT_DURATION: f32 = 5.0;;
+pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
+//pub const HOOK_CONTRACT_SPEED: f32 = 650.0;
+pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -45,7 +55,6 @@ impl Game {
 
         // TODO: clone
         let entities = self.entities.clone();
-        let walls = self.walls();
 
         for (entity_id, entity) in self.entities.iter_mut() {
             match entity {
@@ -53,13 +62,6 @@ impl Game {
                     if !self.settings.aa_rect().contains_point(bullet.pos(time)) {
                         context.removed_entities.insert(*entity_id);
                         continue;
-                    }
-
-                    for wall in walls.iter() {
-                        if wall.rect.contains_point(bullet.pos(time)) {
-                            context.removed_entities.insert(*entity_id);
-                            continue;
-                        }
                     }
 
                     for (entity_id_b, entity_b) in entities.iter() {
@@ -78,6 +80,12 @@ impl Game {
                                     < TURRET_RADIUS + BULLET_RADIUS
                                 {
                                     context.removed_entities.insert(*entity_id);
+                                }
+                            }
+                            Entity::Wall(wall) => {
+                                if wall.rect.contains_point(bullet.pos(time)) {
+                                    context.removed_entities.insert(*entity_id);
+                                    continue;
                                 }
                             }
                             _ => (),
@@ -138,7 +146,14 @@ impl Game {
         if let Some((entity_id, ent)) = self.get_player_entity(player_id) {
             let mut ent = ent.clone();
 
-            self.run_player_entity_input(player_id, input, input_state, context, &mut ent)?;
+            self.run_player_entity_input(
+                player_id,
+                input,
+                input_state,
+                context,
+                entity_id,
+                &mut ent,
+            )?;
 
             self.entities.insert(entity_id, Entity::Player(ent));
         }
@@ -146,12 +161,13 @@ impl Game {
         Ok(())
     }
 
-    pub fn run_player_entity_input(
+    fn run_player_entity_input(
         &mut self,
         player_id: PlayerId,
         input: &Input,
         input_state: Option<&Game>,
         context: &mut RunContext,
+        entity_id: EntityId,
         ent: &mut PlayerEntity,
     ) -> GameResult<()> {
         let dt = self.settings.tick_period();
@@ -161,9 +177,6 @@ impl Game {
         let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
         });
-
-        // TODO: Redundant state needed for display
-        ent.is_dashing = cur_dash.is_some();
 
         let mut delta = Vector::new(0.0, 0.0);
 
@@ -206,25 +219,93 @@ impl Game {
             ent.angle = None;
         }
 
+        if let Some(hook) = ent.hook.clone() {
+            match hook.state {
+                HookState::Shooting {
+                    start_time,
+                    start_pos,
+                    vel,
+                } => {
+                    let pos = start_pos + (input_time - start_time) * vel;
+
+                    if !input.use_action || input_time - start_time > HOOK_MAX_SHOOT_DURATION {
+                        let duration = (pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
+                        ent.hook = Some(Hook {
+                            state: HookState::Contracting {
+                                start_time: input_time,
+                                start_pos: pos,
+                                duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
+                            },
+                        });
+                    } else {
+                        for (target_id, target) in input_state.entities.iter() {
+                            if entity_id != *target_id
+                                && target.can_hook_attach()
+                                && target.shape(input_time).contains_point(pos)
+                            {
+                                ent.hook = Some(Hook {
+                                    state: HookState::Attached {
+                                        target: *target_id,
+                                        offset: pos - target.pos(input_time),
+                                    },
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+                HookState::Attached { target, offset } => {
+                    if let Some(target_entity) = input_state.entities.get(&target) {
+                        let hook_pos = target_entity.pos(input_time) + offset;
+
+                        if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE {
+                            let duration = (hook_pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
+                            ent.hook = Some(Hook {
+                                state: HookState::Contracting {
+                                    start_time: input_time,
+                                    start_pos: hook_pos,
+                                    duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
+                                },
+                            });
+                        } else {
+                            ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
+                        }
+                    } else {
+                        ent.hook = None;
+                    }
+                }
+                HookState::Contracting {
+                    start_time,
+                    duration,
+                    ..
+                } => {
+                    if input_time - start_time >= duration {
+                        ent.hook = None;
+                    }
+                }
+            }
+        } else if input.use_action && ent.vel.norm() > 0.0 && ent.hook.is_none() {
+            ent.hook = Some(Hook {
+                state: HookState::Shooting {
+                    start_time: input_time,
+                    start_pos: ent.pos,
+                    vel: ent.vel.normalize() * HOOK_SHOOT_SPEED,
+                },
+            });
+        }
+
         let mut offset = ent.vel * dt;
         let mut flip_axis = None;
 
         for (_, entity) in input_state.entities.iter() {
-            match entity {
-                Entity::Player(other_ent) if other_ent.owner != player_id => {
-                    if let Some(collision) =
-                        geom::rect_collision(&ent.rect(), &other_ent.rect(), offset)
-                    {
-                        offset += collision.resolution_vector;
-                        flip_axis = Some(collision.axis);
-                    }
-                }
-                _ => (),
-            }
-        }
+            let other_shape = match entity {
+                Entity::Player(other_ent) if other_ent.owner != player_id => Some(other_ent.rect()),
+                Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
+                _ => None,
+            };
 
-        for wall in input_state.walls() {
-            if let Some(collision) = geom::rect_collision(&ent.rect(), &wall.rect.to_rect(), offset)
+            if let Some(collision) = other_shape
+                .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset))
             {
                 offset += collision.resolution_vector;
                 flip_axis = Some(collision.axis);
@@ -305,11 +386,7 @@ impl Game {
                     }
                 }
                 Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
-                    // TODO: Player geometry
-                    let aa_rect =
-                        AaRect::new_center(ent.pos, Vector::new(PLAYER_SIT_W, PLAYER_SIT_L));
-
-                    if aa_rect.contains_point(bullet.pos(input_time)) {
+                    if ent.rect().contains_point(bullet.pos(input_time)) {
                         context.removed_entities.insert(*entity_id);
                         context
                             .killed_players
