@@ -355,7 +355,7 @@ impl Game {
                         .entities
                         .clone()
                         .into_iter()
-                        .filter(|(_, entity)| prediction.is_predicted(entity))
+                        .filter(|(_, entity)| Prediction::is_predicted(self.my_player_id, entity))
                         .map(|(entity_id, entity)| {
                             (
                                 entity_id,

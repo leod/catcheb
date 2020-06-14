@@ -302,7 +302,8 @@ impl Game {
                 Entity::Player(other_ent) if other_ent.owner != player_id => Some(other_ent.rect()),
                 Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
                 Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
-                    Some(other_ent.aa_rect(input_time).to_rect())
+                    //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
+                    Some(other_ent.aa_rect(self.current_game_time()).to_rect())
                 }
                 _ => None,
             };
