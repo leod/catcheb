@@ -143,6 +143,7 @@ pub struct DangerGuy {
     pub size: Vector,
     pub speed: f32,
     pub wait_time: GameTime,
+    pub is_hot: bool,
 }
 
 impl DangerGuy {
