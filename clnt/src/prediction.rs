@@ -60,7 +60,7 @@ impl Prediction {
                 .map(|input| (server_state, input))
         }) {
             if let Some(record) = self.log.get_mut(&my_last_input.next()) {
-                Self::correct_prediction(&mut record.state, &server_state.game);
+                Self::correct_prediction(self.my_player_id, &mut record.state, &server_state.game);
 
                 // TODO: We should probably remove the redundant tick_num
                 // state within game state.
@@ -121,10 +121,10 @@ impl Prediction {
         self.log.get(&tick_num).map(|record| &record.state)
     }
 
-    pub fn is_predicted(&self, entity: &comn::Entity) -> bool {
+    pub fn is_predicted(my_player_id: comn::PlayerId, entity: &comn::Entity) -> bool {
         match entity {
-            comn::Entity::Player(entity) => entity.owner == self.my_player_id,
-            comn::Entity::Bullet(entity) => entity.owner == Some(self.my_player_id),
+            comn::Entity::Player(entity) => entity.owner == my_player_id,
+            comn::Entity::Bullet(entity) => entity.owner == Some(my_player_id),
             _ => false,
         }
     }
@@ -155,39 +155,66 @@ impl Prediction {
         context.events
     }
 
-    fn correct_prediction(predicted: &mut comn::Game, server: &comn::Game) {
+    fn correct_prediction(
+        my_player_id: comn::PlayerId,
+        predicted: &mut comn::Game,
+        server: &comn::Game,
+    ) {
+        //assert!(predicted.tick_num == server.tick_num);
+
         let mut error = 0.0;
 
         // TODO: Smooth correction of positions
-        join::full_join(predicted.entities.iter(), server.entities.iter()).for_each(|item| {
-            match item {
-                join::Item::Both(_, predicted, server) => {
-                    match (predicted, server) {
-                        (comn::Entity::Player(predicted), comn::Entity::Player(server)) => {
-                            //info!("pos: {:?} vs {:?}", predicted.pos, server.pos);
-                            //info!("dash: {:?} vs {:?}", predicted.last_dash, server.last_dash);
-                            error += (predicted.pos.x - server.pos.x).abs();
-                            error += (predicted.pos.y - server.pos.y).abs();
-                            error += match (predicted.last_dash, server.last_dash) {
-                                (Some((t1, d1)), Some((t2, d2))) => {
-                                    (t1 - t2).abs() + (d1.x - d2.x).abs() + (d1.y - d2.y).abs()
+        predicted.entities = join::full_join(predicted.entities.iter(), server.entities.iter())
+            .filter_map(|item| {
+                match item {
+                    join::Item::Both(id, predicted, server) => {
+                        match (predicted, server) {
+                            (comn::Entity::Player(predicted), comn::Entity::Player(server)) => {
+                                //info!("pos: {:?} vs {:?}", predicted.pos, server.pos);
+                                //info!("dash: {:?} vs {:?}", predicted.last_dash, server.last_dash);
+
+                                if Self::is_predicted(
+                                    my_player_id,
+                                    &comn::Entity::Player(predicted.clone()),
+                                ) {
+                                    error += (predicted.pos.x - server.pos.x).abs();
+                                    error += (predicted.pos.y - server.pos.y).abs();
+                                    error += match (predicted.last_dash, server.last_dash) {
+                                        (Some((t1, d1)), Some((t2, d2))) => {
+                                            (t1 - t2).abs()
+                                                + (d1.x - d2.x).abs()
+                                                + (d1.y - d2.y).abs()
+                                        }
+                                        (None, None) => 0.0,
+                                        _ => 100.0,
+                                    };
+
+                                    Some((
+                                        *id,
+                                        comn::Entity::Player(comn::PlayerEntity {
+                                            pos: predicted.pos + (server.pos - predicted.pos) * 0.1,
+                                            ..server.clone()
+                                        }),
+                                    ))
+                                } else {
+                                    Some((*id, comn::Entity::Player(server.clone())))
                                 }
-                                (None, None) => 0.0,
-                                _ => 100.0,
                             }
+                            _ => Some((*id, server.clone())),
                         }
-                        _ => (),
                     }
+                    join::Item::Left(_, predicted) => None,
+                    join::Item::Right(id, server) => Some((*id, server.clone())),
                 }
-                _ => (),
-            }
-        });
+            })
+            .collect();
+
+        predicted.players = server.players.clone();
 
         if error > 0.0 {
             info!("error: {}", error);
         }
-
-        *predicted = server.clone();
     }
 
     fn add_predicted_entity(state: &mut comn::Game, entity: comn::Entity) {
