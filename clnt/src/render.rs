@@ -60,8 +60,7 @@ pub fn interp_entities<'a>(
             join::Item::Left(_, entity) => Some(entity.clone()),
             join::Item::Right(_, _) => None,
             join::Item::Both(_, entity, (next_time, next_entity)) => {
-                let tau =
-                    (time - state.current_game_time()) / (next_time - state.current_game_time());
+                let tau = (time - state.game_time()) / (next_time - state.game_time());
                 Some(entity.interp(next_entity, tau))
             }
         },
@@ -80,7 +79,7 @@ pub fn interp_entity(
     ) {
         (Some(entity), None) => Some(entity.clone()),
         (Some(entity), Some((next_time, next_entity))) => {
-            let tau = (time - state.current_game_time()) / (next_time - state.current_game_time());
+            let tau = (time - state.game_time()) / (next_time - state.game_time());
             Some(entity.interp(next_entity, tau))
         }
         (None, _) => None,

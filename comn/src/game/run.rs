@@ -53,7 +53,7 @@ pub struct RunContext {
 
 impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
-        let time = self.current_game_time();
+        let time = self.game_time();
 
         // TODO: clone
         let entities = self.entities.clone();
@@ -174,7 +174,7 @@ impl Game {
     ) -> GameResult<()> {
         let dt = self.settings.tick_period();
         let input_state = input_state.unwrap_or(self);
-        let input_time = input_state.current_game_time();
+        let input_time = input_state.game_time();
 
         let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
@@ -305,7 +305,7 @@ impl Game {
                 Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
                 Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
                     //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
-                    Some(other_ent.aa_rect(self.current_game_time()).to_rect())
+                    Some(other_ent.aa_rect(self.game_time()).to_rect())
                 }
                 _ => None,
             };

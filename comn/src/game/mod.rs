@@ -304,7 +304,7 @@ impl Game {
         self.settings.tick_game_time(tick_num)
     }
 
-    pub fn current_game_time(&self) -> GameTime {
+    pub fn game_time(&self) -> GameTime {
         self.tick_game_time(self.tick_num)
     }
 }
