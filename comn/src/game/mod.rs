@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::{DangerGuy, Turret, Wall};
+use entities::{DangerGuy, Turret, Wall, FoodSpawn};
 
 use crate::{
     geom,
@@ -211,6 +211,10 @@ impl Game {
                 target: None,
                 angle: 0.0,
                 next_shot_time: 0.0,
+            }),
+            Entity::FoodSpawn(FoodSpawn {
+                pos: Point::new(900.0, 700.0),
+                has_food: true,
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
