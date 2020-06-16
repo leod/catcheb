@@ -59,7 +59,7 @@ impl Entity {
             Entity::DangerGuy(entity) => entity.shape(time),
             Entity::Turret(entity) => entity.shape(),
             Entity::Wall(entity) => entity.shape(),
-            Entity::FoodSpawn(entity) => entity.shape(),
+            Entity::FoodSpawn(entity) => entity.shape(time),
         }
     }
 }
@@ -287,13 +287,13 @@ pub struct FoodSpawn {
 }
 
 impl FoodSpawn {
-    pub fn rect(&self) -> Rect {
+    pub fn rect(&self, time: GameTime) -> Rect {
         AaRect::new_center(self.pos, Vector::new(run::FOOD_SIZE, run::FOOD_SIZE))
-            .rotate(std::f32::consts::PI / 2.0)
+            .rotate(time * run::FOOD_ROTATION_SPEED)
     }
 
-    pub fn shape(&self) -> Shape {
-        Shape::Rect(self.rect())
+    pub fn shape(&self, time: GameTime) -> Shape {
+        Shape::Rect(self.rect(time))
     }
 }
 
