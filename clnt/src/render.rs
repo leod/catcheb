@@ -99,7 +99,8 @@ pub fn render_game(
         gfx.set_transform(camera_transform);
         let map_size: mint::Vector2<f32> = state.settings.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
-        gfx.fill_rect(&map_rect, Color::from_rgba(142, 182, 155, 1.0));
+        //gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
+        gfx.fill_rect(&map_rect, Color::from_rgba(255, 255, 255, 1.0));
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
 
@@ -125,9 +126,11 @@ pub fn render_game(
             match entity {
                 comn::Entity::Turret(turret) => {
                     let origin: mint::Vector2<f32> = turret.pos.coords.into();
-                    let circle = Circle::new(origin.into(), TURRET_RANGE);
-                    gfx.set_transform(camera_transform);
-                    gfx.stroke_circle(&circle, Color::from_rgba(255, 0, 0, 1.0));
+
+                    if let Some(target) = turret.target.and_then(|id| state.entities.get(&id)) {
+                        let target_pos: mint::Vector2<f32> = target.pos(time).coords.into();
+                        gfx.stroke_path(&[origin.into(), target_pos.into()], Color::from_rgba(255, 0, 0, 1.0));
+                    }
                 }
                 _ => (),
             }
@@ -271,9 +274,14 @@ pub fn render_game(
             }
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
+                let color = if turret.target.is_some() {
+                    Color::RED
+                } else {
+                    Color::from_rgba(150, 150, 150, 1.0)
+                };
                 let circle = Circle::new(origin.into(), TURRET_RADIUS);
                 gfx.set_transform(camera_transform);
-                gfx.fill_circle(&circle, Color::from_rgba(128, 128, 128, 1.0));
+                gfx.fill_circle(&circle, color);
                 gfx.stroke_circle(&circle, Color::BLACK);
 
                 let angle = turret.angle;
@@ -292,7 +300,7 @@ pub fn render_game(
                 let transform = rect_to_transform(&wall.rect.to_rect());
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
-                gfx.fill_rect(&rect, Color::from_rgba(70, 70, 70, 1.0));
+                gfx.fill_rect(&rect, Color::from_rgba(170, 170, 170, 1.0));
                 gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::FoodSpawn(spawn) => {
