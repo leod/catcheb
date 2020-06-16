@@ -284,6 +284,7 @@ impl Wall {
 pub struct FoodSpawn {
     pub pos: Point,
     pub has_food: bool,
+    pub respawn_time: Option<GameTime>,
 }
 
 impl FoodSpawn {

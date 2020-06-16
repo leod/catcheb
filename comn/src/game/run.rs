@@ -43,9 +43,11 @@ pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
 
 pub const FOOD_SIZE: f32 = 20.0;
 pub const FOOD_ROTATION_SPEED: f32 = 3.0;
+pub const FOOD_RESPAWN_DURATION: f32 = 5.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
+    pub is_predicting: bool,
     pub events: Vec<Event>,
     pub new_entities: Vec<Entity>,
     pub removed_entities: BTreeSet<EntityId>,
@@ -129,6 +131,14 @@ impl Game {
                                 start_pos: turret.pos + 12.0 * delta,
                                 vel: delta * BULLET_MOVE_SPEED,
                             }));
+                        }
+                    }
+                }
+                Entity::FoodSpawn(spawn) if !spawn.has_food => {
+                    if let Some(respawn_time) = spawn.respawn_time {
+                        if time >= respawn_time {
+                            spawn.has_food = true;
+                            spawn.respawn_time = None;
                         }
                     }
                 }
@@ -398,6 +408,24 @@ impl Game {
                         context
                             .killed_players
                             .insert(player_id, DeathReason::ShotBy(bullet.owner));
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        let time = self.game_time();
+        for entity in self.entities.values_mut() {
+            match entity {
+                Entity::FoodSpawn(spawn) if spawn.has_food => {
+                    if !context.is_predicting && geom::rect_collision(
+                        &spawn.rect(input_time),
+                        &ent.rect(),
+                        Vector::zeros(),
+                    ).is_some()
+                    {
+                        spawn.has_food = false;
+                        spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
                     }
                 }
                 _ => (),

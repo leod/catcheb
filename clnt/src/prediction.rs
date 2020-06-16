@@ -139,6 +139,8 @@ impl Prediction {
         my_input: &comn::Input,
     ) -> Vec<comn::Event> {
         let mut context = RunContext::default();
+        context.is_predicting = true;
+
         if let Err(e) = state.run_player_input(my_player_id, &my_input, None, &mut context) {
             // TODO: Simulation error handling on client side
             warn!("Simulation error: {:?}", e);

@@ -215,6 +215,7 @@ impl Game {
             Entity::FoodSpawn(FoodSpawn {
                 pos: Point::new(900.0, 700.0),
                 has_food: true,
+                respawn_time: None,
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
@@ -243,13 +244,13 @@ impl Game {
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
                     Point::new(1800.0, 600.0),
-                    Vector::new(20.0, 1100.0),
+                    Vector::new(20.0, 900.0),
                 ),
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
                     Point::new(2200.0, 600.0),
-                    Vector::new(20.0, 1100.0),
+                    Vector::new(20.0, 900.0),
                 ),
             }),
             Entity::Wall(Wall {
@@ -264,6 +265,11 @@ impl Game {
                     Vector::new(150.0, 150.0),
                 ),
             }),
+            Entity::FoodSpawn(FoodSpawn {
+                pos: Point::new(2010.0, 1050.0),
+                has_food: true,
+                respawn_time: None,
+            }),
             /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(1750.0, 200.0),
                 end_pos: Point::new(1750.0, 1400.0),
@@ -274,7 +280,7 @@ impl Game {
             }),*/
         ];
 
-        for i in 0..6 {
+        for i in 0..5 {
             let y = 200.0 * i as f32 + 650.0;
             let phase = (i as f32) / 1.7;
             ents.push(Entity::DangerGuy(DangerGuy {
