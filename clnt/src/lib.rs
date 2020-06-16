@@ -22,7 +22,10 @@ use quicksilver::{
 
 use comn::util::stats;
 
-const SCREEN_SIZE: Vector = Vector { x: 800.0, y: 600.0 };
+const SCREEN_SIZE: Vector = Vector {
+    x: 1280.0,
+    y: 768.0,
+};
 
 #[wasm_bindgen(start)]
 pub fn main() {

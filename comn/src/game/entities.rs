@@ -144,18 +144,22 @@ pub struct DangerGuy {
     pub start_pos: Point,
     pub end_pos: Point,
     pub size: Vector,
-    pub speed: f32,
-    pub wait_time: GameTime,
+    pub speed: (f32, f32),
+    pub wait_time: (GameTime, GameTime),
+    pub phase: f32,
     pub is_hot: bool,
 }
 
 impl DangerGuy {
-    pub fn walk_time(&self) -> GameTime {
-        (self.end_pos - self.start_pos).norm() / self.speed
+    pub fn walk_time(&self) -> (GameTime, GameTime) {
+        (
+            (self.end_pos - self.start_pos).norm() / self.speed.0,
+            (self.end_pos - self.start_pos).norm() / self.speed.1,
+        )
     }
 
     pub fn period(&self) -> GameTime {
-        2.0 * (self.walk_time() + self.wait_time)
+        self.wait_time.0 + self.walk_time().0 + self.wait_time.1 + self.walk_time().1
     }
 
     pub fn delta(&self) -> Vector {
@@ -163,7 +167,7 @@ impl DangerGuy {
     }
 
     pub fn tau(&self, t: GameTime) -> GameTime {
-        (t / self.period()).fract() * self.period()
+        ((t - self.phase) / self.period()).fract() * self.period()
     }
 
     pub fn pos(&self, t: GameTime) -> Point {
@@ -171,15 +175,17 @@ impl DangerGuy {
         let tau = self.tau(t);
 
         // TODO: Simplify, maybe pareen?
-        if tau < self.wait_time {
+        if tau < self.wait_time.0 {
             self.start_pos
-        } else if tau <= self.wait_time + self.walk_time() {
-            self.start_pos + (tau - self.wait_time) / self.walk_time() * delta
-        } else if tau < 2.0 * self.wait_time + self.walk_time() {
+        } else if tau <= self.wait_time.0 + self.walk_time().0 {
+            self.start_pos + (tau - self.wait_time.0) / self.walk_time().0 * delta
+        } else if tau < self.wait_time.0 + self.wait_time.1 + self.walk_time().0 {
             self.end_pos
         } else {
             self.end_pos
-                - (tau - 2.0 * self.wait_time - self.walk_time()) / self.walk_time() * delta
+                - (tau - self.wait_time.0 - self.wait_time.1 - self.walk_time().0)
+                    / self.walk_time().1
+                    * delta
         }
 
         /*pareen::seq! {
@@ -196,7 +202,7 @@ impl DangerGuy {
         let delta = self.delta();
         let tau = self.tau(t);
 
-        if tau <= self.wait_time + self.walk_time() {
+        if tau <= self.wait_time.0 + self.walk_time().0 {
             delta
         } else {
             -delta
