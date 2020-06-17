@@ -399,8 +399,7 @@ impl Runner {
                         }
 
                         {
-                            let input_age =
-                                game.current_game_time() - game.tick_game_time(tick_num);
+                            let input_age = game.game_time() - game.tick_game_time(tick_num);
 
                             if input_age > MAX_PLAYER_INPUT_AGE {
                                 // TODO: Inform the client if they are lagging behind too much?
@@ -444,10 +443,9 @@ impl Runner {
                         // This results in a mapping from our game time to the
                         // receive game time.
                         if Some(tick_num) == max_input_num {
-                            player.recv_input_time.record_tick(
-                                game.current_game_time(),
-                                game.tick_game_time(tick_num),
-                            );
+                            player
+                                .recv_input_time
+                                .record_tick(game.game_time(), game.tick_game_time(tick_num));
                         }
                     }
                 }
@@ -497,12 +495,12 @@ impl Runner {
             let lag = (PLAYER_INPUT_BUFFER as GameTime + 0.5) * game.settings.tick_period();
             let buffered_input_time = player
                 .recv_input_time
-                .estimate(game.current_game_time() - lag)
+                .estimate(game.game_time() - lag)
                 .unwrap_or(0.0);
 
             /*info!(
                 "at {} have {:?} vs {:?}",
-                game.current_game_time(),
+                game.game_time(),
                 buffered_input_time,
                 player.inputs.last().map(|(a, _)| game.tick_game_time(*a))
             );*/

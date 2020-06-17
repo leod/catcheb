@@ -13,6 +13,7 @@ pub enum Entity {
     DangerGuy(DangerGuy),
     Turret(Turret),
     Wall(Wall),
+    FoodSpawn(FoodSpawn),
 }
 
 impl Entity {
@@ -31,6 +32,7 @@ impl Entity {
             Entity::DangerGuy(entity) => entity.pos(time),
             Entity::Turret(entity) => entity.pos,
             Entity::Wall(entity) => entity.pos(),
+            Entity::FoodSpawn(entity) => entity.pos,
         }
     }
 
@@ -57,6 +59,7 @@ impl Entity {
             Entity::DangerGuy(entity) => entity.shape(time),
             Entity::Turret(entity) => entity.shape(),
             Entity::Wall(entity) => entity.shape(),
+            Entity::FoodSpawn(entity) => entity.shape(time),
         }
     }
 }
@@ -141,18 +144,22 @@ pub struct DangerGuy {
     pub start_pos: Point,
     pub end_pos: Point,
     pub size: Vector,
-    pub speed: f32,
-    pub wait_time: GameTime,
+    pub speed: (f32, f32),
+    pub wait_time: (GameTime, GameTime),
+    pub phase: f32,
     pub is_hot: bool,
 }
 
 impl DangerGuy {
-    pub fn walk_time(&self) -> GameTime {
-        (self.end_pos - self.start_pos).norm() / self.speed
+    pub fn walk_time(&self) -> (GameTime, GameTime) {
+        (
+            (self.end_pos - self.start_pos).norm() / self.speed.0,
+            (self.end_pos - self.start_pos).norm() / self.speed.1,
+        )
     }
 
     pub fn period(&self) -> GameTime {
-        2.0 * (self.walk_time() + self.wait_time)
+        self.wait_time.0 + self.walk_time().0 + self.wait_time.1 + self.walk_time().1
     }
 
     pub fn delta(&self) -> Vector {
@@ -160,7 +167,7 @@ impl DangerGuy {
     }
 
     pub fn tau(&self, t: GameTime) -> GameTime {
-        (t / self.period()).fract() * self.period()
+        ((t - self.phase) / self.period()).fract() * self.period()
     }
 
     pub fn pos(&self, t: GameTime) -> Point {
@@ -168,15 +175,17 @@ impl DangerGuy {
         let tau = self.tau(t);
 
         // TODO: Simplify, maybe pareen?
-        if tau < self.wait_time {
+        if tau < self.wait_time.0 {
             self.start_pos
-        } else if tau <= self.wait_time + self.walk_time() {
-            self.start_pos + (tau - self.wait_time) / self.walk_time() * delta
-        } else if tau < 2.0 * self.wait_time + self.walk_time() {
+        } else if tau <= self.wait_time.0 + self.walk_time().0 {
+            self.start_pos + (tau - self.wait_time.0) / self.walk_time().0 * delta
+        } else if tau < self.wait_time.0 + self.wait_time.1 + self.walk_time().0 {
             self.end_pos
         } else {
             self.end_pos
-                - (tau - 2.0 * self.wait_time - self.walk_time()) / self.walk_time() * delta
+                - (tau - self.wait_time.0 - self.wait_time.1 - self.walk_time().0)
+                    / self.walk_time().1
+                    * delta
         }
 
         /*pareen::seq! {
@@ -193,7 +202,7 @@ impl DangerGuy {
         let delta = self.delta();
         let tau = self.tau(t);
 
-        if tau <= self.wait_time + self.walk_time() {
+        if tau <= self.wait_time.0 + self.walk_time().0 {
             delta
         } else {
             -delta
@@ -271,9 +280,28 @@ impl Wall {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FoodSpawn {
+    pub pos: Point,
+    pub has_food: bool,
+    pub respawn_time: Option<GameTime>,
+}
+
+impl FoodSpawn {
+    pub fn rect(&self, time: GameTime) -> Rect {
+        AaRect::new_center(self.pos, Vector::new(run::FOOD_SIZE, run::FOOD_SIZE))
+            .rotate(time * run::FOOD_ROTATION_SPEED)
+    }
+
+    pub fn shape(&self, time: GameTime) -> Shape {
+        Shape::Rect(self.rect(time))
+    }
+}
+
 impl_opaque_diff!(Entity);
 impl_opaque_diff!(Bullet);
 impl_opaque_diff!(PlayerEntity);
 impl_opaque_diff!(DangerGuy);
 impl_opaque_diff!(Turret);
 impl_opaque_diff!(Wall);
+impl_opaque_diff!(FoodSpawn);

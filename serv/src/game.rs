@@ -73,12 +73,13 @@ impl Game {
             .unwrap_or(comn::PlayerId(0));
         let player_id = comn::PlayerId(max_player_id.0 + 1);
 
-        let spawn_time = self.state.current_game_time() + FIRST_SPAWN_DURATION;
+        let spawn_time = self.state.game_time() + FIRST_SPAWN_DURATION;
         let player = comn::Player {
             name: player_name,
             state: PlayerState::Respawning {
                 respawn_time: spawn_time,
             },
+            food: 0,
         };
         let player_meta = PlayerMeta {
             last_input_num: None,
@@ -98,7 +99,7 @@ impl Game {
         //debug!("tick with {} inputs", inputs.len());
         self.state.tick_num = self.state.tick_num.next();
 
-        let current_time = self.state.current_game_time();
+        let current_time = self.state.game_time();
         let mut context = RunContext::default();
 
         self.state.run_tick(&mut context).unwrap();
@@ -204,7 +205,7 @@ impl Game {
     }
 
     pub fn correct_time_for_player(&self, observer_id: comn::PlayerId, state: &mut comn::Game) {
-        let state_time = state.current_game_time();
+        let state_time = state.game_time();
         for entity in state.entities.values_mut() {
             match entity {
                 comn::Entity::Player(player) if player.owner != observer_id => {

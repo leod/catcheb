@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::{DangerGuy, Turret, Wall};
+use entities::{DangerGuy, FoodSpawn, Turret, Wall};
 
 use crate::{
     geom,
@@ -143,6 +143,7 @@ pub enum PlayerState {
 pub struct Player {
     pub name: String,
     pub state: PlayerState,
+    pub food: usize,
 }
 
 impl_opaque_diff!(Player);
@@ -176,27 +177,22 @@ impl Game {
 
     pub fn initial_entities(settings: &Settings) -> Vec<Entity> {
         let mut ents = vec![
-            /*Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(700.0, 100.0),
-                end_pos: Point::new(1000.0, 100.0),
-                size: Vector::new(160.0, 160.0),
-                speed: 100.0,
-                wait_time: 3.0,
-            }),*/
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(100.0, 1200.0),
                 end_pos: Point::new(1500.0, 1200.0),
                 size: Vector::new(140.0, 40.0),
-                speed: 1000.0,
-                wait_time: 2.0,
+                speed: (1000.0, 1000.0),
+                wait_time: (2.0, 2.0),
+                phase: 0.0,
                 is_hot: true,
             }),
             Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(1500.0, 1400.0),
                 end_pos: Point::new(100.0, 1400.0),
                 size: Vector::new(140.0, 40.0),
-                speed: 1000.0,
-                wait_time: 2.0,
+                speed: (1000.0, 1000.0),
+                wait_time: (2.0, 2.0),
+                phase: 0.0,
                 is_hot: true,
             }),
             Entity::Turret(Turret {
@@ -216,6 +212,11 @@ impl Game {
                 target: None,
                 angle: 0.0,
                 next_shot_time: 0.0,
+            }),
+            Entity::FoodSpawn(FoodSpawn {
+                pos: Point::new(900.0, 700.0),
+                has_food: true,
+                respawn_time: None,
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
@@ -243,14 +244,14 @@ impl Game {
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
-                    Point::new(2000.0, 600.0),
-                    Vector::new(20.0, 1100.0),
+                    Point::new(1800.0, 600.0),
+                    Vector::new(20.0, 900.0),
                 ),
             }),
             Entity::Wall(Wall {
                 rect: geom::AaRect::new_top_left(
-                    Point::new(2250.0, 600.0),
-                    Vector::new(20.0, 1100.0),
+                    Point::new(2200.0, 600.0),
+                    Vector::new(20.0, 900.0),
                 ),
             }),
             Entity::Wall(Wall {
@@ -265,36 +266,42 @@ impl Game {
                     Vector::new(150.0, 150.0),
                 ),
             }),
-            Entity::DangerGuy(DangerGuy {
+            Entity::FoodSpawn(FoodSpawn {
+                pos: Point::new(2010.0, 1050.0),
+                has_food: true,
+                respawn_time: None,
+            }),
+            /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(1750.0, 200.0),
                 end_pos: Point::new(1750.0, 1400.0),
                 size: Vector::new(180.0, 40.0),
                 speed: 800.0,
                 wait_time: 2.0,
                 is_hot: false,
-            }),
+            }),*/
         ];
 
-        for i in 0..6 {
+        for i in 0..5 {
             let y = 200.0 * i as f32 + 650.0;
+            let phase = (i as f32) / 1.7;
             ents.push(Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(2040.0, y),
-                end_pos: Point::new(2230.0, y),
-                size: Vector::new(40.0, 100.0),
-                speed: 400.0,
-                wait_time: 2.0,
+                start_pos: Point::new(1835.0, y),
+                end_pos: Point::new(1995.0, y),
+                size: Vector::new(30.0, 100.0),
+                speed: (800.0, 300.0),
+                wait_time: (4.0, 0.5),
+                phase,
                 is_hot: true,
             }));
-            if i % 2 == 0 {
-                ents.push(Entity::DangerGuy(DangerGuy {
-                    start_pos: Point::new(2230.0, y + 100.0),
-                    end_pos: Point::new(2040.0, y + 100.0),
-                    size: Vector::new(40.0, 100.0),
-                    speed: 400.0,
-                    wait_time: 2.0,
-                    is_hot: true,
-                }));
-            }
+            ents.push(Entity::DangerGuy(DangerGuy {
+                start_pos: Point::new(2185.0, y),
+                end_pos: Point::new(2025.0, y),
+                size: Vector::new(30.0, 100.0),
+                speed: (800.0, 300.0),
+                wait_time: (4.0, 0.5),
+                phase,
+                is_hot: true,
+            }));
         }
 
         ents
@@ -304,7 +311,7 @@ impl Game {
         self.settings.tick_game_time(tick_num)
     }
 
-    pub fn current_game_time(&self) -> GameTime {
+    pub fn game_time(&self) -> GameTime {
         self.tick_game_time(self.tick_num)
     }
 }
