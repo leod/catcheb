@@ -418,14 +418,17 @@ impl Game {
         for entity in self.entities.values_mut() {
             match entity {
                 Entity::FoodSpawn(spawn) if spawn.has_food => {
-                    if !context.is_predicting && geom::rect_collision(
-                        &spawn.rect(input_time),
-                        &ent.rect(),
-                        Vector::zeros(),
-                    ).is_some()
+                    if !context.is_predicting
+                        && geom::rect_collision(
+                            &spawn.rect(input_time),
+                            &ent.rect(),
+                            Vector::zeros(),
+                        )
+                        .is_some()
                     {
                         spawn.has_food = false;
                         spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
+                        self.players.get_mut(&ent.owner).unwrap().food += 1;
                     }
                 }
                 _ => (),
