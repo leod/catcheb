@@ -17,7 +17,7 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{BULLET_RADIUS, TURRET_RADIUS, FOOD_SIZE},
+    game::run::{BULLET_RADIUS, FOOD_SIZE, TURRET_RADIUS},
     geom,
     util::join,
 };
@@ -305,7 +305,7 @@ pub fn render_game(
             }
             comn::Entity::FoodSpawn(spawn) => {
                 let origin: mint::Vector2<f32> = spawn.pos.coords.into();
-				let transform = rect_to_transform(&spawn.rect(time));
+                let transform = rect_to_transform(&spawn.rect(time));
 
                 if spawn.has_food {
                     let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));

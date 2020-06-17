@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
 
-use entities::{DangerGuy, Turret, Wall, FoodSpawn};
+use entities::{DangerGuy, FoodSpawn, Turret, Wall};
 
 use crate::{
     geom,
@@ -143,6 +143,7 @@ pub enum PlayerState {
 pub struct Player {
     pub name: String,
     pub state: PlayerState,
+    pub food: usize,
 }
 
 impl_opaque_diff!(Player);

@@ -79,6 +79,7 @@ impl Game {
             state: PlayerState::Respawning {
                 respawn_time: spawn_time,
             },
+            food: 0,
         };
         let player_meta = PlayerMeta {
             last_input_num: None,
