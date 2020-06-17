@@ -41,8 +41,13 @@ pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
 
+pub const FOOD_SIZE: f32 = 20.0;
+pub const FOOD_ROTATION_SPEED: f32 = 3.0;
+pub const FOOD_RESPAWN_DURATION: f32 = 5.0;
+
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
+    pub is_predicting: bool,
     pub events: Vec<Event>,
     pub new_entities: Vec<Entity>,
     pub removed_entities: BTreeSet<EntityId>,
@@ -51,7 +56,7 @@ pub struct RunContext {
 
 impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
-        let time = self.current_game_time();
+        let time = self.game_time();
 
         // TODO: clone
         let entities = self.entities.clone();
@@ -129,6 +134,14 @@ impl Game {
                         }
                     }
                 }
+                Entity::FoodSpawn(spawn) if !spawn.has_food => {
+                    if let Some(respawn_time) = spawn.respawn_time {
+                        if time >= respawn_time {
+                            spawn.has_food = true;
+                            spawn.respawn_time = None;
+                        }
+                    }
+                }
                 _ => (),
             }
         }
@@ -172,7 +185,7 @@ impl Game {
     ) -> GameResult<()> {
         let dt = self.settings.tick_period();
         let input_state = input_state.unwrap_or(self);
-        let input_time = input_state.current_game_time();
+        let input_time = input_state.game_time();
 
         let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
@@ -303,7 +316,7 @@ impl Game {
                 Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
                 Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
                     //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
-                    Some(other_ent.aa_rect(self.current_game_time()).to_rect())
+                    Some(other_ent.aa_rect(self.game_time()).to_rect())
                 }
                 _ => None,
             };
@@ -395,6 +408,27 @@ impl Game {
                         context
                             .killed_players
                             .insert(player_id, DeathReason::ShotBy(bullet.owner));
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        let time = self.game_time();
+        for entity in self.entities.values_mut() {
+            match entity {
+                Entity::FoodSpawn(spawn) if spawn.has_food => {
+                    if !context.is_predicting
+                        && geom::rect_collision(
+                            &spawn.rect(input_time),
+                            &ent.rect(),
+                            Vector::zeros(),
+                        )
+                        .is_some()
+                    {
+                        spawn.has_food = false;
+                        spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
+                        self.players.get_mut(&ent.owner).unwrap().food += 1;
                     }
                 }
                 _ => (),

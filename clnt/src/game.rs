@@ -346,10 +346,11 @@ impl Game {
                     .map(|(entity_id, entity)| (entity_id, (recv_game_time, entity))),
             );
 
-            if let Some((prediction, predicted_state)) = self.prediction.as_ref().and_then(|p| {
-                p.predicted_state(self.tick_num().next())
-                    .map(|state| (p, state))
-            }) {
+            if let Some(predicted_state) = self
+                .prediction
+                .as_ref()
+                .and_then(|p| p.predicted_state(self.tick_num().next()))
+            {
                 entities.extend(
                     predicted_state
                         .entities
