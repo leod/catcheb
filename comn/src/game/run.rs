@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::entities::Bullet;
 use crate::{
-    geom::{self, AaRect},
+    geom::{self, AaRect, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
     Input, PlayerEntity, PlayerId, Vector,
 };
@@ -240,6 +240,14 @@ impl Game {
                     vel,
                 } => {
                     let pos = start_pos + (input_time - start_time) * vel;
+                    let next_pos =
+                        start_pos + (input_time - start_time + self.settings.tick_period()) * vel;
+                    let pos_delta = next_pos - pos;
+                    let pos_delta_norm = pos_delta.norm();
+                    let ray = Ray {
+                        origin: pos,
+                        dir: pos_delta / pos_delta_norm,
+                    };
 
                     if !input.use_action || input_time - start_time > HOOK_MAX_SHOOT_DURATION {
                         let duration = (pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
@@ -252,22 +260,34 @@ impl Game {
                         });
                     } else {
                         for (target_id, target) in input_state.entities.iter() {
-                            if entity_id != *target_id
-                                && target.can_hook_attach()
-                                && target.shape(input_time).contains_point(pos)
+                            if entity_id != *target_id && target.can_hook_attach()
+                            //&& target.shape(input_time).contains_point(pos)
                             {
-                                ent.hook = Some(Hook {
-                                    state: HookState::Attached {
-                                        target: *target_id,
-                                        offset: pos - target.pos(input_time),
-                                    },
-                                });
-                                break;
+                                if let Some(intersection_t) = ray
+                                    .intersects(&target.intersection_shape(input_time))
+                                    .filter(|t| *t <= pos_delta_norm)
+                                {
+                                    let intersection_p = ray.origin + intersection_t * ray.dir;
+                                    ent.hook = Some(Hook {
+                                        state: HookState::Attached {
+                                            start_time: input_time
+                                                + intersection_t / pos_delta_norm
+                                                    * self.settings.tick_period(),
+                                            target: *target_id,
+                                            offset: intersection_p - target.pos(input_time),
+                                        },
+                                    });
+                                    break;
+                                }
                             }
                         }
                     }
                 }
-                HookState::Attached { target, offset } => {
+                HookState::Attached {
+                    start_time: _,
+                    target,
+                    offset,
+                } => {
                     if let Some(target_entity) = input_state.entities.get(&target) {
                         let hook_pos = target_entity.pos(input_time) + offset;
 
@@ -298,6 +318,7 @@ impl Game {
                 }
             }
         } else if input.use_action && ent.vel.norm() > 0.0 && ent.hook.is_none() {
+            // TODO: Trace ray when spawning hook?
             ent.hook = Some(Hook {
                 state: HookState::Shooting {
                     start_time: input_time,
@@ -311,21 +332,25 @@ impl Game {
         let mut flip_axis = None;
 
         for (_, entity) in input_state.entities.iter() {
-            let other_shape = match entity {
-                Entity::Player(other_ent) if other_ent.owner != player_id => Some(other_ent.rect()),
-                Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
+            let (other_shape, flip) = match entity {
+                Entity::Player(other_ent) if other_ent.owner != player_id => {
+                    (Some(other_ent.rect()), false)
+                }
+                Entity::Wall(other_ent) => (Some(other_ent.rect.to_rect()), true),
                 Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
                     //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
-                    Some(other_ent.aa_rect(self.game_time()).to_rect())
+                    (Some(other_ent.aa_rect(self.game_time()).to_rect()), true)
                 }
-                _ => None,
+                _ => (None, false),
             };
 
             if let Some(collision) = other_shape
                 .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset))
             {
                 offset += collision.resolution_vector;
-                flip_axis = Some(collision.axis);
+                if flip {
+                    flip_axis = Some(collision.axis);
+                }
             }
         }
 

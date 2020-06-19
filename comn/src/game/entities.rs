@@ -62,6 +62,17 @@ impl Entity {
             Entity::FoodSpawn(entity) => entity.shape(time),
         }
     }
+
+    pub fn intersection_shape(&self, time: f32) -> Shape {
+        match self {
+            Entity::Player(entity) => entity.shape(),
+            Entity::Bullet(entity) => entity.shape(time),
+            Entity::DangerGuy(entity) => entity.shape(time),
+            Entity::Turret(entity) => entity.shape(),
+            Entity::Wall(entity) => entity.shape(),
+            Entity::FoodSpawn(entity) => entity.intersection_shape(time),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -72,6 +83,7 @@ pub enum HookState {
         vel: Vector,
     },
     Attached {
+        start_time: GameTime,
         target: EntityId,
         offset: Vector,
     },
@@ -295,6 +307,13 @@ impl FoodSpawn {
 
     pub fn shape(&self, time: GameTime) -> Shape {
         Shape::Rect(self.rect(time))
+    }
+
+    pub fn intersection_shape(&self, _: GameTime) -> Shape {
+        Shape::Circle(Circle {
+            center: self.pos,
+            radius: run::FOOD_SIZE * 2.0f32.sqrt(),
+        })
     }
 }
 
