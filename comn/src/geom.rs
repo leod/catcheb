@@ -268,7 +268,10 @@ impl Ray {
                     Some(t_min)
                 }
             }
-            Shape::Rect(_) => unimplemented!(),
+            Shape::Rect(_) => {
+                // TODO: Ray-Rect
+                None
+            }
             Shape::Circle(circle) => {
                 // https://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm
 
