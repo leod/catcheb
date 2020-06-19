@@ -1,5 +1,7 @@
 use std::iter::once;
 
+use log::info;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{Point, Vector};
@@ -233,5 +235,70 @@ pub struct Circle {
 impl Circle {
     pub fn contains_point(&self, point: Point) -> bool {
         (self.center - point).norm_squared() <= self.radius * self.radius
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ray {
+    pub origin: Point,
+    pub dir: Vector,
+}
+
+impl Ray {
+    pub fn intersects(&self, shape: &Shape) -> Option<f32> {
+        match shape {
+            Shape::AaRect(aa_rect) => {
+                // https://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
+                // https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
+
+                let min = aa_rect.top_left;
+                let max = min + aa_rect.size;
+
+                let t0x = (min.x - self.origin.x) / self.dir.x;
+                let t0y = (min.y - self.origin.y) / self.dir.y;
+                let t1x = (max.x - self.origin.x) / self.dir.x;
+                let t1y = (max.y - self.origin.y) / self.dir.y;
+
+                let t_min = t0x.min(t1x).max(t0y.min(t1y));
+                let t_max = t0x.max(t1x).min(t0y.max(t1y));
+
+                if t_max < 0.0 || t_min > t_max {
+                    None
+                } else {
+                    Some(t_min)
+                }
+            }
+            Shape::Rect(_) => unimplemented!(),
+            Shape::Circle(circle) => {
+                // https://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm
+
+                let d = self.dir;
+                let f = self.origin - circle.center;
+                let r = circle.radius;
+
+                let a = d.dot(&d);
+                let b = 2.0 * f.dot(&d);
+                let c = f.dot(&f) - r * r;
+
+                let discriminant = b * b - 4.0 * a * c;
+
+                if discriminant >= 0.0 {
+                    let discriminant = discriminant.sqrt();
+
+                    let t1 = (-b - discriminant) / (2.0 * a);
+                    let t2 = (-b + discriminant) / (2.0 * a);
+
+                    if t1 >= 0.0 {
+                        Some(t1)
+                    } else if t2 >= 0.0 {
+                        Some(t2)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+        }
     }
 }
