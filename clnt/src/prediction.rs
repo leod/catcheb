@@ -32,6 +32,10 @@ impl Prediction {
         my_input: comn::Input,
         server_state: Option<&ReceivedState>,
     ) -> Vec<comn::Event> {
+        // We predict the state for `predict_tick_num`, given the state of
+        // `tick_num`.
+        let predict_tick_num = tick_num.next();
+
         // Let's make as few assumptions as possible regarding consistency
         // in calls to `record_tick_input`.
         if let Some(max_logged) = self.max_logged_tick_num() {
@@ -54,17 +58,12 @@ impl Prediction {
 
         // If we have a server state for the tick, apply corrections for our
         // previous prediction.
-        if let Some((server_state, my_last_input)) = server_state.and_then(|server_state| {
-            server_state
-                .my_last_input
-                .map(|input| (server_state, input))
-        }) {
+        let server_state_and_my_last_input =
+            server_state.and_then(|state| state.my_last_input.map(|input| (state, input)));
+
+        if let Some((server_state, my_last_input)) = server_state_and_my_last_input {
             if let Some(record) = self.log.get_mut(&my_last_input.next()) {
                 Self::correct_prediction(self.my_player_id, &mut record.state, &server_state.game);
-
-                // TODO: We should probably remove the redundant tick_num
-                // state within game state.
-                record.state.tick_num = my_last_input.next();
             }
 
             // We can now forget about any older predictions in the log.
@@ -86,8 +85,6 @@ impl Prediction {
                 record.state = last_state.clone();
             }
 
-            assert!(last_state.tick_num == tick_num);
-
             Some(last_state)
         } else if let Some(server_state) = server_state {
             // Our prediction log is empty, but we have a server state that we
@@ -99,13 +96,15 @@ impl Prediction {
         };
 
         if let Some(mut state) = last_state {
+            assert!(state.tick_num == tick_num);
+
             //info!("running at {:?} in {:?}", tick_num, state.tick_num);
             let events = Self::run_tick(&mut state, self.my_player_id, &my_input);
 
             assert!(tick_num.next() == state.tick_num);
 
             self.log.insert(
-                tick_num.next(),
+                predict_tick_num,
                 Record {
                     state,
                     my_last_input: my_input.clone(),

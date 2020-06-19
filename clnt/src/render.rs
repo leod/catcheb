@@ -165,7 +165,11 @@ pub fn render_game(
                             start_pos,
                             vel,
                         } => (player.pos, start_pos + (time - start_time) * vel, false),
-                        comn::HookState::Attached { target, offset } => {
+                        comn::HookState::Attached {
+                            start_time,
+                            target,
+                            offset,
+                        } => {
                             let b = interp_entity(state, next_entities, time, target)
                                 .map_or(player.pos, |interp_target| {
                                     interp_target.pos(time) + offset
