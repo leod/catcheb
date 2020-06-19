@@ -332,21 +332,25 @@ impl Game {
         let mut flip_axis = None;
 
         for (_, entity) in input_state.entities.iter() {
-            let other_shape = match entity {
-                Entity::Player(other_ent) if other_ent.owner != player_id => Some(other_ent.rect()),
-                Entity::Wall(other_ent) => Some(other_ent.rect.to_rect()),
+            let (other_shape, flip) = match entity {
+                Entity::Player(other_ent) if other_ent.owner != player_id => {
+                    (Some(other_ent.rect()), false)
+                }
+                Entity::Wall(other_ent) => (Some(other_ent.rect.to_rect()), true),
                 Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
                     //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
-                    Some(other_ent.aa_rect(self.game_time()).to_rect())
+                    (Some(other_ent.aa_rect(self.game_time()).to_rect()), true)
                 }
-                _ => None,
+                _ => (None, false),
             };
 
             if let Some(collision) = other_shape
                 .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset))
             {
                 offset += collision.resolution_vector;
-                flip_axis = Some(collision.axis);
+                if flip {
+                    flip_axis = Some(collision.axis);
+                }
             }
         }
 
