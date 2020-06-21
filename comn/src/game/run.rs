@@ -21,6 +21,8 @@ pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
 pub const PLAYER_DASH_DURATION: GameTime = 0.6;
 pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
+pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
+pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 //pub const HOOK_MAX_SHOOT_DURATION: f32 = 5.0;
@@ -461,7 +463,14 @@ impl Game {
             context.killed_players.insert(player_id, killed);
 
             if !context.is_predicting {
-                for _ in 0..5 {
+                let player = self.players.get_mut(&ent.owner).unwrap();
+                let spawn_food = player
+                    .food
+                    .min(PLAYER_MAX_LOSE_FOOD)
+                    .max(PLAYER_MIN_LOSE_FOOD);
+                player.food -= spawn_food.min(player.food);
+
+                for _ in 0..spawn_food {
                     // TODO: Random
                     let angle = rand::thread_rng().gen::<f32>() * std::f32::consts::PI * 2.0;
                     let speed = rand::thread_rng().gen_range(FOOD_MIN_SPEED, FOOD_MAX_SPEED);
