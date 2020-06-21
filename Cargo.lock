@@ -307,6 +307,7 @@ dependencies = [
  "instant",
  "log",
  "nalgebra",
+ "rand",
  "rmp-serde",
  "serde",
  "serde_json",
