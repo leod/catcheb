@@ -322,6 +322,15 @@ pub fn render_game(
                 gfx.set_transform(camera_transform);
                 gfx.stroke_circle(&circle, Color::BLACK);
             }
+            comn::Entity::Food(food) => {
+                let origin: mint::Vector2<f32> = food.pos(time).coords.into();
+                let transform = rect_to_transform(&food.rect(time));
+
+                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+                gfx.set_transform(transform.then(camera_transform));
+                gfx.fill_rect(&rect, Color::ORANGE);
+                gfx.stroke_rect(&rect, Color::BLACK);
+            }
         }
     }
 
