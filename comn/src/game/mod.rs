@@ -143,7 +143,7 @@ pub enum PlayerState {
 pub struct Player {
     pub name: String,
     pub state: PlayerState,
-    pub food: usize,
+    pub food: u32,
 }
 
 impl_opaque_diff!(Player);
