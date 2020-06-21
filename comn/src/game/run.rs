@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::entities::Bullet;
+use rand::Rng;
+
+use crate::entities::{Bullet, Food};
 use crate::{
-    geom::{self, AaRect, Ray},
+    geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
     Input, PlayerEntity, PlayerId, Vector,
 };
@@ -44,6 +46,11 @@ pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
 pub const FOOD_SIZE: f32 = 20.0;
 pub const FOOD_ROTATION_SPEED: f32 = 3.0;
 pub const FOOD_RESPAWN_DURATION: f32 = 5.0;
+pub const FOOD_MAX_LIFETIME: f32 = 10.0;
+pub const FOOD_MIN_SPEED: f32 = 300.0;
+pub const FOOD_MAX_SPEED: f32 = 700.0;
+pub const FOOD_SPEED_MIN_FACTOR: f32 = 5.0;
+pub const FOOD_SPEED_MAX_FACTOR: f32 = 10.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -142,6 +149,11 @@ impl Game {
                         }
                     }
                 }
+                Entity::Food(food) => {
+                    if time - food.start_time > FOOD_MAX_LIFETIME {
+                        context.removed_entities.insert(*entity_id);
+                    }
+                }
                 _ => (),
             }
         }
@@ -187,6 +199,7 @@ impl Game {
         let input_state = input_state.unwrap_or(self);
         let input_time = input_state.game_time();
 
+        // Movement
         let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
         });
@@ -232,6 +245,7 @@ impl Game {
             ent.angle = None;
         }
 
+        // Experimental hook stuff
         if let Some(hook) = ent.hook.clone() {
             match hook.state {
                 HookState::Shooting {
@@ -328,6 +342,7 @@ impl Game {
             });
         }
 
+        // Check for collisions
         let mut offset = ent.vel * dt;
         let mut flip_axis = None;
 
@@ -354,6 +369,7 @@ impl Game {
             }
         }
 
+        // Allow reflecting off walls when dashing
         if let (Some((dash_time, dash_dir)), Some(flip_axis)) = (cur_dash, flip_axis) {
             let reflected_dash_dir = dash_dir - 2.0 * dash_dir.dot(&flip_axis) * flip_axis;
             ent.last_dash = Some((dash_time, reflected_dash_dir));
@@ -369,6 +385,7 @@ impl Game {
             ent.angle = None;
         }*/
 
+        // Clip to map boundary
         ent.pos.x = ent
             .pos
             .x
@@ -380,6 +397,7 @@ impl Game {
             .min(self.settings.size.y - PLAYER_SIT_W / 2.0)
             .max(PLAYER_SIT_W / 2.0);
 
+        // Start dashing
         if input.use_item
             && ent.last_dash.map_or(true, |(dash_time, _)| {
                 dash_time + PLAYER_DASH_COOLDOWN <= input_time
@@ -389,6 +407,7 @@ impl Game {
             ent.last_dash = Some((input_time, delta));
         }
 
+        // Shooting
         /*if input_time >= ent.next_shot_time {
             if ent.shots_left == 0 {
                 ent.shots_left = MAGAZINE_SIZE;
@@ -412,6 +431,9 @@ impl Game {
             }
         }*/
 
+        // Check for death
+        let mut killed = None;
+
         for (entity_id, entity) in input_state.entities.iter() {
             match entity {
                 Entity::DangerGuy(danger_guy) if danger_guy.is_hot => {
@@ -422,41 +444,75 @@ impl Game {
                     )
                     .is_some()
                     {
-                        context
-                            .killed_players
-                            .insert(player_id, DeathReason::TouchedTheDanger);
+                        killed = Some(DeathReason::TouchedTheDanger);
                     }
                 }
                 Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
                     if ent.rect().contains_point(bullet.pos(input_time)) {
                         context.removed_entities.insert(*entity_id);
-                        context
-                            .killed_players
-                            .insert(player_id, DeathReason::ShotBy(bullet.owner));
+                        killed = Some(DeathReason::ShotBy(bullet.owner));
                     }
                 }
                 _ => (),
             }
         }
 
-        let time = self.game_time();
-        for entity in self.entities.values_mut() {
-            match entity {
-                Entity::FoodSpawn(spawn) if spawn.has_food => {
-                    if !context.is_predicting
-                        && geom::rect_collision(
+        if let Some(killed) = killed {
+            context.killed_players.insert(player_id, killed);
+
+            if !context.is_predicting {
+                for _ in 0..5 {
+                    // TODO: Random
+                    let angle = rand::thread_rng().gen::<f32>() * std::f32::consts::PI * 2.0;
+                    let speed = rand::thread_rng().gen_range(FOOD_MIN_SPEED, FOOD_MAX_SPEED);
+                    let start_vel = Vector::new(speed * angle.cos(), speed * angle.sin());
+                    let factor =
+                        rand::thread_rng().gen_range(FOOD_SPEED_MIN_FACTOR, FOOD_SPEED_MAX_FACTOR);
+
+                    let food = Food {
+                        start_time: self.game_time(),
+                        start_pos: ent.pos,
+                        start_vel,
+                        factor,
+                        amount: 1,
+                    };
+                    context.new_entities.push(Entity::Food(food));
+                }
+            }
+        }
+
+        // Take food
+        if !context.is_predicting {
+            let time = self.game_time();
+            for (entity_id, entity) in self.entities.iter_mut() {
+                match entity {
+                    Entity::FoodSpawn(spawn) if spawn.has_food => {
+                        if geom::rect_collision(
                             &spawn.rect(input_time),
                             &ent.rect(),
                             Vector::zeros(),
                         )
                         .is_some()
-                    {
-                        spawn.has_food = false;
-                        spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
-                        self.players.get_mut(&ent.owner).unwrap().food += 1;
+                        {
+                            spawn.has_food = false;
+                            spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
+                            self.players.get_mut(&ent.owner).unwrap().food += 1;
+                        }
                     }
+                    Entity::Food(food) => {
+                        if geom::rect_collision(
+                            &food.rect(input_time),
+                            &ent.rect(),
+                            Vector::zeros(),
+                        )
+                        .is_some()
+                        {
+                            self.players.get_mut(&ent.owner).unwrap().food += 1;
+                            context.removed_entities.insert(*entity_id);
+                        }
+                    }
+                    _ => (),
                 }
-                _ => (),
             }
         }
 

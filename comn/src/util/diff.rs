@@ -6,7 +6,7 @@ use crate::util::join;
 
 // TODO: Serialize / Deserialize trait bounds on Diffable and Diff are only
 // here so that we can automatically derive Serialize and Deserialize for
-// BTreeMap.
+// BTreeMapDiff.
 
 pub trait Diffable: Sized {
     type Diff: Diff<Value = Self> + Serialize + for<'a> Deserialize<'a>;
