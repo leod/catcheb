@@ -92,6 +92,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
     let mut stats = Stats::default();
     let mut show_stats = false;
+    let mut lag_frames = 0;
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
@@ -104,8 +105,14 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             match event {
                 Event::KeyboardInput(event) => {
                     if !pressed_keys.contains(&event.key()) {
-                        if event.key() == Key::P {
-                            show_stats = !show_stats;
+                        match event.key() {
+                            Key::P => {
+                                show_stats = !show_stats;
+                            }
+                            Key::L => {
+                                lag_frames = 30;
+                            }
+                            _ => (),
                         }
                     }
 
@@ -120,6 +127,11 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 }
                 _ => (),
             }
+        }
+
+        if lag_frames > 0 {
+            lag_frames -= 1;
+            continue;
         }
 
         if !game.is_good() {
@@ -161,7 +173,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             );
         }
 
-        gfx.clear(Color::BLACK);
+        gfx.clear(Color::WHITE);
 
         if let Some(state) = game.state() {
             render::render_game(
