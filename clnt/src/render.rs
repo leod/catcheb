@@ -17,7 +17,7 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{BULLET_RADIUS, FOOD_SIZE, TURRET_RADIUS},
+    game::run::{BULLET_RADIUS, FOOD_MAX_LIFETIME, FOOD_SIZE, TURRET_RADIUS},
     geom,
     util::join,
 };
@@ -100,7 +100,7 @@ pub fn render_game(
         let map_size: mint::Vector2<f32> = state.settings.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
         //gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
-        gfx.fill_rect(&map_rect, Color::from_rgba(255, 255, 255, 1.0));
+        gfx.fill_rect(&map_rect, Color::WHITE);
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
 
@@ -136,7 +136,7 @@ pub fn render_game(
             }
         }*/
 
-        gfx.set_blend_mode(Some(Default::default()));
+        //gfx.set_blend_mode(Some(Default::default()));
     }
 
     for entity in interp_entities(state, next_entities, time) {
@@ -328,8 +328,30 @@ pub fn render_game(
 
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
-                gfx.fill_rect(&rect, Color::ORANGE);
-                gfx.stroke_rect(&rect, Color::BLACK);
+
+                // TODO: Blending's-a not working -- user error or not?
+                let alpha = pareen::constant(1.0)
+                    .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, 0.0)
+                    .squeeze(food.start_time..=food.start_time + FOOD_MAX_LIFETIME)
+                    .eval(time);
+                gfx.fill_rect(
+                    &rect,
+                    Color {
+                        r: 1.0,
+                        g: 1.0 - 0.5 * alpha,
+                        b: 1.0 - alpha,
+                        a: 1.0,
+                    },
+                );
+                gfx.stroke_rect(
+                    &rect,
+                    Color {
+                        r: 1.0 - alpha,
+                        g: 1.0 - alpha,
+                        b: 1.0 - alpha,
+                        a: 1.0,
+                    },
+                );
             }
         }
     }

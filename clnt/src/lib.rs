@@ -161,7 +161,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             );
         }
 
-        gfx.clear(Color::WHITE);
+        gfx.clear(Color::BLACK);
 
         if let Some(state) = game.state() {
             render::render_game(
