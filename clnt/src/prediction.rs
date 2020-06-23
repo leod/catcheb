@@ -191,7 +191,7 @@ impl Prediction {
                                     Some((
                                         *id,
                                         comn::Entity::Player(comn::PlayerEntity {
-                                            pos: predicted.pos + (server.pos - predicted.pos) * 0.1,
+                                            pos: predicted.pos + (server.pos - predicted.pos) * 0.2,
                                             ..server.clone()
                                         }),
                                     ))
@@ -209,6 +209,7 @@ impl Prediction {
             .collect();
 
         predicted.players = server.players.clone();
+        //predicted.entities = server.entities.clone();
 
         if error > 0.0 {
             info!("error: {}", error);

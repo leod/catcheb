@@ -143,7 +143,7 @@ pub enum PlayerState {
 pub struct Player {
     pub name: String,
     pub state: PlayerState,
-    pub food: usize,
+    pub food: u32,
 }
 
 impl_opaque_diff!(Player);
@@ -271,7 +271,7 @@ impl Game {
                 has_food: true,
                 respawn_time: None,
             }),
-            Entity::DangerGuy(DangerGuy {
+            /*Entity::DangerGuy(DangerGuy {
                 start_pos: Point::new(1750.0, 200.0),
                 end_pos: Point::new(1750.0, 1400.0),
                 size: Vector::new(180.0, 40.0),
@@ -279,7 +279,7 @@ impl Game {
                 wait_time: (2.0, 3.0),
                 phase: 0.0,
                 is_hot: false,
-            }),
+            }),*/
         ];
 
         for i in 0..5 {
