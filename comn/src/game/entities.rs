@@ -14,6 +14,7 @@ pub enum Entity {
     Turret(Turret),
     Wall(Wall),
     FoodSpawn(FoodSpawn),
+    Food(Food),
 }
 
 impl Entity {
@@ -33,6 +34,7 @@ impl Entity {
             Entity::Turret(entity) => entity.pos,
             Entity::Wall(entity) => entity.pos(),
             Entity::FoodSpawn(entity) => entity.pos,
+            Entity::Food(entity) => entity.pos(time),
         }
     }
 
@@ -60,17 +62,14 @@ impl Entity {
             Entity::Turret(entity) => entity.shape(),
             Entity::Wall(entity) => entity.shape(),
             Entity::FoodSpawn(entity) => entity.shape(time),
+            Entity::Food(entity) => entity.shape(time),
         }
     }
 
     pub fn intersection_shape(&self, time: f32) -> Shape {
         match self {
-            Entity::Player(entity) => entity.shape(),
-            Entity::Bullet(entity) => entity.shape(time),
-            Entity::DangerGuy(entity) => entity.shape(time),
-            Entity::Turret(entity) => entity.shape(),
-            Entity::Wall(entity) => entity.shape(),
             Entity::FoodSpawn(entity) => entity.intersection_shape(time),
+            _ => self.shape(time),
         }
     }
 }
@@ -317,6 +316,33 @@ impl FoodSpawn {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Food {
+    pub start_time: GameTime,
+    pub start_pos: Point,
+    pub start_vel: Vector,
+    pub factor: f32,
+    pub amount: usize,
+}
+
+impl Food {
+    pub fn pos(&self, time: GameTime) -> Point {
+        // v(t) = vel * exp(-factor*t)
+
+        let dt = time - self.start_time;
+
+        self.start_pos + self.start_vel * (1.0 - (-self.factor * dt).exp()) / self.factor
+    }
+
+    pub fn rect(&self, time: GameTime) -> Rect {
+        AaRect::new_center(self.pos(time), Vector::new(run::FOOD_SIZE, run::FOOD_SIZE)).to_rect()
+    }
+
+    pub fn shape(&self, time: GameTime) -> Shape {
+        Shape::Rect(self.rect(time))
+    }
+}
+
 impl_opaque_diff!(Entity);
 impl_opaque_diff!(Bullet);
 impl_opaque_diff!(PlayerEntity);
@@ -324,3 +350,4 @@ impl_opaque_diff!(DangerGuy);
 impl_opaque_diff!(Turret);
 impl_opaque_diff!(Wall);
 impl_opaque_diff!(FoodSpawn);
+impl_opaque_diff!(Food);

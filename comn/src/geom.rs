@@ -1,7 +1,5 @@
 use std::iter::once;
 
-use log::info;
-
 use serde::{Deserialize, Serialize};
 
 use crate::{Point, Vector};
