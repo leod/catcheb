@@ -15,3 +15,5 @@ nalgebra = { version = "0.21", features = ["serde-serialize", "mint"] }
 instant = "0.1"
 log = "0.4"
 rand = "0.7"
+
+coarse-prof = { git = "https://github.com/leod/coarse-prof.git" }
