@@ -7,7 +7,7 @@ use crate::entities::{Bullet, Food};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
-    Input, PlayerEntity, PlayerId, Vector,
+    Input, Matrix, PlayerEntity, PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -215,15 +215,7 @@ impl Game {
             ent.vel =
                 geom::smooth_to_target_vector(PLAYER_DASH_ACCEL_FACTOR, ent.vel, target_vel, dt);
 
-            // TODO: State redundancy
-            //ent.angle = Some();
-            let angle = dash_dir.y.atan2(dash_dir.x);
-            ent.deformation = na::Matrix2::new(
-                2.0f32.sqrt() * angle.cos(),
-                1.0 / 2.0f32.sqrt() * -angle.sin(),
-                2.0f32.sqrt() * angle.sin(),
-                1.0 / 2.0f32.sqrt() * angle.cos(),
-            );
+            ent.target_angle = dash_dir.y.atan2(dash_dir.x);
         } else {
             // Normal movement when not dashing.
             if input.move_left {
@@ -239,6 +231,10 @@ impl Game {
                 delta.y += 1.0;
             }
 
+            if delta.norm() > 0.0 {
+                ent.target_angle = delta.y.atan2(delta.x);
+            }
+
             delta = if delta.norm() > 0.0 {
                 delta.normalize()
             } else {
@@ -250,11 +246,11 @@ impl Game {
             if (ent.vel - target_vel).norm() < 0.01 {
                 ent.vel = target_vel;
             }
-
-            // TODO: State redundancy
-            //ent.angle = None;
-            ent.deformation = na::Matrix2::identity();
         }
+
+        let angle_dist =
+            ((ent.target_angle - ent.angle).sin()).atan2((ent.target_angle - ent.angle).cos());
+        ent.angle += angle_dist * 0.5;
 
         // Experimental hook stuff
         if let Some(hook) = ent.hook.clone() {
@@ -342,13 +338,13 @@ impl Game {
                     }
                 }
             }
-        } else if input.use_action && ent.vel.norm() > 0.0 && ent.hook.is_none() {
+        } else if input.use_action && ent.hook.is_none() {
             // TODO: Trace ray when spawning hook?
             ent.hook = Some(Hook {
                 state: HookState::Shooting {
                     start_time: input_time,
                     start_pos: ent.pos,
-                    vel: ent.vel.normalize() * HOOK_SHOOT_SPEED,
+                    vel: Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED,
                 },
             });
         }

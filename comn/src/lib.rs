@@ -12,8 +12,8 @@ use uuid::Uuid;
 pub use crate::{
     game::{
         entities::{DangerGuy, Hook, HookState, PlayerEntity},
-        DeathReason, Entity, EntityId, EntityMap, Event, Game, Input, Item, Player, PlayerId,
-        PlayerMap, PlayerState, Point, Settings, Tick, TickNum, Time, Vector,
+        DeathReason, Entity, EntityId, EntityMap, Event, Game, Input, Item, Matrix, Player,
+        PlayerId, PlayerMap, PlayerState, Point, Settings, Tick, TickNum, Time, Vector,
     },
     util::ping::SequenceNum,
 };
