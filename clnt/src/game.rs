@@ -117,9 +117,13 @@ impl Game {
     }
 
     pub fn update(&mut self, now: Instant, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
-        self.webrtc_client.set_now((Instant::now(), now));
-        while let Some((recv_time, message)) = self.webrtc_client.take_message() {
-            self.handle_message(recv_time, message);
+        {
+            coarse_prof::profile!("webrtc");
+
+            self.webrtc_client.set_now((Instant::now(), now));
+            while let Some((recv_time, message)) = self.webrtc_client.take_message() {
+                self.handle_message(recv_time, message);
+            }
         }
 
         if let Some(sequence_num) = self.ping.next_ping_sequence_num(now) {
@@ -223,6 +227,8 @@ impl Game {
         let mut events = Vec::new();
 
         for tick_num in crossed_tick_nums.iter() {
+            coarse_prof::profile!("tick");
+
             // For debugging, keep track of how many ticks we do not
             // receive server data on time.
             if let Some(_) = self.received_states.get(tick_num) {
@@ -247,6 +253,7 @@ impl Game {
 
             // Predict effects of our own input locally.
             if let Some(prediction) = self.prediction.as_mut() {
+                coarse_prof::profile!("predict");
                 prediction.record_tick_input(
                     *tick_num,
                     input.clone(),
@@ -254,6 +261,8 @@ impl Game {
                 );
             }
         }
+
+        coarse_prof::profile!("cleanup");
 
         if self.next_tick_num <= Some(self.tick_num()) {
             // We have reached the tick that we were interpolating into, so
