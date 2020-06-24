@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    game::{run, EntityId, PlayerId, Point, Vector},
+    game::{run, EntityId, Matrix, PlayerId, Point, Vector},
     geom::{AaRect, Circle, Rect, Shape},
     GameError, GameResult, GameTime,
 };
@@ -103,7 +103,7 @@ pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
     pub vel: Vector,
-    pub angle: Option<f32>,
+    pub deformation: Matrix,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
@@ -116,7 +116,7 @@ impl PlayerEntity {
             owner,
             pos,
             vel: Vector::zeros(),
-            angle: Some(0.0),
+            deformation: Matrix::identity(),
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
@@ -125,15 +125,10 @@ impl PlayerEntity {
     }
 
     pub fn rect(&self) -> Rect {
-        if let Some(angle) = self.angle {
-            AaRect::new_center(
-                self.pos,
-                Vector::new(run::PLAYER_MOVE_W, run::PLAYER_MOVE_L),
-            )
-            .rotate(angle)
-        } else {
-            AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
-                .to_rect()
+        Rect {
+            center: self.pos,
+            x_edge: self.deformation.column(0) * run::PLAYER_SIT_W,
+            y_edge: self.deformation.column(1) * run::PLAYER_SIT_L,
         }
     }
 

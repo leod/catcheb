@@ -21,6 +21,7 @@ pub use run::RunContext;
 pub type Time = f32;
 pub type Vector = na::Vector2<f32>;
 pub type Point = na::Point2<f32>;
+pub type Matrix = na::Matrix2<f32>;
 
 #[derive(Debug, Clone)]
 pub enum Error {

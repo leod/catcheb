@@ -53,8 +53,6 @@ impl AaRect {
     pub fn rotate(&self, angle: f32) -> Rect {
         Rect {
             center: self.center(),
-            size: self.size,
-            angle,
             x_edge: self.size.x * Vector::new(angle.cos(), angle.sin()),
             y_edge: self.size.y * Vector::new(-angle.sin(), angle.cos()),
         }
@@ -63,8 +61,6 @@ impl AaRect {
     pub fn to_rect(&self) -> Rect {
         Rect {
             center: self.center(),
-            size: self.size,
-            angle: 0.0,
             x_edge: Vector::new(self.size.x, 0.0),
             y_edge: Vector::new(0.0, self.size.y),
         }
@@ -104,8 +100,6 @@ impl AxisProjection {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rect {
     pub center: Point,
-    pub size: Vector,
-    pub angle: f32,
     pub x_edge: Vector,
     pub y_edge: Vector,
 }

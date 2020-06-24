@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use nalgebra as na;
 use rand::Rng;
 
 use crate::entities::{Bullet, Food};
@@ -215,7 +216,14 @@ impl Game {
                 geom::smooth_to_target_vector(PLAYER_DASH_ACCEL_FACTOR, ent.vel, target_vel, dt);
 
             // TODO: State redundancy
-            ent.angle = Some(dash_dir.y.atan2(dash_dir.x));
+            //ent.angle = Some();
+            let angle = dash_dir.y.atan2(dash_dir.x);
+            ent.deformation = na::Matrix2::new(
+                2.0f32.sqrt() * angle.cos(),
+                1.0 / 2.0f32.sqrt() * -angle.sin(),
+                2.0f32.sqrt() * angle.sin(),
+                1.0 / 2.0f32.sqrt() * angle.cos(),
+            );
         } else {
             // Normal movement when not dashing.
             if input.move_left {
@@ -244,7 +252,8 @@ impl Game {
             }
 
             // TODO: State redundancy
-            ent.angle = None;
+            //ent.angle = None;
+            ent.deformation = na::Matrix2::identity();
         }
 
         // Experimental hook stuff
