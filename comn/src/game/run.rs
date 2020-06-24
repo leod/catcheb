@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nalgebra as na;
 use rand::Rng;
 
 use crate::entities::{Bullet, Food};
@@ -24,15 +23,13 @@ pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
 pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
+pub const PLAYER_TURN_FACTOR: f32 = 0.5;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
-//pub const HOOK_MAX_SHOOT_DURATION: f32 = 5.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
 pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
-//pub const HOOK_MAX_CONTRACT_DURATION: f32 = 5.0;;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
-//pub const HOOK_CONTRACT_SPEED: f32 = 650.0;
 pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
@@ -45,6 +42,8 @@ pub const TURRET_RANGE: f32 = 400.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
+pub const TURRET_TURN_FACTOR: f32 = 0.1;
+pub const TURRET_SPAWN_OFFSET: f32 = 12.0;
 
 pub const FOOD_SIZE: f32 = 20.0;
 pub const FOOD_ROTATION_SPEED: f32 = 3.0;
@@ -126,7 +125,7 @@ impl Game {
                         let target_angle = turret.angle_to_pos(target_pos);
                         let angle_dist = ((target_angle - turret.angle).sin())
                             .atan2((target_angle - turret.angle).cos());
-                        turret.angle += angle_dist * 0.1;
+                        turret.angle += angle_dist * TURRET_TURN_FACTOR;
                         //.min(TURRET_MAX_TURN_SPEED * tick_period)
                         //.max(TURRET_MAX_TURN_SPEED * tick_period);
 
@@ -138,7 +137,7 @@ impl Game {
                             context.new_entities.push(Entity::Bullet(Bullet {
                                 owner: None,
                                 start_time: time,
-                                start_pos: turret.pos + 12.0 * delta,
+                                start_pos: turret.pos + TURRET_SPAWN_OFFSET * delta,
                                 vel: delta * BULLET_MOVE_SPEED,
                             }));
                         }
@@ -248,9 +247,16 @@ impl Game {
             }
         }
 
-        let angle_dist =
-            ((ent.target_angle - ent.angle).sin()).atan2((ent.target_angle - ent.angle).cos());
-        ent.angle += angle_dist * 0.5;
+        {
+            let angle_dist =
+                ((ent.target_angle - ent.angle).sin()).atan2((ent.target_angle - ent.angle).cos());
+            ent.angle += angle_dist * PLAYER_TURN_FACTOR;
+            ent.target_size_scale = 1.0
+                + (0.4 * (-angle_dist.abs() * 1.0).exp() * ent.vel.norm() / PLAYER_MOVE_SPEED)
+                    .min(0.6);
+            ent.size_scale =
+                geom::smooth_to_target_f32(30.0, ent.size_scale, ent.target_size_scale, dt);
+        }
 
         // Experimental hook stuff
         if let Some(hook) = ent.hook.clone() {
@@ -281,9 +287,7 @@ impl Game {
                         });
                     } else {
                         for (target_id, target) in input_state.entities.iter() {
-                            if entity_id != *target_id && target.can_hook_attach()
-                            //&& target.shape(input_time).contains_point(pos)
-                            {
+                            if entity_id != *target_id && target.can_hook_attach() {
                                 if let Some(intersection_t) = ray
                                     .intersects(&target.intersection_shape(input_time))
                                     .filter(|t| *t <= pos_delta_norm)
