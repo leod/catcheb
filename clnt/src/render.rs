@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use log::info;
+use nalgebra as na;
 
 use quicksilver::{
     geom::{Circle, Rectangle, Transform, Vector},
@@ -362,10 +363,19 @@ pub fn render_game(
 }
 
 fn rect_to_transform(rect: &geom::Rect) -> Transform {
-    let size: mint::Vector2<f32> = rect.size.into();
-    let center: mint::Vector2<f32> = rect.center.coords.into();
+    let m_column: mint::ColumnMatrix3<f32> = na::Matrix3::new(
+        rect.x_edge.x,
+        rect.y_edge.x,
+        rect.center.x,
+        rect.x_edge.y,
+        rect.y_edge.y,
+        rect.center.y,
+        0.0,
+        0.0,
+        1.0,
+    )
+    .into();
+    let m_row: mint::RowMatrix3<f32> = m_column.into();
 
-    Transform::translate(center.into())
-        * Transform::rotate(rect.angle.to_degrees())
-        * Transform::scale(size.into())
+    m_row.into()
 }
