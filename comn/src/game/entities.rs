@@ -103,7 +103,9 @@ pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
     pub vel: Vector,
-    pub deformation: Matrix,
+    pub angle: f32,
+    pub target_angle: f32,
+    pub size: Vector,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
@@ -116,7 +118,9 @@ impl PlayerEntity {
             owner,
             pos,
             vel: Vector::zeros(),
-            deformation: Matrix::identity(),
+            angle: 0.0,
+            target_angle: 0.0,
+            size: Vector::new(1.0, 1.0),
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
@@ -125,11 +129,8 @@ impl PlayerEntity {
     }
 
     pub fn rect(&self) -> Rect {
-        Rect {
-            center: self.pos,
-            x_edge: self.deformation.column(0) * run::PLAYER_SIT_W,
-            y_edge: self.deformation.column(1) * run::PLAYER_SIT_L,
-        }
+        AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
+            .rotate(self.angle)
     }
 
     pub fn shape(&self) -> Shape {
