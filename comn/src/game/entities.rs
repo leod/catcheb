@@ -100,12 +100,16 @@ pub struct Hook {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
+    // TODO: Much of the PlayerEntity is needed only for the server and the
+    // owning player. As a simple optimization, we can have a PlayerView
+    // entity that carries only the state necessary for display.
     pub owner: PlayerId,
     pub pos: Point,
     pub vel: Vector,
     pub angle: f32,
     pub target_angle: f32,
-    pub size: Vector,
+    pub size_scale: f32,
+    pub target_size_scale: f32,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
@@ -120,7 +124,8 @@ impl PlayerEntity {
             vel: Vector::zeros(),
             angle: 0.0,
             target_angle: 0.0,
-            size: Vector::new(1.0, 1.0),
+            size_scale: 1.0,
+            target_size_scale: 1.0,
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
@@ -129,8 +134,14 @@ impl PlayerEntity {
     }
 
     pub fn rect(&self) -> Rect {
-        AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
-            .rotate(self.angle)
+        AaRect::new_center(
+            self.pos,
+            Vector::new(
+                run::PLAYER_SIT_W * self.size_scale,
+                run::PLAYER_SIT_L / self.size_scale,
+            ),
+        )
+        .rotate(self.angle)
     }
 
     pub fn shape(&self) -> Shape {

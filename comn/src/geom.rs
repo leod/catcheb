@@ -77,6 +77,10 @@ pub fn smooth_to_target_vector(factor: f32, start: Vector, target: Vector, dt: f
     target - (target - start) * (-factor * dt).exp()
 }
 
+pub fn smooth_to_target_f32(factor: f32, start: f32, target: f32, dt: f32) -> f32 {
+    target - (target - start) * (-factor * dt).exp()
+}
+
 // Awesome resource:
 // https://www.codeproject.com/Articles/15573/2D-Polygon-Collision-Detection
 
