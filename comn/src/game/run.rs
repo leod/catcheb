@@ -23,7 +23,7 @@ pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
 pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
-pub const PLAYER_TURN_FACTOR: f32 = 0.4;
+pub const PLAYER_TURN_FACTOR: f32 = 0.25;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
@@ -269,7 +269,7 @@ impl Game {
 
         {
             let phi = ent.target_angle - ent.angle;
-            let mut angle_dist = phi.sin().atan2(phi.cos());
+            let angle_dist = phi.sin().atan2(phi.cos());
 
             //let angle_dist = (phi.sin() / phi.cos()).atan();
             /*let phi1 = ent.target_angle - ent.angle;
@@ -293,26 +293,25 @@ impl Game {
             let factor = if cur_dash.is_some() {
                 PLAYER_DASH_TURN_FACTOR
             } else if time_since_turn < 0.25 {
-                0.5 * PLAYER_TURN_FACTOR
+                //0.5 * PLAYER_TURN_FACTOR
+                PLAYER_TURN_FACTOR
             } else {
                 PLAYER_TURN_FACTOR
             };
             ent.angle += angle_dist * factor;
 
-            /*if time_since_turn >= 0.25 {
-                ent.angle = ent.target_angle;
-            }*/
-
-            let mut turn_scale = (time_since_turn * std::f32::consts::PI * 2.0)
-                .cos()
-                .powf(2.0);
-            if cur_dash.is_none() {
-                turn_scale = turn_scale * 0.5 + 0.3;
-            }
+            let turn_scale = if let Some((dash_time, _)) = cur_dash {
+                let dash_delta = input_time - dash_time;
+                (dash_delta * std::f32::consts::PI * 2.0).cos().powf(2.0)
+            } else {
+                (time_since_turn * std::f32::consts::PI * 2.0)
+                    .cos()
+                    .powf(2.0)
+            };
 
             let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
 
-            ent.target_size_scale = 0.8 * move_scale * turn_scale;
+            ent.target_size_scale = 0.5 * move_scale * turn_scale;
 
             ent.size_scale =
                 geom::smooth_to_target_f32(20.0, ent.size_scale, ent.target_size_scale, dt);
@@ -446,16 +445,11 @@ impl Game {
             let reflected_dash_dir = dash_dir - 2.0 * dash_dir.dot(&flip_axis) * flip_axis;
             ent.last_dash = Some((dash_time, reflected_dash_dir));
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
+            ent.last_turn = input_time;
             offset += flip_axis * 0.1;
         }
 
         ent.pos += offset;
-
-        /*if delta.norm() > 0.0 {
-            ent.angle = Some(delta.y.atan2(delta.x));
-        } else {
-            ent.angle = None;
-        }*/
 
         // Clip to map boundary
         ent.pos.x = ent
