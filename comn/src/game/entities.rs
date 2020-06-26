@@ -107,6 +107,8 @@ pub struct PlayerEntity {
     pub pos: Point,
     pub vel: Vector,
     pub angle: f32,
+    pub flip: bool,
+    pub last_turn: GameTime,
     pub target_angle: f32,
     pub size_scale: f32,
     pub target_size_scale: f32,
@@ -123,6 +125,8 @@ impl PlayerEntity {
             pos,
             vel: Vector::zeros(),
             angle: 0.0,
+            flip: false,
+            last_turn: 0.0,
             target_angle: 0.0,
             size_scale: 1.0,
             target_size_scale: 1.0,
@@ -137,8 +141,8 @@ impl PlayerEntity {
         AaRect::new_center(
             self.pos,
             Vector::new(
-                run::PLAYER_SIT_W * self.size_scale,
-                run::PLAYER_SIT_L / self.size_scale,
+                run::PLAYER_SIT_W * (1.0 + self.size_scale),
+                run::PLAYER_SIT_L / (1.0 + self.size_scale),
             ),
         )
         .rotate(self.angle)

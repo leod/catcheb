@@ -23,7 +23,7 @@ pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
 pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
-pub const PLAYER_TURN_FACTOR: f32 = 0.3;
+pub const PLAYER_TURN_FACTOR: f32 = 0.4;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -209,6 +209,8 @@ impl Game {
         });
 
         let mut delta = Vector::new(0.0, 0.0);
+        let prev_target_angle = ent.target_angle;
+        let time_since_turn = (input_time - ent.last_turn).min(0.5);
 
         if let Some((_dash_time, dash_dir)) = cur_dash {
             // Movement is constricted while dashing.
@@ -242,30 +244,77 @@ impl Game {
                 delta
             };
 
-            let target_vel = delta * PLAYER_MOVE_SPEED;
+            let mut target_vel =
+                Vector::new(ent.angle.cos(), ent.angle.sin()) * PLAYER_MOVE_SPEED * delta.norm();
+            if ent.flip && time_since_turn < 0.25 && ent.vel.norm() > 10.0 {
+                target_vel *= 0.1;
+            }
+
             ent.vel = geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
             if (ent.vel - target_vel).norm() < 0.01 {
                 ent.vel = target_vel;
             }
         }
 
+        if ent.target_angle != prev_target_angle {
+            let phi = ent.target_angle - prev_target_angle;
+            let angle_dist = phi.sin().atan2(phi.cos());
+            //log::info!("{}", angle_dist);
+            if (angle_dist.abs() - std::f32::consts::PI).abs() < 0.01 {
+                ent.flip = true;
+            }
+
+            ent.last_turn = input_time;
+        }
+
         {
             let phi = ent.target_angle - ent.angle;
-            let angle_dist = phi.sin().atan2(phi.cos());
+            let mut angle_dist = phi.sin().atan2(phi.cos());
 
             //let angle_dist = (phi.sin() / phi.cos()).atan();
-            let phi1 = ent.target_angle - ent.angle;
+            /*let phi1 = ent.target_angle - ent.angle;
             let phi2 = phi + std::f32::consts::PI;
             let phi3 = phi - std::f32::consts::PI;
             let angle_dist1 = (phi1.sin() / phi1.cos()).atan();
             let angle_dist2 = (phi2.sin() / phi2.cos()).atan();
             let angle_dist3 = (phi3.sin() / phi3.cos()).atan();
-            let angle_dist = *[angle_dist1, angle_dist2, angle_dist3].iter().min_by(|a, b| a.partial_cmp(&b).unwrap()).unwrap();
+            let angle_dist = *[angle_dist1, angle_dist2, angle_dist3].iter().min_by(|a, b| a.partial_cmp(&b).unwrap()).unwrap();*/
 
-            ent.angle += angle_dist * PLAYER_TURN_FACTOR;
-            ent.target_size_scale = 1.0
-                + (0.4 * (-angle_dist.abs() * 10.0).exp() * ent.vel.norm() / PLAYER_MOVE_SPEED)
-                    .min(0.6);
+            /*if ((prev_target_angle - ent.target_angle).abs() - std::f32::consts::PI).abs() < 0.1 {
+                let prev_phi = prev_target_angle - ent.angle;
+                let prev_angle_dist = prev_phi.sin().atan2(prev_phi.cos());
+                ent.angle = ent.target_angle + prev_angle_dist;
+                angle_dist = 0.0;
+            } else {
+                ent.angle += angle_dist * PLAYER_TURN_FACTOR;
+            }*/
+
+            if ent.flip {
+                if time_since_turn >= 0.25 {}
+                if time_since_turn >= 0.5 {
+                    //ent.angle = ent.target_angle;
+                    ent.flip = false;
+                }
+            } else {
+                let factor = if time_since_turn < 0.25 {
+                    0.5 * PLAYER_TURN_FACTOR
+                } else {
+                    PLAYER_TURN_FACTOR
+                };
+                ent.angle += angle_dist * factor;
+            }
+
+            /*if time_since_turn >= 0.25 {
+                ent.angle = ent.target_angle;
+            }*/
+
+            let turn_scale = (time_since_turn * std::f32::consts::PI * 2.0)
+                .cos()
+                .powf(2.0);
+            let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
+
+            ent.target_size_scale = 0.8 * move_scale * turn_scale;
+
             ent.size_scale =
                 geom::smooth_to_target_f32(30.0, ent.size_scale, ent.target_size_scale, dt);
         }
@@ -428,7 +477,7 @@ impl Game {
             })
             && delta.norm() > 0.1
         {
-            ent.last_dash = Some((input_time, delta));
+            ent.last_dash = Some((input_time, ent.vel.normalize()));
         }
 
         // Shooting
