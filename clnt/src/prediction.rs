@@ -6,16 +6,18 @@ use comn::{game::RunContext, util::join};
 
 use crate::game::ReceivedState;
 
+const MIN_PREDICTION_ERROR_FOR_REPLAY: f32 = 0.001;
+
 #[derive(Debug, Clone)]
 struct Record {
-    state: comn::Game,
+    entities: comn::EntityMap,
     my_last_input: comn::Input,
-    //new_entities: Vec<comn::EntityId>,
 }
 
 pub struct Prediction {
     my_player_id: comn::PlayerId,
     log: BTreeMap<comn::TickNum, Record>,
+    last_server_state_scratch: Option<comn::Game>,
 }
 
 impl Prediction {
@@ -23,6 +25,7 @@ impl Prediction {
         Self {
             my_player_id,
             log: BTreeMap::new(),
+            last_server_state_scratch: None,
         }
     }
 
@@ -39,20 +42,13 @@ impl Prediction {
         // Let's make as few assumptions as possible regarding consistency
         // in calls to `record_tick_input`.
         if let Some(max_logged) = self.max_logged_tick_num() {
-            if max_logged > tick_num {
-                info!(
-                    "Predicting tick that is in our past ({:?} vs {:?}); resetting log",
-                    tick_num, max_logged,
-                );
-                self.log = Default::default();
-            } else if max_logged != tick_num {
-                // TODO: Do we really need to harshly re-initialize prediction
-                // here?
+            if max_logged != tick_num {
                 info!(
                     "Skipped ticks in prediction ({:?} vs {:?}); resetting log",
                     tick_num, max_logged,
                 );
                 self.log = Default::default();
+                self.last_server_state_scratch = None;
             }
         }
 
@@ -62,65 +58,81 @@ impl Prediction {
             server_state.and_then(|state| state.my_last_input.map(|input| (state, input)));
 
         if let Some((server_state, my_last_input)) = server_state_and_my_last_input {
-            if let Some(record) = self.log.get_mut(&my_last_input.next()) {
-                Self::correct_prediction(self.my_player_id, &mut record.state, &server_state.game);
+            let mut last_state = server_state.game.clone();
+
+            let prediction_error = if let Some(record) = self.log.get_mut(&my_last_input.next()) {
+                Self::correct_prediction(
+                    self.my_player_id,
+                    &mut record.entities,
+                    &server_state.game.entities,
+                )
+            } else {
+                0.0
+            };
+
+            if prediction_error > 0.0 {
+                info!("error: {}", prediction_error);
             }
 
             // We can now forget about any older predictions in the log.
-            // TODO: Needless clone.
-            self.log = self
-                .log
-                .clone()
+            self.log = std::mem::replace(&mut self.log, BTreeMap::new())
                 .into_iter()
                 .filter(|&(tick_num, _)| tick_num > my_last_input)
                 .collect();
-        }
 
-        let last_state = if let Some(first_record) = self.log.values().next() {
-            // Starting at the oldest state in our log, re-apply the inputs
-            // that we had.
-            let mut last_state = first_record.state.clone();
-            for record in self.log.values_mut().skip(1) {
-                Self::run_tick(&mut last_state, self.my_player_id, &record.my_last_input);
-                record.state = last_state.clone();
+            // Check if we need to replay our inputs following the corrected state.
+            if prediction_error >= MIN_PREDICTION_ERROR_FOR_REPLAY {
+                // Starting at the second-oldest state in our log (the oldest
+                // one just got corrected), re-apply the inputs that we had
+                // for those ticks.
+                let last_entities = self.log.values().next().unwrap().entities.clone();
+                Self::load_entities(&mut last_state, &last_entities);
+
+                for record in self.log.values_mut().skip(1) {
+                    Self::run_player_input(
+                        &mut last_state,
+                        self.my_player_id,
+                        &record.my_last_input,
+                    );
+                    record.entities =
+                        Self::extract_predicted_entities(&last_state, self.my_player_id);
+                }
             }
 
-            Some(last_state)
-        } else if let Some(server_state) = server_state {
-            // Our prediction log is empty, but we have a server state that we
-            // can use to start prediction.
-            Some(server_state.game.clone())
-        } else {
-            // We have no state from which we can start prediction.
-            None
-        };
+            self.last_server_state_scratch = Some(last_state);
+        }
 
-        if let Some(mut state) = last_state {
-            assert!(state.tick_num == tick_num);
+        // Run prediction for the new given input.
+        if let Some(last_state) = self.last_server_state_scratch.as_mut() {
+            // Prepare state to run prediction in.
+            if let Some(last_record) = self.log.values().next_back() {
+                Self::load_entities(last_state, &last_record.entities);
+            }
+            last_state.tick_num = tick_num;
 
-            //info!("running at {:?} in {:?}", tick_num, state.tick_num);
-            let events = Self::run_tick(&mut state, self.my_player_id, &my_input);
-
-            assert!(tick_num.next() == state.tick_num);
+            let events = Self::run_player_input(last_state, self.my_player_id, &my_input);
 
             self.log.insert(
                 predict_tick_num,
                 Record {
-                    state,
+                    entities: Self::extract_predicted_entities(last_state, self.my_player_id),
                     my_last_input: my_input.clone(),
                 },
             );
+
             events
         } else {
+            // We have not received any authorative state yet at all, so we
+            // cannot run prediction.
             Vec::new()
         }
     }
 
-    pub fn predicted_state(&self, tick_num: comn::TickNum) -> Option<&comn::Game> {
-        self.log.get(&tick_num).map(|record| &record.state)
+    pub fn predicted_entities(&self, tick_num: comn::TickNum) -> Option<&comn::EntityMap> {
+        self.log.get(&tick_num).map(|record| &record.entities)
     }
 
-    pub fn is_predicted(my_player_id: comn::PlayerId, entity: &comn::Entity) -> bool {
+    fn is_predicted(my_player_id: comn::PlayerId, entity: &comn::Entity) -> bool {
         match entity {
             comn::Entity::Player(entity) => entity.owner == my_player_id,
             comn::Entity::Bullet(entity) => entity.owner == Some(my_player_id),
@@ -128,11 +140,31 @@ impl Prediction {
         }
     }
 
+    fn extract_predicted_entities(
+        state: &comn::Game,
+        my_player_id: comn::PlayerId,
+    ) -> comn::EntityMap {
+        state
+            .entities
+            .iter()
+            .filter(|(_, entity)| Self::is_predicted(my_player_id, entity))
+            .map(|(entity_id, entity)| (*entity_id, entity.clone()))
+            .collect()
+    }
+
     fn max_logged_tick_num(&self) -> Option<comn::TickNum> {
         self.log.keys().next_back().copied()
     }
 
-    fn run_tick(
+    fn load_entities(state: &mut comn::Game, entities: &comn::EntityMap) {
+        state.entities.extend(
+            entities
+                .iter()
+                .map(|(entity_id, entity)| (*entity_id, entity.clone())),
+        )
+    }
+
+    fn run_player_input(
         state: &mut comn::Game,
         my_player_id: comn::PlayerId,
         my_input: &comn::Input,
@@ -141,94 +173,84 @@ impl Prediction {
         context.is_predicting = true;
 
         if let Err(e) = state.run_player_input(my_player_id, &my_input, None, &mut context) {
-            // TODO: Simulation error handling on client side
             warn!("Simulation error: {:?}", e);
         }
 
         for entity in context.new_entities {
-            Self::add_predicted_entity(state, entity);
+            Self::add_predicted_entity(&mut state.entities, entity);
         }
-
-        // TODO: We should probably remove the redundant tick_num
-        // state within game state.
-        state.tick_num = state.tick_num.next();
 
         context.events
     }
 
     fn correct_prediction(
         my_player_id: comn::PlayerId,
-        predicted: &mut comn::Game,
-        server: &comn::Game,
-    ) {
+        predicted: &mut comn::EntityMap,
+        server: &comn::EntityMap,
+    ) -> f32 {
         let mut error = 0.0;
 
-        predicted.entities = join::full_join(predicted.entities.iter(), server.entities.iter())
+        *predicted = join::full_join(predicted.iter(), server.iter())
             .filter_map(|item| {
                 match item {
-                    join::Item::Both(id, predicted, server) => {
-                        match (predicted, server) {
-                            (comn::Entity::Player(predicted), comn::Entity::Player(server)) => {
-                                //info!("pos: {:?} vs {:?}", predicted.pos, server.pos);
-                                //info!("dash: {:?} vs {:?}", predicted.last_dash, server.last_dash);
-
-                                if Self::is_predicted(
-                                    my_player_id,
-                                    &comn::Entity::Player(predicted.clone()),
-                                ) {
-                                    error += (predicted.pos.x - server.pos.x).abs();
-                                    error += (predicted.pos.y - server.pos.y).abs();
-                                    error += match (predicted.last_dash, server.last_dash) {
-                                        (Some((t1, d1)), Some((t2, d2))) => {
-                                            (t1 - t2).abs()
-                                                + (d1.x - d2.x).abs()
-                                                + (d1.y - d2.y).abs()
-                                        }
-                                        (None, None) => 0.0,
-                                        _ => 100.0,
-                                    };
-
-                                    Some((
-                                        *id,
-                                        comn::Entity::Player(comn::PlayerEntity {
-                                            pos: predicted.pos + (server.pos - predicted.pos) * 0.2,
-                                            ..server.clone()
-                                        }),
-                                    ))
-                                } else {
-                                    Some((*id, comn::Entity::Player(server.clone())))
+                    join::Item::Both(id, predicted, server) => match (predicted, server) {
+                        (comn::Entity::Player(predicted), comn::Entity::Player(server))
+                            if Self::is_predicted(
+                                my_player_id,
+                                &comn::Entity::Player(predicted.clone()),
+                            ) =>
+                        {
+                            error += (predicted.pos.x - server.pos.x).abs();
+                            error += (predicted.pos.y - server.pos.y).abs();
+                            error += match (predicted.last_dash, server.last_dash) {
+                                (Some((t1, d1)), Some((t2, d2))) => {
+                                    (t1 - t2).abs() + (d1.x - d2.x).abs() + (d1.y - d2.y).abs()
                                 }
-                            }
-                            _ => Some((*id, server.clone())),
+                                (None, None) => 0.0,
+                                _ => 100.0,
+                            };
+
+                            Some((
+                                *id,
+                                comn::Entity::Player(comn::PlayerEntity {
+                                    pos: predicted.pos + (server.pos - predicted.pos) * 0.2,
+                                    ..server.clone()
+                                }),
+                            ))
                         }
-                    }
+                        _ => Some((*id, server.clone())),
+                    },
                     join::Item::Left(_, _) => None,
-                    join::Item::Right(id, server) => Some((*id, server.clone())),
+                    join::Item::Right(id, server) => {
+                        // Server has a new entity, make sure to replay
+                        // prediction so that we include it. Might be that there
+                        // is a better way to go about it, because this will
+                        // replay prediction too often.
+                        if Self::is_predicted(my_player_id, server) {
+                            error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                        }
+
+                        Some((*id, server.clone()))
+                    }
                 }
             })
             .collect();
 
-        predicted.players = server.players.clone();
-        //predicted.entities = server.entities.clone();
-
-        if error > 0.0 {
-            info!("error: {}", error);
-        }
+        error
     }
 
-    fn add_predicted_entity(state: &mut comn::Game, entity: comn::Entity) {
+    fn add_predicted_entity(entities: &mut comn::EntityMap, entity: comn::Entity) {
         // TODO: Some scheme for entity IDs of predicted entities
-        let entity_id = state
-            .entities
+        let entity_id = entities
             .keys()
             .next_back()
             .copied()
             .unwrap_or(comn::EntityId(0))
             .next();
 
-        // Sanity checks
-        assert!(!state.entities.contains_key(&entity_id));
+        // Sanity check
+        assert!(!entities.contains_key(&entity_id));
 
-        state.entities.insert(entity_id, entity);
+        entities.insert(entity_id, entity);
     }
 }
