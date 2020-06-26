@@ -6,7 +6,7 @@ use crate::entities::{Bullet, Food};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
-    Input, Matrix, PlayerEntity, PlayerId, Vector,
+    Input, PlayerEntity, PlayerId, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
