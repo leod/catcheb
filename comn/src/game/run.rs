@@ -24,6 +24,7 @@ pub const PLAYER_DASH_SPEED: f32 = 850.0;
 pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
 pub const PLAYER_TURN_FACTOR: f32 = 0.4;
+pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -208,9 +209,7 @@ impl Game {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
         });
 
-        let mut delta = Vector::new(0.0, 0.0);
         let prev_target_angle = ent.target_angle;
-        let time_since_turn = (input_time - ent.last_turn).min(0.5);
 
         if let Some((_dash_time, dash_dir)) = cur_dash {
             // Movement is constricted while dashing.
@@ -221,6 +220,7 @@ impl Game {
             ent.target_angle = dash_dir.y.atan2(dash_dir.x);
         } else {
             // Normal movement when not dashing.
+            let mut delta = Vector::new(0.0, 0.0);
             if input.move_left {
                 delta.x -= 1.0;
             }
@@ -244,11 +244,11 @@ impl Game {
                 delta
             };
 
-            let mut target_vel =
+            let target_vel =
                 Vector::new(ent.angle.cos(), ent.angle.sin()) * PLAYER_MOVE_SPEED * delta.norm();
-            if ent.flip && time_since_turn < 0.25 && ent.vel.norm() > 10.0 {
+            /*if ent.flip && time_since_turn < 0.25 && ent.vel.norm() > 10.0 {
                 target_vel *= 0.1;
-            }
+            }*/
 
             ent.vel = geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
             if (ent.vel - target_vel).norm() < 0.01 {
@@ -261,10 +261,10 @@ impl Game {
             let angle_dist = phi.sin().atan2(phi.cos());
             //log::info!("{}", angle_dist);
             if (angle_dist.abs() - std::f32::consts::PI).abs() < 0.01 {
-                ent.flip = true;
+                ent.angle += ent.target_angle - prev_target_angle;
+            } else {
+                ent.last_turn = input_time;
             }
-
-            ent.last_turn = input_time;
         }
 
         {
@@ -289,34 +289,33 @@ impl Game {
                 ent.angle += angle_dist * PLAYER_TURN_FACTOR;
             }*/
 
-            if ent.flip {
-                if time_since_turn >= 0.25 {}
-                if time_since_turn >= 0.5 {
-                    //ent.angle = ent.target_angle;
-                    ent.flip = false;
-                }
+            let time_since_turn = (input_time - ent.last_turn).min(0.5);
+            let factor = if cur_dash.is_some() {
+                PLAYER_DASH_TURN_FACTOR
+            } else if time_since_turn < 0.25 {
+                0.5 * PLAYER_TURN_FACTOR
             } else {
-                let factor = if time_since_turn < 0.25 {
-                    0.5 * PLAYER_TURN_FACTOR
-                } else {
-                    PLAYER_TURN_FACTOR
-                };
-                ent.angle += angle_dist * factor;
-            }
+                PLAYER_TURN_FACTOR
+            };
+            ent.angle += angle_dist * factor;
 
             /*if time_since_turn >= 0.25 {
                 ent.angle = ent.target_angle;
             }*/
 
-            let turn_scale = (time_since_turn * std::f32::consts::PI * 2.0)
+            let mut turn_scale = (time_since_turn * std::f32::consts::PI * 2.0)
                 .cos()
                 .powf(2.0);
+            if cur_dash.is_none() {
+                turn_scale = turn_scale * 0.5 + 0.3;
+            }
+
             let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
 
             ent.target_size_scale = 0.8 * move_scale * turn_scale;
 
             ent.size_scale =
-                geom::smooth_to_target_f32(30.0, ent.size_scale, ent.target_size_scale, dt);
+                geom::smooth_to_target_f32(20.0, ent.size_scale, ent.target_size_scale, dt);
         }
 
         // Experimental hook stuff
@@ -475,7 +474,6 @@ impl Game {
             && ent.last_dash.map_or(true, |(dash_time, _)| {
                 dash_time + PLAYER_DASH_COOLDOWN <= input_time
             })
-            && delta.norm() > 0.1
         {
             ent.last_dash = Some((input_time, ent.vel.normalize()));
         }
