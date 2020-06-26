@@ -23,7 +23,7 @@ pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
 pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
-pub const PLAYER_TURN_FACTOR: f32 = 0.5;
+pub const PLAYER_TURN_FACTOR: f32 = 0.3;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -250,11 +250,21 @@ impl Game {
         }
 
         {
-            let angle_dist =
-                ((ent.target_angle - ent.angle).sin()).atan2((ent.target_angle - ent.angle).cos());
+            let phi = ent.target_angle - ent.angle;
+            let angle_dist = phi.sin().atan2(phi.cos());
+
+            //let angle_dist = (phi.sin() / phi.cos()).atan();
+            let phi1 = ent.target_angle - ent.angle;
+            let phi2 = phi + std::f32::consts::PI;
+            let phi3 = phi - std::f32::consts::PI;
+            let angle_dist1 = (phi1.sin() / phi1.cos()).atan();
+            let angle_dist2 = (phi2.sin() / phi2.cos()).atan();
+            let angle_dist3 = (phi3.sin() / phi3.cos()).atan();
+            let angle_dist = *[angle_dist1, angle_dist2, angle_dist3].iter().min_by(|a, b| a.partial_cmp(&b).unwrap()).unwrap();
+
             ent.angle += angle_dist * PLAYER_TURN_FACTOR;
             ent.target_size_scale = 1.0
-                + (0.4 * (-angle_dist.abs() * 1.0).exp() * ent.vel.norm() / PLAYER_MOVE_SPEED)
+                + (0.4 * (-angle_dist.abs() * 10.0).exp() * ent.vel.norm() / PLAYER_MOVE_SPEED)
                     .min(0.6);
             ent.size_scale =
                 geom::smooth_to_target_f32(30.0, ent.size_scale, ent.target_size_scale, dt);
@@ -288,6 +298,7 @@ impl Game {
                             },
                         });
                     } else {
+                        // TODO: Closest hook intersection
                         for (target_id, target) in input_state.entities.iter() {
                             if entity_id != *target_id && target.can_hook_attach() {
                                 if let Some(intersection_t) = ray
