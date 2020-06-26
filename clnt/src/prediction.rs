@@ -88,7 +88,8 @@ impl Prediction {
                 let last_entities = self.log.values().next().unwrap().entities.clone();
                 Self::load_entities(&mut last_state, &last_entities);
 
-                for record in self.log.values_mut().skip(1) {
+                for (tick_num, record) in self.log.iter_mut().skip(1) {
+                    last_state.tick_num = *tick_num;
                     Self::run_player_input(
                         &mut last_state,
                         self.my_player_id,
