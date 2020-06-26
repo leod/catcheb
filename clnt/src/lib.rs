@@ -101,13 +101,24 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
     //let mut dt_smoothing = 16.6666667;
 
     loop {
+        coarse_prof::profile!("loop");
+
         while let Some(event) = input.next_event().await {
             match event {
                 Event::KeyboardInput(event) => {
                     if !pressed_keys.contains(&event.key()) {
                         match event.key() {
-                            Key::P => {
+                            Key::K => {
                                 show_stats = !show_stats;
+                            }
+                            Key::P => {
+                                let mut writer = std::io::Cursor::new(Vec::new());
+                                coarse_prof::write(&mut writer).unwrap();
+                                coarse_prof::reset();
+                                log::info!(
+                                    "{}",
+                                    std::str::from_utf8(&writer.into_inner()).unwrap()
+                                );
                             }
                             Key::L => {
                                 lag_frames = 30;
@@ -128,6 +139,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 _ => (),
             }
         }
+
+        coarse_prof::profile!("frame");
 
         if lag_frames > 0 {
             lag_frames -= 1;
@@ -152,10 +165,14 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         //Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
         now += smoothed_dt;
 
-        let events = game.update(now, smoothed_dt, &current_input(&pressed_keys));
+        {
+            coarse_prof::profile!("update");
 
-        for event in events {
-            event_list.push(now, event);
+            let events = game.update(now, smoothed_dt, &current_input(&pressed_keys));
+
+            for event in events {
+                event_list.push(now, event);
+            }
         }
 
         {
@@ -173,9 +190,11 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             );
         }
 
+        coarse_prof::profile!("render");
         gfx.clear(Color::WHITE);
 
         if let Some(state) = game.state() {
+            coarse_prof::profile!("game");
             render::render_game(
                 &mut gfx,
                 &mut resources,
@@ -210,6 +229,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         }*/
 
         if show_stats {
+            coarse_prof::profile!("stats");
+
             for _ in 0..33 {
                 debug("")?;
             }
@@ -259,14 +280,20 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             debug(&format!("input delay:       {}", game.stats().input_delay))?;
         }
 
-        event_list.render(
-            now,
-            &mut gfx,
-            &mut resources.font_small,
-            Vector::new(600.0, 30.0),
-        )?;
+        {
+            coarse_prof::profile!("event_list");
+            event_list.render(
+                now,
+                &mut gfx,
+                &mut resources.font_small,
+                Vector::new(600.0, 30.0),
+            )?;
+        }
 
-        gfx.present(&window)?;
+        {
+            coarse_prof::profile!("present");
+            gfx.present(&window)?;
+        }
 
         // Keep some statistics for debugging...
         stats.dt_ms.record(last_dt.as_secs_f32() * 1000.0);
