@@ -157,6 +157,11 @@ pub fn render_game(
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, color);
                 gfx.stroke_rect(&rect, Color::BLACK);
+
+                let nose = Rectangle::new(Vector::new(0.5, -0.1), Vector::new(0.2, 0.2));
+                gfx.set_transform(transform.then(camera_transform));
+                gfx.fill_rect(&nose, Color::CYAN);
+
                 gfx.set_transform(camera_transform);
 
                 if let Some(hook) = player.hook.as_ref() {
