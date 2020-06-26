@@ -22,7 +22,7 @@ use crate::{
     webrtc::{self, RecvMessageRx, SendMessageTx},
 };
 
-pub const PLAYER_INPUT_BUFFER: usize = 2;
+pub const PLAYER_INPUT_BUFFER: usize = 1;
 pub const MAX_PLAYER_INPUT_AGE: f32 = 1.0;
 pub const MAX_DIFF_TICKS: u32 = 50;
 

@@ -260,6 +260,7 @@ dependencies = [
 name = "clnt"
 version = "0.1.0"
 dependencies = [
+ "coarse-prof",
  "comn",
  "console_error_panic_hook",
  "instant",
@@ -283,6 +284,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "coarse-prof"
+version = "0.2.4"
+source = "git+https://github.com/leod/coarse-prof.git#66758eb4ddbcb5f58caf89f947d17d3abb7218a5"
+dependencies = [
+ "instant",
+ "log",
 ]
 
 [[package]]
@@ -315,6 +325,7 @@ dependencies = [
 name = "comn"
 version = "0.1.0"
 dependencies = [
+ "coarse-prof",
  "instant",
  "log",
  "nalgebra",

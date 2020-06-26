@@ -171,6 +171,8 @@ impl Game {
         context: &mut RunContext,
     ) -> GameResult<()> {
         if let Some((entity_id, ent)) = self.get_player_entity(player_id) {
+            coarse_prof::profile!("run_player_input");
+
             let mut ent = ent.clone();
 
             self.run_player_entity_input(
