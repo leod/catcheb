@@ -24,6 +24,7 @@ mint = "0.5"
 nalgebra = { version = "0.21", features = ["mint"] }
 instant = "0.1"
 pareen = { git = "https://github.com/leod/pareen.git", features = ["easer"] }
+coarse-prof = { git = "https://github.com/leod/coarse-prof.git" }
 
 comn = { path = "../comn" }
 
