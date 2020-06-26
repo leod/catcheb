@@ -325,25 +325,45 @@ impl Game {
         events
     }
 
-    pub fn state(&self) -> Option<&comn::Game> {
-        if let Some(prediction) = self.prediction.as_ref() {
-            prediction.predicted_state(self.tick_num())
-        } else {
-            // TODO: If prediction is disabled, loss in tick packages leads to
-            // obvious flickering, since states will be None.
-            self.received_states
-                .get(&self.tick_num())
-                .map(|state| &state.game)
+    pub fn state(&self) -> Option<comn::Game> {
+        // Due to loss, we might not always have an authorative state for the
+        // current tick num. Take the closest one then.
+        let mut state = self
+            .received_states
+            .iter()
+            .filter(|(tick_num, _)| **tick_num <= self.tick_num())
+            .next_back()
+            .map(|(_, state)| state.game.clone());
+
+        // When using prediction, overwrite the predicted entities in the
+        // authorative state.
+        if let Some(state) = state.as_mut() {
+            let predicted_entities = self
+                .prediction
+                .as_ref()
+                .and_then(|prediction| prediction.predicted_entities(self.tick_num()));
+
+            if let Some(predicted_entities) = predicted_entities {
+                state.entities.extend(
+                    predicted_entities
+                        .iter()
+                        .map(|(entity_id, entity)| (*entity_id, entity.clone())),
+                );
+            }
         }
+
+        state
     }
 
     pub fn next_entities(&self) -> BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)> {
         let mut entities = BTreeMap::new();
 
-        if let Some((recv_tick_num, recv_state)) = self
+        // Add entities from authorative state, if available.
+        let next_state = self
             .next_tick_num
-            .and_then(|key| self.received_states.get(&key).map(|value| (key, value)))
-        {
+            .and_then(|key| self.received_states.get(&key).map(|value| (key, value)));
+
+        if let Some((recv_tick_num, recv_state)) = next_state {
             let recv_game_time = self.settings.tick_game_time(recv_tick_num);
 
             entities.extend(
@@ -354,26 +374,25 @@ impl Game {
                     .into_iter()
                     .map(|(entity_id, entity)| (entity_id, (recv_game_time, entity))),
             );
+        }
 
-            if let Some(predicted_state) = self
-                .prediction
-                .as_ref()
-                .and_then(|p| p.predicted_state(self.tick_num().next()))
-            {
-                entities.extend(
-                    predicted_state
-                        .entities
-                        .clone()
-                        .into_iter()
-                        .filter(|(_, entity)| Prediction::is_predicted(self.my_player_id, entity))
-                        .map(|(entity_id, entity)| {
-                            (
-                                entity_id,
-                                (self.settings.tick_game_time(self.tick_num().next()), entity),
-                            )
-                        }),
-                );
-            }
+        // Add entities from predicted state, if available. Note that, due to
+        // loss in ticks received from the server, these entities might live in
+        // a different time from the authorative entities.
+        let predicted_entities = self
+            .prediction
+            .as_ref()
+            .and_then(|prediction| prediction.predicted_entities(self.tick_num().next()));
+
+        if let Some(predicted_entities) = predicted_entities {
+            let pred_game_time = self.settings.tick_game_time(self.tick_num().next());
+
+            entities.extend(
+                predicted_entities
+                    .clone()
+                    .into_iter()
+                    .map(|(entity_id, entity)| (entity_id, (pred_game_time, entity))),
+            );
         }
 
         entities
