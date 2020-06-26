@@ -213,7 +213,7 @@ impl Prediction {
                             Some((
                                 *id,
                                 comn::Entity::Player(comn::PlayerEntity {
-                                    pos: predicted.pos + (server.pos - predicted.pos) * 0.2,
+                                    pos: Self::correct_point(predicted.pos, server.pos),
                                     ..server.clone()
                                 }),
                             ))
@@ -237,6 +237,17 @@ impl Prediction {
             .collect();
 
         error
+    }
+
+    fn correct_point(predicted: comn::Point, server: comn::Point) -> comn::Point {
+        let delta = server - predicted;
+
+        if delta.norm() < 0.01 || delta.norm() > 200.0 {
+            server
+        } else {
+            // Smoothly correct prediction over time
+            predicted + delta * 0.2
+        }
     }
 
     fn add_predicted_entity(entities: &mut comn::EntityMap, entity: comn::Entity) {
