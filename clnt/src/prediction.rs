@@ -220,16 +220,23 @@ impl Prediction {
                         }
                         _ => Some((*id, server.clone())),
                     },
-                    join::Item::Left(_, _) => None,
-                    join::Item::Right(id, server) => {
-                        // Server has a new entity, make sure to replay
-                        // prediction so that we include it. Might be that there
-                        // is a better way to go about it, because this will
-                        // replay prediction too often.
-                        if Self::is_predicted(my_player_id, server) {
+                    join::Item::Left(_, predicted) => {
+                        if Self::is_predicted(my_player_id, predicted) {
+                            // An entity that we predicted (most likely the
+                            // PlayerEntity) no longer exists in the authorative
+                            // state. Make sure to replay.
                             error += MIN_PREDICTION_ERROR_FOR_REPLAY;
                         }
-
+                        None
+                    }
+                    join::Item::Right(id, server) => {
+                        if Self::is_predicted(my_player_id, server) {
+                            // Server has a new entity, make sure to replay
+                            // prediction so that we include it. Might be that
+                            // there is a better way to go about it, because
+                            // this will replay prediction too often.
+                            error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                        }
                         Some((*id, server.clone()))
                     }
                 }
