@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::{run, EntityId, PlayerId, Point, Vector},
-    geom::{AaRect, Circle, Rect, Shape},
+    geom::{self, AaRect, Circle, Rect, Shape},
     GameError, GameResult, GameTime,
 };
 
@@ -151,9 +151,10 @@ impl PlayerEntity {
     }
 
     pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
-        // TODO: Interpolate player properties other than just the position
         PlayerEntity {
             pos: self.pos + alpha * (other.pos - self.pos),
+            size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
+            angle: geom::interp_angle(self.angle, other.angle, alpha),
             ..self.clone()
         }
     }
