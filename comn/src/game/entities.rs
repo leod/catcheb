@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     game::{run, EntityId, PlayerId, Point, Vector},
-    geom::{AaRect, Circle, Rect, Shape},
+    geom::{self, AaRect, Circle, Rect, Shape},
     GameError, GameResult, GameTime,
 };
 
@@ -42,6 +42,9 @@ impl Entity {
         match (self, other) {
             (Entity::Player(this), Entity::Player(other)) => {
                 Entity::Player(this.interp(other, alpha))
+            }
+            (Entity::Turret(this), Entity::Turret(other)) => {
+                Entity::Turret(this.interp(other, alpha))
             }
             _ => self.clone(),
         }
@@ -100,10 +103,17 @@ pub struct Hook {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
+    // TODO: Much of the PlayerEntity is needed only for the server and the
+    // owning player. As a simple optimization, we can have a PlayerView
+    // entity that carries only the state necessary for display.
     pub owner: PlayerId,
     pub pos: Point,
     pub vel: Vector,
-    pub angle: Option<f32>,
+    pub angle: f32,
+    pub last_turn: GameTime,
+    pub target_angle: f32,
+    pub size_scale: f32,
+    pub target_size_scale: f32,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
@@ -116,7 +126,11 @@ impl PlayerEntity {
             owner,
             pos,
             vel: Vector::zeros(),
-            angle: Some(0.0),
+            angle: 0.0,
+            last_turn: 0.0,
+            target_angle: 0.0,
+            size_scale: 1.0,
+            target_size_scale: 1.0,
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
@@ -125,16 +139,14 @@ impl PlayerEntity {
     }
 
     pub fn rect(&self) -> Rect {
-        if let Some(angle) = self.angle {
-            AaRect::new_center(
-                self.pos,
-                Vector::new(run::PLAYER_MOVE_W, run::PLAYER_MOVE_L),
-            )
-            .rotate(angle)
-        } else {
-            AaRect::new_center(self.pos, Vector::new(run::PLAYER_SIT_W, run::PLAYER_SIT_L))
-                .to_rect()
-        }
+        AaRect::new_center(
+            self.pos,
+            Vector::new(
+                run::PLAYER_SIT_W * (1.0 + self.size_scale),
+                run::PLAYER_SIT_L / (1.0 + self.size_scale),
+            ),
+        )
+        .rotate(self.angle)
     }
 
     pub fn shape(&self) -> Shape {
@@ -142,9 +154,10 @@ impl PlayerEntity {
     }
 
     pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
-        // TODO: Interpolate player properties other than just the position
         PlayerEntity {
             pos: self.pos + alpha * (other.pos - self.pos),
+            size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
+            angle: geom::interp_angle(self.angle, other.angle, alpha),
             ..self.clone()
         }
     }
@@ -273,6 +286,13 @@ impl Turret {
             center: self.pos,
             radius: run::TURRET_RADIUS,
         })
+    }
+
+    pub fn interp(&self, other: &Turret, alpha: f32) -> Turret {
+        Turret {
+            angle: geom::interp_angle(self.angle, other.angle, alpha),
+            ..other.clone()
+        }
     }
 }
 

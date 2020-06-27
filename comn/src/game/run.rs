@@ -23,15 +23,17 @@ pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
 pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
+pub const PLAYER_TURN_FACTOR: f32 = 0.35;
+pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
+pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 20.0;
+pub const PLAYER_SIZE_SCALE: f32 = 0.5;
+pub const PLAYER_TURN_DURATION: GameTime = 0.5;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
-//pub const HOOK_MAX_SHOOT_DURATION: f32 = 5.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
 pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
-//pub const HOOK_MAX_CONTRACT_DURATION: f32 = 5.0;;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
-//pub const HOOK_CONTRACT_SPEED: f32 = 650.0;
 pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
@@ -44,6 +46,8 @@ pub const TURRET_RANGE: f32 = 400.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
 pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
 pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
+pub const TURRET_TURN_FACTOR: f32 = 0.1;
+pub const TURRET_SPAWN_OFFSET: f32 = 12.0;
 
 pub const FOOD_SIZE: f32 = 20.0;
 pub const FOOD_ROTATION_SPEED: f32 = 3.0;
@@ -125,7 +129,7 @@ impl Game {
                         let target_angle = turret.angle_to_pos(target_pos);
                         let angle_dist = ((target_angle - turret.angle).sin())
                             .atan2((target_angle - turret.angle).cos());
-                        turret.angle += angle_dist * 0.1;
+                        turret.angle += angle_dist * TURRET_TURN_FACTOR;
                         //.min(TURRET_MAX_TURN_SPEED * tick_period)
                         //.max(TURRET_MAX_TURN_SPEED * tick_period);
 
@@ -137,7 +141,7 @@ impl Game {
                             context.new_entities.push(Entity::Bullet(Bullet {
                                 owner: None,
                                 start_time: time,
-                                start_pos: turret.pos + 12.0 * delta,
+                                start_pos: turret.pos + TURRET_SPAWN_OFFSET * delta,
                                 vel: delta * BULLET_MOVE_SPEED,
                             }));
                         }
@@ -204,22 +208,20 @@ impl Game {
         let input_time = input_state.game_time();
 
         // Movement
-        let cur_dash = ent.last_dash.filter(|(dash_time, _)| {
+        let current_dash = ent.last_dash.filter(|(dash_time, _)| {
             input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
         });
 
-        let mut delta = Vector::new(0.0, 0.0);
+        let prev_target_angle = ent.target_angle;
+        let mut any_move_key = false;
 
-        if let Some((_dash_time, dash_dir)) = cur_dash {
+        if let Some((_dash_time, dash_dir)) = current_dash {
             // Movement is constricted while dashing.
-            let target_vel = dash_dir * PLAYER_DASH_SPEED;
-            ent.vel =
-                geom::smooth_to_target_vector(PLAYER_DASH_ACCEL_FACTOR, ent.vel, target_vel, dt);
-
-            // TODO: State redundancy
-            ent.angle = Some(dash_dir.y.atan2(dash_dir.x));
+            ent.target_angle = dash_dir.y.atan2(dash_dir.x);
+            ent.last_turn = input_time;
         } else {
             // Normal movement when not dashing.
+            let mut delta = Vector::new(0.0, 0.0);
             if input.move_left {
                 delta.x -= 1.0;
             }
@@ -233,20 +235,75 @@ impl Game {
                 delta.y += 1.0;
             }
 
-            delta = if delta.norm() > 0.0 {
-                delta.normalize()
-            } else {
-                delta
-            };
+            if delta.norm() > 0.0 {
+                ent.target_angle = delta.y.atan2(delta.x);
+                any_move_key = true;
+            }
+        }
 
-            let target_vel = delta * PLAYER_MOVE_SPEED;
+        // Smooth turning and scaling
+        if (ent.target_angle - prev_target_angle).abs() >= 0.001 {
+            let phi = ent.target_angle - prev_target_angle;
+            let angle_dist = phi.sin().atan2(phi.cos());
+            if (angle_dist.abs() - std::f32::consts::PI).abs() < 0.01 {
+                ent.angle += ent.target_angle - prev_target_angle;
+            } else {
+                ent.last_turn = input_time;
+            }
+        }
+        {
+            let phi = ent.target_angle - ent.angle;
+            let angle_dist = phi.sin().atan2(phi.cos());
+            let time_since_turn = (input_time - ent.last_turn).min(PLAYER_TURN_DURATION);
+            let factor = if current_dash.is_some() {
+                PLAYER_DASH_TURN_FACTOR
+            } else {
+                PLAYER_TURN_FACTOR
+            };
+            ent.angle += angle_dist * factor;
+
+            let turn_scale = if let Some((dash_time, _)) = current_dash {
+                let dash_delta = input_time - dash_time;
+                (dash_delta * std::f32::consts::PI / PLAYER_TURN_DURATION)
+                    .cos()
+                    .powf(2.0)
+            } else {
+                (time_since_turn * std::f32::consts::PI / PLAYER_TURN_DURATION)
+                    .cos()
+                    .powf(2.0)
+                    * 0.8
+                    + 0.2
+            };
+            let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
+            ent.target_size_scale = PLAYER_SIZE_SCALE * move_scale * turn_scale;
+
+            ent.size_scale = geom::smooth_to_target_f32(
+                PLAYER_SIZE_SCALE_FACTOR,
+                ent.size_scale,
+                ent.target_size_scale,
+                dt,
+            );
+        }
+
+        // Acceleration
+        {
+            let target_vel = if let Some((_, dash_dir)) = current_dash {
+                dash_dir * PLAYER_DASH_SPEED
+            } else {
+                Vector::new(ent.angle.cos(), ent.angle.sin())
+                    * PLAYER_MOVE_SPEED
+                    * (any_move_key as usize as f32)
+            };
+            let factor = if current_dash.is_some() {
+                PLAYER_DASH_ACCEL_FACTOR
+            } else {
+                PLAYER_ACCEL_FACTOR
+            };
+            ent.vel = geom::smooth_to_target_vector(factor, ent.vel, target_vel, dt);
             ent.vel = geom::smooth_to_target_vector(PLAYER_ACCEL_FACTOR, ent.vel, target_vel, dt);
             if (ent.vel - target_vel).norm() < 0.01 {
                 ent.vel = target_vel;
             }
-
-            // TODO: State redundancy
-            ent.angle = None;
         }
 
         // Experimental hook stuff
@@ -277,10 +334,9 @@ impl Game {
                             },
                         });
                     } else {
+                        // TODO: Closest hook intersection
                         for (target_id, target) in input_state.entities.iter() {
-                            if entity_id != *target_id && target.can_hook_attach()
-                            //&& target.shape(input_time).contains_point(pos)
-                            {
+                            if entity_id != *target_id && target.can_hook_attach() {
                                 if let Some(intersection_t) = ray
                                     .intersects(&target.intersection_shape(input_time))
                                     .filter(|t| *t <= pos_delta_norm)
@@ -335,13 +391,13 @@ impl Game {
                     }
                 }
             }
-        } else if input.use_action && ent.vel.norm() > 0.0 && ent.hook.is_none() {
+        } else if input.use_action && ent.hook.is_none() {
             // TODO: Trace ray when spawning hook?
             ent.hook = Some(Hook {
                 state: HookState::Shooting {
                     start_time: input_time,
                     start_pos: ent.pos,
-                    vel: ent.vel.normalize() * HOOK_SHOOT_SPEED,
+                    vel: Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED,
                 },
             });
         }
@@ -374,20 +430,17 @@ impl Game {
         }
 
         // Allow reflecting off walls when dashing
-        if let (Some((dash_time, dash_dir)), Some(flip_axis)) = (cur_dash, flip_axis) {
+        if let (Some((dash_time, dash_dir)), Some(flip_axis)) = (current_dash, flip_axis) {
             let reflected_dash_dir = dash_dir - 2.0 * dash_dir.dot(&flip_axis) * flip_axis;
             ent.last_dash = Some((dash_time, reflected_dash_dir));
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
-            offset += flip_axis * 0.1;
+            ent.last_turn = input_time;
+            ent.angle = ent.vel.y.atan2(ent.vel.x);
+            ent.target_angle = reflected_dash_dir.y.atan2(reflected_dash_dir.x);
+            offset += flip_axis * 10.0;
         }
 
         ent.pos += offset;
-
-        /*if delta.norm() > 0.0 {
-            ent.angle = Some(delta.y.atan2(delta.x));
-        } else {
-            ent.angle = None;
-        }*/
 
         // Clip to map boundary
         ent.pos.x = ent
@@ -406,9 +459,8 @@ impl Game {
             && ent.last_dash.map_or(true, |(dash_time, _)| {
                 dash_time + PLAYER_DASH_COOLDOWN <= input_time
             })
-            && delta.norm() > 0.1
         {
-            ent.last_dash = Some((input_time, delta));
+            ent.last_dash = Some((input_time, Vector::new(ent.angle.cos(), ent.angle.sin())));
         }
 
         // Shooting

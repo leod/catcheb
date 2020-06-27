@@ -19,11 +19,11 @@ impl fmt::Display for Var {
         write!(
             f,
             "{:>8.3} {:>8.3} {:>8.3} {:>8.3} {:>8.3}",
-            self.records.back().map(|(_, v)| *v).unwrap_or(0.0 / 0.0),
-            self.min().unwrap_or(0.0 / 0.0),
-            self.max().unwrap_or(0.0 / 0.0),
-            self.mean().unwrap_or(0.0 / 0.0),
-            self.std_dev().unwrap_or(0.0 / 0.0),
+            self.records.back().map(|(_, v)| *v).unwrap_or(f32::NAN),
+            self.min().unwrap_or(f32::NAN),
+            self.max().unwrap_or(f32::NAN),
+            self.mean().unwrap_or(f32::NAN),
+            self.std_dev().unwrap_or(f32::NAN),
         )
     }
 }
@@ -74,7 +74,7 @@ impl Var {
         if self.records.is_empty() {
             None
         } else {
-            Some(self.recent_values().fold(0.0 / 0.0, f32::min))
+            Some(self.recent_values().fold(f32::NAN, f32::min))
         }
     }
 
@@ -82,7 +82,7 @@ impl Var {
         if self.records.is_empty() {
             None
         } else {
-            Some(self.recent_values().fold(0.0 / 0.0, f32::max))
+            Some(self.recent_values().fold(f32::NAN, f32::max))
         }
     }
 
