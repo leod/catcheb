@@ -88,7 +88,8 @@ impl Prediction {
                 let last_entities = self.log.values().next().unwrap().entities.clone();
                 Self::load_entities(&mut last_state, &last_entities);
 
-                for record in self.log.values_mut().skip(1) {
+                for (tick_num, record) in self.log.iter_mut().skip(1) {
+                    last_state.tick_num = *tick_num;
                     Self::run_player_input(
                         &mut last_state,
                         self.my_player_id,
@@ -116,7 +117,7 @@ impl Prediction {
                 predict_tick_num,
                 Record {
                     entities: Self::extract_predicted_entities(last_state, self.my_player_id),
-                    my_last_input: my_input.clone(),
+                    my_last_input: my_input,
                 },
             );
 
@@ -191,59 +192,65 @@ impl Prediction {
         let mut error = 0.0;
 
         *predicted = join::full_join(predicted.iter(), server.iter())
-            .filter_map(|item| {
-                match item {
-                    join::Item::Both(id, predicted, server) => match (predicted, server) {
-                        (comn::Entity::Player(predicted), comn::Entity::Player(server))
-                            if Self::is_predicted(
-                                my_player_id,
-                                &comn::Entity::Player(predicted.clone()),
-                            ) =>
-                        {
-                            error += (predicted.pos.x - server.pos.x).abs();
-                            error += (predicted.pos.y - server.pos.y).abs();
-                            error += match (predicted.last_dash, server.last_dash) {
-                                (Some((t1, d1)), Some((t2, d2))) => {
-                                    (t1 - t2).abs() + (d1.x - d2.x).abs() + (d1.y - d2.y).abs()
-                                }
-                                (None, None) => 0.0,
-                                _ => 100.0,
-                            };
-
-                            Some((
-                                *id,
-                                comn::Entity::Player(comn::PlayerEntity {
-                                    pos: Self::correct_point(predicted.pos, server.pos),
-                                    ..server.clone()
-                                }),
-                            ))
-                        }
-                        _ => Some((*id, server.clone())),
-                    },
-                    join::Item::Left(_, predicted) => {
-                        if Self::is_predicted(my_player_id, predicted) {
-                            // An entity that we predicted (most likely the
-                            // PlayerEntity) no longer exists in the authorative
-                            // state. Make sure to replay.
-                            error += MIN_PREDICTION_ERROR_FOR_REPLAY;
-                        }
-                        None
-                    }
-                    join::Item::Right(id, server) => {
-                        if Self::is_predicted(my_player_id, server) {
-                            // Server has a new entity, make sure to replay
-                            // prediction so that we include it. Might be that
-                            // there is a better way to go about it, because
-                            // this will replay prediction too often.
-                            error += MIN_PREDICTION_ERROR_FOR_REPLAY;
-                        }
-                        Some((*id, server.clone()))
-                    }
-                }
-            })
+            .filter_map(|item| Self::correct_entity(my_player_id, item, &mut error))
             .collect();
 
         error
+    }
+
+    fn correct_entity(
+        my_player_id: comn::PlayerId,
+        item: join::Item<&comn::EntityId, &comn::Entity, &comn::Entity>,
+        error: &mut f32,
+    ) -> Option<(comn::EntityId, comn::Entity)> {
+        match item {
+            join::Item::Both(id, predicted, server) => match (predicted, server) {
+                (comn::Entity::Player(predicted), comn::Entity::Player(server))
+                    if Self::is_predicted(
+                        my_player_id,
+                        &comn::Entity::Player(predicted.clone()),
+                    ) =>
+                {
+                    *error += (predicted.pos.x - server.pos.x).abs();
+                    *error += (predicted.pos.y - server.pos.y).abs();
+                    *error += match (predicted.last_dash, server.last_dash) {
+                        (Some((t1, d1)), Some((t2, d2))) => {
+                            (t1 - t2).abs() + (d1.x - d2.x).abs() + (d1.y - d2.y).abs()
+                        }
+                        (None, None) => 0.0,
+                        _ => 100.0,
+                    };
+
+                    Some((
+                        *id,
+                        comn::Entity::Player(comn::PlayerEntity {
+                            pos: Self::correct_point(predicted.pos, server.pos),
+                            ..server.clone()
+                        }),
+                    ))
+                }
+                _ => Some((*id, server.clone())),
+            },
+            join::Item::Left(_, predicted) => {
+                if Self::is_predicted(my_player_id, predicted) {
+                    // An entity that we predicted (most likely the
+                    // PlayerEntity) no longer exists in the authorative
+                    // state. Make sure to replay.
+                    *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                }
+                None
+            }
+            join::Item::Right(id, server) => {
+                if Self::is_predicted(my_player_id, server) {
+                    // Server has a new entity, make sure to replay
+                    // prediction so that we include it. Might be that
+                    // there is a better way to go about it, because
+                    // this will replay prediction too often.
+                    *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                }
+                Some((*id, server.clone()))
+            }
+        }
     }
 
     fn correct_point(predicted: comn::Point, server: comn::Point) -> comn::Point {
