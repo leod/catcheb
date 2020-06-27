@@ -537,6 +537,7 @@ impl Game {
 
         let data = signed_message.serialize();
 
+        coarse_prof::profile!("webrtc");
         if let Err(err) = self.webrtc_client.send(&data) {
             warn!("Failed to send message: {:?}", err);
         }
