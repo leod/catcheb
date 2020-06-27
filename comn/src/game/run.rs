@@ -23,7 +23,7 @@ pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
 pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
-pub const PLAYER_TURN_FACTOR: f32 = 0.25;
+pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
@@ -256,45 +256,22 @@ impl Game {
             }
         }
 
+        // Smooth turning and scaling
         if ent.target_angle != prev_target_angle {
             let phi = ent.target_angle - prev_target_angle;
             let angle_dist = phi.sin().atan2(phi.cos());
-            //log::info!("{}", angle_dist);
             if (angle_dist.abs() - std::f32::consts::PI).abs() < 0.01 {
                 ent.angle += ent.target_angle - prev_target_angle;
             } else {
                 ent.last_turn = input_time;
             }
         }
-
         {
             let phi = ent.target_angle - ent.angle;
             let angle_dist = phi.sin().atan2(phi.cos());
-
-            //let angle_dist = (phi.sin() / phi.cos()).atan();
-            /*let phi1 = ent.target_angle - ent.angle;
-            let phi2 = phi + std::f32::consts::PI;
-            let phi3 = phi - std::f32::consts::PI;
-            let angle_dist1 = (phi1.sin() / phi1.cos()).atan();
-            let angle_dist2 = (phi2.sin() / phi2.cos()).atan();
-            let angle_dist3 = (phi3.sin() / phi3.cos()).atan();
-            let angle_dist = *[angle_dist1, angle_dist2, angle_dist3].iter().min_by(|a, b| a.partial_cmp(&b).unwrap()).unwrap();*/
-
-            /*if ((prev_target_angle - ent.target_angle).abs() - std::f32::consts::PI).abs() < 0.1 {
-                let prev_phi = prev_target_angle - ent.angle;
-                let prev_angle_dist = prev_phi.sin().atan2(prev_phi.cos());
-                ent.angle = ent.target_angle + prev_angle_dist;
-                angle_dist = 0.0;
-            } else {
-                ent.angle += angle_dist * PLAYER_TURN_FACTOR;
-            }*/
-
             let time_since_turn = (input_time - ent.last_turn).min(0.5);
             let factor = if cur_dash.is_some() {
                 PLAYER_DASH_TURN_FACTOR
-            } else if time_since_turn < 0.25 {
-                //0.5 * PLAYER_TURN_FACTOR
-                PLAYER_TURN_FACTOR
             } else {
                 PLAYER_TURN_FACTOR
             };
@@ -307,10 +284,10 @@ impl Game {
                 (time_since_turn * std::f32::consts::PI * 2.0)
                     .cos()
                     .powf(2.0)
+                    * 0.8
+                    + 0.2
             };
-
             let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
-
             ent.target_size_scale = 0.5 * move_scale * turn_scale;
 
             ent.size_scale =
@@ -445,8 +422,9 @@ impl Game {
             let reflected_dash_dir = dash_dir - 2.0 * dash_dir.dot(&flip_axis) * flip_axis;
             ent.last_dash = Some((dash_time, reflected_dash_dir));
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
-            ent.last_turn = input_time;
-            offset += flip_axis * 0.1;
+            //ent.last_turn = input_time;
+            ent.angle = ent.vel.y.atan2(ent.vel.x);
+            offset += flip_axis * 10.0;
         }
 
         ent.pos += offset;
@@ -469,7 +447,7 @@ impl Game {
                 dash_time + PLAYER_DASH_COOLDOWN <= input_time
             })
         {
-            ent.last_dash = Some((input_time, ent.vel.normalize()));
+            ent.last_dash = Some((input_time, Vector::new(ent.angle.cos(), ent.angle.sin())));
         }
 
         // Shooting

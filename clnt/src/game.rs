@@ -399,6 +399,8 @@ impl Game {
     }
 
     fn handle_message(&mut self, recv_time: Instant, message: comn::ServerMessage) {
+        coarse_prof::profile!("handle_message");
+
         match message {
             comn::ServerMessage::Ping(_) => {
                 // Handled in on_message callback to get better ping
@@ -529,6 +531,8 @@ impl Game {
     }
 
     fn send(&self, message: comn::ClientMessage) {
+        coarse_prof::profile!("send");
+
         let signed_message = comn::SignedClientMessage(self.my_token, message);
 
         let data = signed_message.serialize();
