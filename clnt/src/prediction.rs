@@ -117,7 +117,7 @@ impl Prediction {
                 predict_tick_num,
                 Record {
                     entities: Self::extract_predicted_entities(last_state, self.my_player_id),
-                    my_last_input: my_input.clone(),
+                    my_last_input: my_input,
                 },
             );
 

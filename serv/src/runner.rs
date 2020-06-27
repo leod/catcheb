@@ -371,7 +371,7 @@ impl Runner {
                 comn::ClientMessage::Input(inputs) => {
                     let game = &self.games[&player.game_id].state();
 
-                    if inputs.len() == 0 || inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
+                    if inputs.is_empty() || inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
                         warn!(
                             "Received invalid number of inputs ({}) from {:?}, ignoring",
                             inputs.len(),
