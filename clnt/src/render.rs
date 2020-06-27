@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use log::info;
 use nalgebra as na;
 
 use quicksilver::{
@@ -14,7 +13,6 @@ use quicksilver::{
         Image,
         VectorFont,
     },
-    Settings, Window,
 };
 
 use comn::{
@@ -172,7 +170,7 @@ pub fn render_game(
                             vel,
                         } => (player.pos, start_pos + (time - start_time) * vel, false),
                         comn::HookState::Attached {
-                            start_time,
+                            start_time: _,
                             target,
                             offset,
                         } => {

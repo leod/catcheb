@@ -204,7 +204,7 @@ impl Game {
         // 3. We crossed more than one tick. This should happen only on lag
         //    spikes, be it local or in the network.
         let mut crossed_tick_nums: Vec<comn::TickNum> = (prev_tick_num.0 + 1..=new_tick_num.0)
-            .map(|i| comn::TickNum(i))
+            .map(comn::TickNum)
             .collect();
 
         if crossed_tick_nums.len() > MAX_TICKS_PER_UPDATE {
@@ -231,7 +231,7 @@ impl Game {
 
             // For debugging, keep track of how many ticks we do not
             // receive server data on time.
-            if let Some(_) = self.received_states.get(tick_num) {
+            if self.received_states.get(tick_num).is_some() {
                 self.stats.skip_loss.record_received(tick_num.0 as usize);
             }
 
