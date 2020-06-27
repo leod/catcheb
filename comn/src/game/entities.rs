@@ -43,6 +43,9 @@ impl Entity {
             (Entity::Player(this), Entity::Player(other)) => {
                 Entity::Player(this.interp(other, alpha))
             }
+            (Entity::Turret(this), Entity::Turret(other)) => {
+                Entity::Turret(this.interp(other, alpha))
+            }
             _ => self.clone(),
         }
     }
@@ -283,6 +286,13 @@ impl Turret {
             center: self.pos,
             radius: run::TURRET_RADIUS,
         })
+    }
+
+    pub fn interp(&self, other: &Turret, alpha: f32) -> Turret {
+        Turret {
+            angle: geom::interp_angle(self.angle, other.angle, alpha),
+            ..other.clone()
+        }
     }
 }
 
