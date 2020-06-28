@@ -85,7 +85,7 @@ impl Game {
         }
 
         if self.catcher.is_none() {
-            // TODO: random
+            // TODO: Random
             let mut rng = rand::thread_rng();
             self.catcher = self
                 .players
@@ -93,6 +93,11 @@ impl Game {
                 .filter(|(_, player)| player.state == PlayerState::Alive)
                 .map(|(player_id, _)| *player_id)
                 .choose(&mut rng);
+            if let Some(catcher) = self.catcher {
+                context
+                    .events
+                    .push(Event::NewCatcher { player_id: catcher });
+            }
         }
 
         // TODO: clone
@@ -202,14 +207,7 @@ impl Game {
 
             let mut ent = ent.clone();
 
-            self.run_player_entity_input(
-                player_id,
-                input,
-                input_state,
-                context,
-                entity_id,
-                &mut ent,
-            )?;
+            self.run_player_entity_input(input, input_state, context, entity_id, &mut ent)?;
 
             self.entities.insert(entity_id, Entity::Player(ent));
         }
@@ -219,7 +217,6 @@ impl Game {
 
     fn run_player_entity_input(
         &mut self,
-        player_id: PlayerId,
         input: &Input,
         input_state: Option<&Game>,
         context: &mut RunContext,
@@ -441,9 +438,12 @@ impl Game {
         let mut offset = ent.vel * dt;
         let mut flip_axis = None;
 
+        // TODO: Should probably use auth state for player collisions?
         for (_, entity) in input_state.entities.iter() {
             let (other_shape, flip) = match entity {
-                Entity::Player(other_ent) if other_ent.owner != player_id => {
+                Entity::Player(other_ent)
+                    if other_ent.owner != ent.owner && current_dash.is_none() =>
+                {
                     (Some(other_ent.rect()), false)
                 }
                 Entity::Wall(other_ent) => (Some(other_ent.rect.to_rect()), true),
@@ -506,7 +506,7 @@ impl Game {
 
             if delta.norm() > 0.0 && input.use_item {
                 context.new_entities.push(Entity::Bullet(Bullet {
-                    owner: Some(player_id),
+                    owner: Some(ent.owner),
                     start_time: input_time,
                     start_pos: ent.pos,
                     vel: delta.normalize() * BULLET_MOVE_SPEED,
@@ -538,7 +538,7 @@ impl Game {
                         killed = Some(DeathReason::TouchedTheDanger);
                     }
                 }
-                Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
+                Entity::Bullet(bullet) if bullet.owner != Some(ent.owner) => {
                     if ent.rect().contains_point(bullet.pos(input_time)) {
                         context.removed_entities.insert(*entity_id);
                         killed = Some(DeathReason::ShotBy(bullet.owner));
@@ -548,35 +548,9 @@ impl Game {
             }
         }
 
-        if let Some(killed) = killed {
-            context.killed_players.insert(player_id, killed);
-
-            if !context.is_predicting {
-                let player = self.players.get_mut(&ent.owner).unwrap();
-                let spawn_food = player
-                    .food
-                    .min(PLAYER_MAX_LOSE_FOOD)
-                    .max(PLAYER_MIN_LOSE_FOOD);
-                player.food -= spawn_food.min(player.food);
-
-                for _ in 0..spawn_food {
-                    // TODO: Random
-                    let angle = rand::thread_rng().gen::<f32>() * std::f32::consts::PI * 2.0;
-                    let speed = rand::thread_rng().gen_range(FOOD_MIN_SPEED, FOOD_MAX_SPEED);
-                    let start_vel = Vector::new(speed * angle.cos(), speed * angle.sin());
-                    let factor =
-                        rand::thread_rng().gen_range(FOOD_SPEED_MIN_FACTOR, FOOD_SPEED_MAX_FACTOR);
-
-                    let food = Food {
-                        start_time: self.game_time(),
-                        start_pos: ent.pos,
-                        start_vel,
-                        factor,
-                        amount: 1,
-                    };
-                    context.new_entities.push(Entity::Food(food));
-                }
-            }
+        // Dying
+        if let Some(reason) = killed {
+            self.kill_player(entity_id, ent, reason, context)?;
         }
 
         // Take food
@@ -610,6 +584,65 @@ impl Game {
                         }
                     }
                     _ => (),
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn kill_player(
+        &mut self,
+        entity_id: EntityId,
+        ent: &PlayerEntity,
+        reason: DeathReason,
+        context: &mut RunContext,
+    ) -> GameResult<()> {
+        context.killed_players.insert(ent.owner, reason);
+
+        if !context.is_predicting {
+            let player = self.players.get_mut(&ent.owner).unwrap();
+            let spawn_food = player
+                .food
+                .min(PLAYER_MAX_LOSE_FOOD)
+                .max(PLAYER_MIN_LOSE_FOOD);
+            player.food -= spawn_food.min(player.food);
+
+            for _ in 0..spawn_food {
+                // TODO: Random
+                let angle = rand::thread_rng().gen::<f32>() * std::f32::consts::PI * 2.0;
+                let speed = rand::thread_rng().gen_range(FOOD_MIN_SPEED, FOOD_MAX_SPEED);
+                let start_vel = Vector::new(speed * angle.cos(), speed * angle.sin());
+                let factor =
+                    rand::thread_rng().gen_range(FOOD_SPEED_MIN_FACTOR, FOOD_SPEED_MAX_FACTOR);
+
+                let food = Food {
+                    start_time: self.game_time(),
+                    start_pos: ent.pos,
+                    start_vel,
+                    factor,
+                    amount: 1,
+                };
+                context.new_entities.push(Entity::Food(food));
+            }
+
+            if self.catcher == Some(ent.owner) {
+                // Choose a new catcher
+                self.catcher = self
+                    .entities
+                    .iter()
+                    .filter(|(other_id, _)| **other_id != entity_id)
+                    .filter_map(|(_, other_entity)| {
+                        other_entity.player().ok().map(|other_player| {
+                            (other_player.owner, (ent.pos - other_player.pos).norm())
+                        })
+                    })
+                    .min_by(|(_, dist1), (_, dist2)| dist1.partial_cmp(dist2).unwrap())
+                    .map(|(other_owner, _)| other_owner);
+                if let Some(catcher) = self.catcher {
+                    context
+                        .events
+                        .push(Event::NewCatcher { player_id: catcher });
                 }
             }
         }
