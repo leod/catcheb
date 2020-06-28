@@ -5,12 +5,15 @@ use rand::seq::SliceRandom;
 
 use comn::{game::RunContext, Entity, PlayerState};
 
+use crate::bot::Bot;
+
 pub const FIRST_SPAWN_DURATION: comn::GameTime = 0.5;
 pub const RESPAWN_DURATION: comn::GameTime = 2.0;
 pub const KEEP_PREV_STATES_DURATION: comn::GameTime = 1.0;
 
 pub struct PlayerMeta {
     pub last_input_num: Option<comn::TickNum>,
+    pub bot: Option<Bot>,
 }
 
 pub struct Game {
@@ -60,7 +63,7 @@ impl Game {
         &self.state.settings
     }
 
-    pub fn join(&mut self, player_name: String) -> comn::PlayerId {
+    pub fn join(&mut self, player_name: String, bot: bool) -> comn::PlayerId {
         // Runner takes care of not trying to join a full game.
         assert!(!self.is_full());
 
@@ -83,6 +86,7 @@ impl Game {
         };
         let player_meta = PlayerMeta {
             last_input_num: None,
+            bot: if bot { Some(Bot::default()) } else { None },
         };
         info!(
             "New player {:?} with id {:?} joined game",
@@ -116,6 +120,16 @@ impl Game {
                 .get_mut(&player_id)
                 .unwrap()
                 .last_input_num = Some(*input_tick_num);
+        }
+
+        for (player_id, player_meta) in self.players_meta.iter_mut() {
+            if let Some(bot) = player_meta.bot.as_mut() {
+                let input = bot.get_next_input(&self.state);
+
+                self.state
+                    .run_player_input(*player_id, &input, None, &mut context)
+                    .unwrap();
+            }
         }
 
         for (player_id, player) in self.state.players.iter_mut() {

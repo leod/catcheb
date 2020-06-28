@@ -3,6 +3,7 @@
 // Needed for pareen stuff
 #![type_length_limit = "600000000"]
 
+mod bot;
 mod fake_bad_net;
 mod game;
 mod http;

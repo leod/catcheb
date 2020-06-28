@@ -91,7 +91,7 @@ impl TickNum {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Input {
     pub move_left: bool,
     pub move_right: bool,
