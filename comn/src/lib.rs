@@ -64,6 +64,7 @@ pub enum ClientMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
     Input(Vec<(TickNum, Input)>),
+    // TODO: Send some kind of hash with the AckTick
     AckTick(TickNum),
 }
 
