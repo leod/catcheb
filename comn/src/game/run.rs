@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rand::Rng;
+use rand::{seq::IteratorRandom, Rng};
 
 use crate::entities::{Bullet, Food};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
-    Input, PlayerEntity, PlayerId, Vector,
+    Input, PlayerEntity, PlayerId, PlayerState, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -15,7 +15,6 @@ pub const PLAYER_SIT_L: f32 = 40.0;
 pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
-pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
 pub const PLAYER_ACCEL_FACTOR: f32 = 30.0;
 pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
 pub const PLAYER_DASH_DURATION: GameTime = 0.6;
@@ -25,9 +24,11 @@ pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
 pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
-pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 20.0;
-pub const PLAYER_SIZE_SCALE: f32 = 0.5;
+pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
+pub const PLAYER_SIZE_SKEW: f32 = 0.5;
 pub const PLAYER_TURN_DURATION: GameTime = 0.5;
+pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 2.0;
+pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -69,7 +70,30 @@ pub struct RunContext {
 
 impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
+        assert!(!context.is_predicting);
+
         let time = self.game_time();
+
+        if let Some(catcher) = self.catcher {
+            let catcher_alive = self
+                .players
+                .get(&catcher)
+                .map_or(false, |player| player.state == PlayerState::Alive);
+            if !catcher_alive {
+                self.catcher = None;
+            }
+        }
+
+        if self.catcher.is_none() {
+            // TODO: random
+            let mut rng = rand::thread_rng();
+            self.catcher = self
+                .players
+                .iter()
+                .filter(|(_, player)| player.state == PlayerState::Alive)
+                .map(|(player_id, _)| *player_id)
+                .choose(&mut rng);
+        }
 
         // TODO: clone
         let entities = self.entities.clone();
@@ -272,12 +296,26 @@ impl Game {
                     + 0.2
             };
             let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
-            ent.target_size_scale = PLAYER_SIZE_SCALE * move_scale * turn_scale;
+            let target_size_skew = PLAYER_SIZE_SKEW * move_scale * turn_scale;
 
+            ent.size_skew = geom::smooth_to_target_f32(
+                PLAYER_SIZE_SKEW_FACTOR,
+                ent.size_skew,
+                target_size_skew,
+                dt,
+            );
+        }
+        {
+            let is_catcher = self.catcher == Some(ent.owner);
+            let target_size_scale = if is_catcher {
+                PLAYER_CATCHER_SIZE_SCALE
+            } else {
+                1.0
+            };
             ent.size_scale = geom::smooth_to_target_f32(
                 PLAYER_SIZE_SCALE_FACTOR,
                 ent.size_scale,
-                ent.target_size_scale,
+                target_size_scale,
                 dt,
             );
         }
