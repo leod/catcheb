@@ -157,7 +157,11 @@ impl PlayerEntity {
         PlayerEntity {
             pos: self.pos + alpha * (other.pos - self.pos),
             size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
-            angle: geom::interp_angle(self.angle, other.angle, alpha),
+            angle: if geom::angle_dist(self.angle, other.angle).abs() < std::f32::consts::PI / 2.0 {
+                geom::interp_angle(self.angle, other.angle, alpha)
+            } else {
+                self.angle
+            },
             ..self.clone()
         }
     }

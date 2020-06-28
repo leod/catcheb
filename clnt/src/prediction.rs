@@ -158,6 +158,8 @@ impl Prediction {
     }
 
     fn load_entities(state: &mut comn::Game, entities: &comn::EntityMap) {
+        // TODO: To be safe, we should remove all predicted entities from the
+        // state before adding the new entities.
         state.entities.extend(
             entities
                 .iter()

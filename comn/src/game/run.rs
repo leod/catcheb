@@ -127,8 +127,7 @@ impl Game {
                     if let Some(target) = turret.target {
                         let target_pos = entities[&target].pos(time);
                         let target_angle = turret.angle_to_pos(target_pos);
-                        let angle_dist = ((target_angle - turret.angle).sin())
-                            .atan2((target_angle - turret.angle).cos());
+                        let angle_dist = geom::angle_dist(target_angle, turret.angle);
                         turret.angle += angle_dist * TURRET_TURN_FACTOR;
                         //.min(TURRET_MAX_TURN_SPEED * tick_period)
                         //.max(TURRET_MAX_TURN_SPEED * tick_period);
@@ -243,8 +242,7 @@ impl Game {
 
         // Smooth turning and scaling
         if (ent.target_angle - prev_target_angle).abs() >= 0.001 {
-            let phi = ent.target_angle - prev_target_angle;
-            let angle_dist = phi.sin().atan2(phi.cos());
+            let angle_dist = geom::angle_dist(ent.target_angle, prev_target_angle);
             if (angle_dist.abs() - std::f32::consts::PI).abs() < 0.01 {
                 ent.angle += ent.target_angle - prev_target_angle;
             } else {
@@ -252,8 +250,7 @@ impl Game {
             }
         }
         {
-            let phi = ent.target_angle - ent.angle;
-            let angle_dist = phi.sin().atan2(phi.cos());
+            let angle_dist = geom::angle_dist(ent.target_angle, ent.angle);
             let time_since_turn = (input_time - ent.last_turn).min(PLAYER_TURN_DURATION);
             let factor = if current_dash.is_some() {
                 PLAYER_DASH_TURN_FACTOR
