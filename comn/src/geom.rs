@@ -81,9 +81,12 @@ pub fn smooth_to_target_f32(factor: f32, start: f32, target: f32, dt: f32) -> f3
     target - (target - start) * (-factor * dt).exp()
 }
 
+pub fn angle_dist(alpha: f32, beta: f32) -> f32 {
+    (alpha - beta).sin().atan2((alpha - beta).cos())
+}
+
 pub fn interp_angle(alpha: f32, beta: f32, t: f32) -> f32 {
-    let delta = (beta - alpha).sin().atan2((beta - alpha).cos());
-    alpha + t * delta
+    alpha + t * angle_dist(beta, alpha)
 }
 
 // Awesome resource:
