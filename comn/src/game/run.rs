@@ -29,6 +29,7 @@ pub const PLAYER_SIZE_SKEW: f32 = 0.5;
 pub const PLAYER_TURN_DURATION: GameTime = 0.5;
 pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 2.0;
 pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
+pub const PLAYER_CATCH_FOOD: u32 = 10;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -438,12 +439,12 @@ impl Game {
         let mut offset = ent.vel * dt;
         let mut flip_axis = None;
 
-        // TODO: Should probably use auth state for player collisions?
-        for (_, entity) in input_state.entities.iter() {
-            let (other_shape, flip) = match entity {
-                Entity::Player(other_ent)
-                    if other_ent.owner != ent.owner && current_dash.is_none() =>
-                {
+        let mut caught_players = BTreeSet::new();
+
+        // TODO: Should probably use auth state for player-player collisions?
+        for (other_entity_id, other_entity) in input_state.entities.iter() {
+            let (other_shape, flip) = match other_entity {
+                Entity::Player(other_ent) if other_ent.owner != ent.owner => {
                     (Some(other_ent.rect()), false)
                 }
                 Entity::Wall(other_ent) => (Some(other_ent.rect.to_rect()), true),
@@ -457,9 +458,22 @@ impl Game {
             if let Some(collision) = other_shape
                 .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset))
             {
-                offset += collision.resolution_vector;
-                if flip {
-                    flip_axis = Some(collision.axis);
+                let mut collide = true;
+
+                if let Entity::Player(_) = other_entity {
+                    // TODO: Decide whom to favor regarding catching... or if
+                    // we should even make it happen over a longer duration.
+                    if self.catcher == Some(ent.owner) && current_dash.is_some() {
+                        caught_players.insert(*other_entity_id);
+                        collide = false;
+                    }
+                }
+
+                if collide {
+                    offset += collision.resolution_vector;
+                    if flip {
+                        flip_axis = Some(collision.axis);
+                    }
                 }
             }
         }
@@ -550,7 +564,15 @@ impl Game {
 
         // Dying
         if let Some(reason) = killed {
-            self.kill_player(entity_id, ent, reason, context)?;
+            self.kill_player(entity_id, reason, context)?;
+        }
+
+        for caught_entity_id in caught_players {
+            // If we are doing reconciliation, the entity might no longer exist in auth state.
+            if self.entities.contains_key(&caught_entity_id) {
+                self.kill_player(caught_entity_id, DeathReason::CaughtBy(ent.owner), context)?;
+                self.players.get_mut(&ent.owner).unwrap().food += PLAYER_CATCH_FOOD;
+            }
         }
 
         // Take food
@@ -594,10 +616,10 @@ impl Game {
     fn kill_player(
         &mut self,
         entity_id: EntityId,
-        ent: &PlayerEntity,
         reason: DeathReason,
         context: &mut RunContext,
     ) -> GameResult<()> {
+        let ent = self.get_entity(entity_id)?.player()?.clone();
         context.killed_players.insert(ent.owner, reason);
 
         if !context.is_predicting {
