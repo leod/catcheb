@@ -231,7 +231,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         if show_stats {
             coarse_prof::profile!("stats");
 
-            for _ in 0..33 {
+            for _ in 0..46 {
                 debug("")?;
             }
 
@@ -286,7 +286,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 now,
                 &mut gfx,
                 &mut resources.font_small,
-                Vector::new(600.0, 30.0),
+                Vector::new(1000.0, 30.0),
             )?;
         }
 

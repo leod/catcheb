@@ -111,6 +111,7 @@ pub enum Item {
 pub enum DeathReason {
     ShotBy(Option<PlayerId>),
     TouchedTheDanger,
+    CaughtBy(PlayerId),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +131,9 @@ pub enum Event {
     PlayerDied {
         player_id: PlayerId,
         reason: DeathReason,
+    },
+    NewCatcher {
+        player_id: PlayerId,
     },
 }
 

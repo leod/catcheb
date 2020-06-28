@@ -77,7 +77,11 @@ impl EventList {
                 }
                 DeathReason::ShotBy(None) => format!("{} rekt by turret lol", player_id.0),
                 DeathReason::TouchedTheDanger => format!("{} touched the danger", player_id.0),
+                DeathReason::CaughtBy(other_player_id) => {
+                    format!("{} caught {}!!", other_player_id.0, player_id.0)
+                }
             }),
+            Event::NewCatcher { player_id } => Some(format!("{} is the new catcher", player_id.0)),
             _ => None,
         }
     }
