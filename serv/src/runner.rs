@@ -200,7 +200,11 @@ impl Runner {
                     } else {
                         // Create a new game.
                         let game_id = comn::GameId(Uuid::new_v4());
-                        let game = Game::new(self.config.game_settings.clone());
+                        let mut game = Game::new(self.config.game_settings.clone());
+
+                        game.join("bot1".into(), true);
+                        game.join("bot2".into(), true);
+                        game.join("bot3".into(), true);
 
                         self.games.insert(game_id, game);
 
@@ -216,7 +220,7 @@ impl Runner {
         };
 
         let player_token = comn::PlayerToken(Uuid::new_v4());
-        let player_id = game.join(request.player_name);
+        let player_id = game.join(request.player_name, false);
 
         let player = Player::new(game.settings().tick_period(), game_id, player_id);
 
