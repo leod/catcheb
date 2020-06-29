@@ -113,10 +113,21 @@ impl Prediction {
 
             let events = Self::run_player_input(last_state, self.my_player_id, &my_input);
 
+            let mut entities = Self::extract_predicted_entities(last_state, self.my_player_id);
+            if let Some(server_state) = server_state {
+                // Some properties of predicted entities cannot be predicted,
+                // i.e. those that are affected by events that only the server
+                // controls (the motivating case was players taking food). We
+                // overwrite these by the server state. Note that there will be
+                // some time shift in when the properties are updated, but such
+                // is life.
+                Self::write_unpredicted_properties(&mut entities, &server_state.game.entities);
+            }
+
             self.log.insert(
                 predict_tick_num,
                 Record {
-                    entities: Self::extract_predicted_entities(last_state, self.my_player_id),
+                    entities,
                     my_last_input: my_input,
                 },
             );
@@ -279,5 +290,20 @@ impl Prediction {
         assert!(!entities.contains_key(&entity_id));
 
         entities.insert(entity_id, entity);
+    }
+
+    fn write_unpredicted_properties(predicted: &mut comn::EntityMap, server: &comn::EntityMap) {
+        for item in join::full_join(predicted.iter_mut(), server.iter()) {
+            match item {
+                join::Item::Both(
+                    _,
+                    comn::Entity::Player(predicted),
+                    comn::Entity::Player(server),
+                ) => {
+                    predicted.size_bump = server.size_bump;
+                }
+                _ => (),
+            }
+        }
     }
 }

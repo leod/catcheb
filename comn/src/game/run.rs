@@ -6,7 +6,7 @@ use crate::entities::{Bullet, Food};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
-    Input, PlayerEntity, PlayerId, PlayerState, Vector,
+    Input, PlayerEntity, PlayerId, PlayerMap, PlayerState, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -27,9 +27,13 @@ pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
 pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
 pub const PLAYER_SIZE_SKEW: f32 = 0.5;
 pub const PLAYER_TURN_DURATION: GameTime = 0.5;
-pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 2.0;
+pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
 pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
 pub const PLAYER_CATCH_FOOD: u32 = 10;
+pub const PLAYER_TAKE_FOOD_SIZE_BUMP: f32 = 25.0;
+pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
+pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
+pub const PLAYER_MAX_SIZE_BUMP: f32 = 50.0;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -317,6 +321,18 @@ impl Game {
             } else {
                 1.0
             };
+            ent.size_bump = geom::smooth_to_target_f32(
+                PLAYER_SIZE_BUMP_FACTOR,
+                ent.size_bump,
+                ent.target_size_bump,
+                dt,
+            );
+            ent.target_size_bump = geom::smooth_to_target_f32(
+                PLAYER_TARGET_SIZE_BUMP_FACTOR,
+                ent.target_size_bump,
+                0.0,
+                dt,
+            );
             ent.size_scale = geom::smooth_to_target_f32(
                 PLAYER_SIZE_SCALE_FACTOR,
                 ent.size_scale,
@@ -578,7 +594,7 @@ impl Game {
             // If we are doing reconciliation, the entity might no longer exist in auth state.
             if self.entities.contains_key(&caught_entity_id) {
                 self.kill_player(caught_entity_id, DeathReason::CaughtBy(ent.owner), context)?;
-                self.players.get_mut(&ent.owner).unwrap().food += PLAYER_CATCH_FOOD;
+                Self::take_food(&mut self.players, ent, PLAYER_CATCH_FOOD);
             }
         }
 
@@ -597,7 +613,7 @@ impl Game {
                         {
                             spawn.has_food = false;
                             spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
-                            self.players.get_mut(&ent.owner).unwrap().food += 1;
+                            Self::take_food(&mut self.players, ent, 1);
                         }
                     }
                     Entity::Food(food) => {
@@ -608,7 +624,7 @@ impl Game {
                         )
                         .is_some()
                         {
-                            self.players.get_mut(&ent.owner).unwrap().food += 1;
+                            Self::take_food(&mut self.players, ent, food.amount);
                             context.removed_entities.insert(*entity_id);
                         }
                     }
@@ -618,6 +634,12 @@ impl Game {
         }
 
         Ok(())
+    }
+
+    fn take_food(players: &mut PlayerMap, ent: &mut PlayerEntity, amount: u32) {
+        players.get_mut(&ent.owner).unwrap().food += amount;
+        ent.target_size_bump += PLAYER_TAKE_FOOD_SIZE_BUMP * amount as f32;
+        ent.target_size_bump = ent.target_size_bump.min(PLAYER_MAX_SIZE_BUMP);
     }
 
     fn kill_player(
