@@ -4,6 +4,7 @@ mod game;
 mod join;
 mod prediction;
 mod render;
+mod scoreboard;
 mod webrtc;
 
 use std::{collections::HashSet, time::Duration};
@@ -92,7 +93,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
     let mut stats = Stats::default();
     let mut show_stats = false;
-    let mut lag_frames = 0;
+    let mut lag_frames: usize = 0;
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
@@ -193,7 +194,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         coarse_prof::profile!("render");
         gfx.clear(Color::WHITE);
 
-        if let Some(state) = game.state() {
+        let state = game.state();
+        if let Some(state) = state.as_ref() {
             coarse_prof::profile!("game");
             render::render_game(
                 &mut gfx,
@@ -288,6 +290,18 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 &mut resources.font_small,
                 Vector::new(1000.0, 30.0),
             )?;
+
+            //if pressed_keys.contains(&Key::Tab) {
+            if let Some(state) = state.as_ref() {
+                scoreboard::render(
+                    &mut gfx,
+                    &mut resources.font_small,
+                    state,
+                    Vector::new(1000.0, 100.0),
+                    Vector::new(300.0, 300.0),
+                )?;
+            }
+            //}
         }
 
         {
