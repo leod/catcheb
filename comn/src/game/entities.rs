@@ -114,6 +114,8 @@ pub struct PlayerEntity {
     pub target_angle: f32,
     pub size_scale: f32,
     pub size_skew: f32,
+    pub size_bump: f32,
+    pub target_size_bump: f32,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
@@ -131,6 +133,8 @@ impl PlayerEntity {
             target_angle: 0.0,
             size_scale: 1.0,
             size_skew: 1.0,
+            size_bump: 0.0,
+            target_size_bump: 0.0,
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
@@ -142,8 +146,8 @@ impl PlayerEntity {
         AaRect::new_center(
             self.pos,
             Vector::new(
-                self.size_scale * run::PLAYER_SIT_W * (1.0 + self.size_skew),
-                self.size_scale * run::PLAYER_SIT_L / (1.0 + self.size_skew),
+                (self.size_bump + self.size_scale * run::PLAYER_SIT_W) * (1.0 + self.size_skew),
+                (self.size_bump + self.size_scale * run::PLAYER_SIT_L) / (1.0 + self.size_skew),
             ),
         )
         .rotate(self.angle)
@@ -346,7 +350,7 @@ pub struct Food {
     pub start_pos: Point,
     pub start_vel: Vector,
     pub factor: f32,
-    pub amount: usize,
+    pub amount: u32,
 }
 
 impl Food {
