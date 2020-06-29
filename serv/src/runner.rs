@@ -562,7 +562,7 @@ impl Runner {
             if let Some(peer) = player.peer {
                 let game = &self.games[&player.game_id];
                 let mut state = game.state.clone();
-                game.correct_time_for_player(player.player_id, &mut state);
+                game.prepare_state_for_player(player.player_id, &mut state);
 
                 let mut events = vec![(game.state.tick_num, game.last_events.clone())];
 
