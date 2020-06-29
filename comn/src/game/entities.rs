@@ -9,6 +9,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Entity {
     Player(PlayerEntity),
+    PlayerView(PlayerView),
     Bullet(Bullet),
     DangerGuy(DangerGuy),
     Turret(Turret),
@@ -29,6 +30,7 @@ impl Entity {
     pub fn pos(&self, time: GameTime) -> Point {
         match self {
             Entity::Player(entity) => entity.pos,
+            Entity::PlayerView(entity) => entity.pos,
             Entity::Bullet(entity) => entity.pos(time),
             Entity::DangerGuy(entity) => entity.pos(time),
             Entity::Turret(entity) => entity.pos,
@@ -42,6 +44,9 @@ impl Entity {
         match (self, other) {
             (Entity::Player(this), Entity::Player(other)) => {
                 Entity::Player(this.interp(other, alpha))
+            }
+            (Entity::PlayerView(this), Entity::PlayerView(other)) => {
+                Entity::PlayerView(this.interp(other, alpha))
             }
             (Entity::Turret(this), Entity::Turret(other)) => {
                 Entity::Turret(this.interp(other, alpha))
@@ -60,6 +65,7 @@ impl Entity {
     pub fn shape(&self, time: f32) -> Shape {
         match self {
             Entity::Player(entity) => entity.shape(),
+            Entity::PlayerView(entity) => entity.shape(),
             Entity::Bullet(entity) => entity.shape(time),
             Entity::DangerGuy(entity) => entity.shape(time),
             Entity::Turret(entity) => entity.shape(),
@@ -103,9 +109,6 @@ pub struct Hook {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
-    // TODO: Much of the PlayerEntity is needed only for the server and the
-    // owning player. As a simple optimization, we can have a PlayerView
-    // entity that carries only the state necessary for display.
     pub owner: PlayerId,
     pub pos: Point,
     pub vel: Vector,
@@ -142,15 +145,25 @@ impl PlayerEntity {
         }
     }
 
-    pub fn rect(&self) -> Rect {
-        AaRect::new_center(
-            self.pos,
-            Vector::new(
-                (self.size_bump + self.size_scale * run::PLAYER_SIT_W) * (1.0 + self.size_skew),
-                (self.size_bump + self.size_scale * run::PLAYER_SIT_L) / (1.0 + self.size_skew),
-            ),
+    pub fn to_view(&self) -> PlayerView {
+        PlayerView {
+            owner: self.owner,
+            pos: self.pos,
+            angle: self.angle,
+            size: self.size(),
+            hook: self.hook.clone(),
+        }
+    }
+
+    pub fn size(&self) -> Vector {
+        Vector::new(
+            (self.size_bump + self.size_scale * run::PLAYER_SIT_W) * (1.0 + self.size_skew),
+            (self.size_bump + self.size_scale * run::PLAYER_SIT_L) / (1.0 + self.size_skew),
         )
-        .rotate(self.angle)
+    }
+
+    pub fn rect(&self) -> Rect {
+        AaRect::new_center(self.pos, self.size()).rotate(self.angle)
     }
 
     pub fn shape(&self) -> Shape {
@@ -160,14 +173,47 @@ impl PlayerEntity {
     pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
         PlayerEntity {
             pos: self.pos + alpha * (other.pos - self.pos),
-            angle: if geom::angle_dist(self.angle, other.angle).abs() < std::f32::consts::PI / 2.0 {
-                geom::interp_angle(self.angle, other.angle, alpha)
-            } else {
-                self.angle
-            },
+            angle: interp_angle(self.angle, other.angle, alpha),
             size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
             size_skew: self.size_skew + alpha * (other.size_skew - self.size_skew),
             size_bump: self.size_bump + alpha * (other.size_bump - self.size_bump),
+            ..self.clone()
+        }
+    }
+}
+
+fn interp_angle(angle: f32, other_angle: f32, t: f32) -> f32 {
+    if geom::angle_dist(angle, other_angle).abs() < std::f32::consts::PI / 2.0 {
+        geom::interp_angle(angle, other_angle, t)
+    } else {
+        // Snap!
+        angle
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PlayerView {
+    pub owner: PlayerId,
+    pub pos: Point,
+    pub angle: f32,
+    pub size: Vector,
+    pub hook: Option<Hook>,
+}
+
+impl PlayerView {
+    pub fn rect(&self) -> Rect {
+        AaRect::new_center(self.pos, self.size).rotate(self.angle)
+    }
+
+    pub fn shape(&self) -> Shape {
+        Shape::Rect(self.rect())
+    }
+
+    pub fn interp(&self, other: &PlayerView, alpha: f32) -> PlayerView {
+        PlayerView {
+            pos: self.pos + alpha * (other.pos - self.pos),
+            angle: interp_angle(self.angle, other.angle, alpha),
+            size: self.size + alpha * (other.size - self.size),
             ..self.clone()
         }
     }
