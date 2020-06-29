@@ -204,7 +204,6 @@ impl Runner {
 
                         game.join("bot1".into(), true);
                         game.join("bot2".into(), true);
-                        game.join("bot3".into(), true);
 
                         self.games.insert(game_id, game);
 

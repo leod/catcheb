@@ -113,7 +113,9 @@ pub struct PlayerEntity {
     pub last_turn: GameTime,
     pub target_angle: f32,
     pub size_scale: f32,
-    pub target_size_scale: f32,
+    pub size_skew: f32,
+    pub size_bump: f32,
+    pub target_size_bump: f32,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
     pub last_dash: Option<(GameTime, Vector)>,
@@ -130,7 +132,9 @@ impl PlayerEntity {
             last_turn: 0.0,
             target_angle: 0.0,
             size_scale: 1.0,
-            target_size_scale: 1.0,
+            size_skew: 1.0,
+            size_bump: 0.0,
+            target_size_bump: 0.0,
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
             last_dash: None,
@@ -142,8 +146,8 @@ impl PlayerEntity {
         AaRect::new_center(
             self.pos,
             Vector::new(
-                run::PLAYER_SIT_W * (1.0 + self.size_scale),
-                run::PLAYER_SIT_L / (1.0 + self.size_scale),
+                (self.size_bump + self.size_scale * run::PLAYER_SIT_W) * (1.0 + self.size_skew),
+                (self.size_bump + self.size_scale * run::PLAYER_SIT_L) / (1.0 + self.size_skew),
             ),
         )
         .rotate(self.angle)
@@ -156,7 +160,7 @@ impl PlayerEntity {
     pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
         PlayerEntity {
             pos: self.pos + alpha * (other.pos - self.pos),
-            size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
+            size_skew: self.size_skew + alpha * (other.size_skew - self.size_skew),
             angle: if geom::angle_dist(self.angle, other.angle).abs() < std::f32::consts::PI / 2.0 {
                 geom::interp_angle(self.angle, other.angle, alpha)
             } else {
@@ -346,7 +350,7 @@ pub struct Food {
     pub start_pos: Point,
     pub start_vel: Vector,
     pub factor: f32,
-    pub amount: usize,
+    pub amount: u32,
 }
 
 impl Food {

@@ -111,6 +111,7 @@ pub enum Item {
 pub enum DeathReason {
     ShotBy(Option<PlayerId>),
     TouchedTheDanger,
+    CaughtBy(PlayerId),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +131,9 @@ pub enum Event {
     PlayerDied {
         player_id: PlayerId,
         reason: DeathReason,
+    },
+    NewCatcher {
+        player_id: PlayerId,
     },
 }
 
@@ -158,6 +162,7 @@ pub struct Game {
     pub tick_num: TickNum,
     pub players: PlayerMap,
     pub entities: EntityMap,
+    pub catcher: Option<PlayerId>,
 }
 
 impl Game {
@@ -173,6 +178,7 @@ impl Game {
                 .enumerate()
                 .map(|(id, entity)| (EntityId(id as u32), entity))
                 .collect(),
+            catcher: None,
         }
     }
 
@@ -323,6 +329,7 @@ pub struct GameDiff {
     pub tick_num: TickNum,
     pub players: BTreeMapDiff<PlayerId, Player>,
     pub entities: BTreeMapDiff<EntityId, Entity>,
+    pub catcher: Option<PlayerId>,
 }
 
 impl Diffable for Game {
@@ -333,6 +340,7 @@ impl Diffable for Game {
             tick_num: other.tick_num,
             players: self.players.diff(&other.players),
             entities: self.entities.diff(&other.entities),
+            catcher: other.catcher,
         }
     }
 }
@@ -344,6 +352,7 @@ impl Diff for GameDiff {
         value.tick_num = self.tick_num;
         self.players.apply(&mut value.players)?;
         self.entities.apply(&mut value.entities)?;
+        value.catcher = self.catcher;
         Ok(())
     }
 }
