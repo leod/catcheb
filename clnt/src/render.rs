@@ -141,85 +141,28 @@ pub fn render_game(
     for entity in interp_entities(state, next_entities, time) {
         match entity {
             comn::Entity::Player(player) => {
-                let pos: mint::Vector2<f32> = player.pos.coords.into();
-
-                let color = if player.owner == my_player_id {
-                    Color::BLUE
-                } else {
-                    Color::from_rgba(148, 0, 211, 1.0)
-                };
-
-                let transform = rect_to_transform(&player.rect());
-                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
-
-                gfx.set_transform(transform.then(camera_transform));
-                gfx.fill_rect(&rect, color);
-                gfx.stroke_rect(&rect, Color::BLACK);
-
-                let nose = Rectangle::new(Vector::new(0.5, -0.1), Vector::new(0.2, 0.2));
-                gfx.set_transform(transform.then(camera_transform));
-                gfx.fill_rect(&nose, Color::CYAN);
-
-                gfx.set_transform(camera_transform);
-
-                if let Some(hook) = player.hook.as_ref() {
-                    let (a, b, dead) = match hook.state {
-                        comn::HookState::Shooting {
-                            start_time,
-                            start_pos,
-                            vel,
-                        } => (player.pos, start_pos + (time - start_time) * vel, false),
-                        comn::HookState::Attached {
-                            start_time: _,
-                            target,
-                            offset,
-                        } => {
-                            let b = interp_entity(state, next_entities, time, target)
-                                .map_or(player.pos, |interp_target| {
-                                    interp_target.pos(time) + offset
-                                });
-                            (player.pos, b, false)
-                        }
-                        comn::HookState::Contracting {
-                            start_time,
-                            duration,
-                            start_pos,
-                        } => {
-                            let delta = player.pos - start_pos;
-                            (
-                                player.pos,
-                                start_pos + ((time - start_time) / duration).min(1.0) * delta,
-                                true,
-                            )
-                        }
-                    };
-
-                    let a: mint::Vector2<f32> = a.coords.into();
-                    let b: mint::Vector2<f32> = b.coords.into();
-                    if !dead {
-                        gfx.stroke_path(
-                            &[a.into(), b.into()],
-                            Color::from_rgba(100, 100, 100, 1.0),
-                        );
-                        gfx.fill_circle(
-                            &Circle::new(b.into(), 12.0),
-                            Color::from_rgba(50, 200, 50, 1.0),
-                        );
-                    } else {
-                        gfx.stroke_path(
-                            &[a.into(), b.into()],
-                            Color::from_rgba(100, 100, 100, 1.0),
-                        );
-                        gfx.stroke_circle(
-                            &Circle::new(b.into(), 7.0),
-                            Color::from_rgba(100, 100, 100, 1.0),
-                        );
-                    }
-                }
-
-                resources
-                    .font
-                    .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;
+                render_player(
+                    gfx,
+                    resources,
+                    state,
+                    next_entities,
+                    time,
+                    my_player_id,
+                    camera_transform,
+                    &player.to_view(),
+                )?;
+            }
+            comn::Entity::PlayerView(player) => {
+                render_player(
+                    gfx,
+                    resources,
+                    state,
+                    next_entities,
+                    time,
+                    my_player_id,
+                    camera_transform,
+                    &player,
+                )?;
             }
             comn::Entity::DangerGuy(danger_guy) => {
                 let origin: mint::Vector2<f32> =
@@ -360,6 +303,104 @@ pub fn render_game(
     }
 
     gfx.set_transform(Transform::IDENTITY);
+
+    Ok(())
+}
+
+fn render_player(
+    gfx: &mut Graphics,
+    resources: &mut Resources,
+    state: &comn::Game,
+    next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    time: comn::GameTime,
+    my_player_id: comn::PlayerId,
+    camera_transform: Transform,
+    player: &comn::PlayerView,
+) -> quicksilver::Result<()> {
+    let pos: mint::Vector2<f32> = player.pos.coords.into();
+
+    let color = if player.owner == my_player_id {
+        Color::BLUE
+    } else {
+        Color::from_rgba(148, 0, 211, 1.0)
+    };
+
+    let transform = rect_to_transform(&player.rect());
+    let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+
+    gfx.set_transform(transform.then(camera_transform));
+    gfx.fill_rect(&rect, color);
+    gfx.stroke_rect(&rect, Color::BLACK);
+
+    let nose = Rectangle::new(Vector::new(0.5, -0.1), Vector::new(0.2, 0.2));
+    gfx.set_transform(transform.then(camera_transform));
+    gfx.fill_rect(&nose, Color::CYAN);
+
+    gfx.set_transform(camera_transform);
+
+    if let Some(hook) = player.hook.as_ref() {
+        render_hook(gfx, state, next_entities, time, player.pos, hook)?;
+    }
+
+    resources
+        .font
+        .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;
+
+    Ok(())
+}
+
+fn render_hook(
+    gfx: &mut Graphics,
+    state: &comn::Game,
+    next_entities: &BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
+    time: comn::GameTime,
+    pos: comn::Point,
+    hook: &comn::Hook,
+) -> quicksilver::Result<()> {
+    let (a, b, dead) = match hook.state {
+        comn::HookState::Shooting {
+            start_time,
+            start_pos,
+            vel,
+        } => (pos, start_pos + (time - start_time) * vel, false),
+        comn::HookState::Attached {
+            start_time: _,
+            target,
+            offset,
+        } => {
+            let b = interp_entity(state, next_entities, time, target)
+                .map_or(pos, |interp_target| interp_target.pos(time) + offset);
+            (pos, b, false)
+        }
+        comn::HookState::Contracting {
+            start_time,
+            duration,
+            start_pos,
+        } => {
+            let delta = pos - start_pos;
+            (
+                pos,
+                start_pos + ((time - start_time) / duration).min(1.0) * delta,
+                true,
+            )
+        }
+    };
+
+    let a: mint::Vector2<f32> = a.coords.into();
+    let b: mint::Vector2<f32> = b.coords.into();
+    if !dead {
+        gfx.stroke_path(&[a.into(), b.into()], Color::from_rgba(100, 100, 100, 1.0));
+        gfx.fill_circle(
+            &Circle::new(b.into(), 12.0),
+            Color::from_rgba(50, 200, 50, 1.0),
+        );
+    } else {
+        gfx.stroke_path(&[a.into(), b.into()], Color::from_rgba(100, 100, 100, 1.0));
+        gfx.stroke_circle(
+            &Circle::new(b.into(), 7.0),
+            Color::from_rgba(100, 100, 100, 1.0),
+        );
+    }
 
     Ok(())
 }
