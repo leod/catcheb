@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use std::{cmp::Ordering, iter::Peekable};
 
 pub fn full_join<Left, Right, K, T, U>(left: Left, right: Right) -> FullJoinIter<Left, Right>
 where
@@ -46,17 +46,21 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         // Advance the iterator which has the element with the smaller key.
         match (self.left.peek(), self.right.peek()) {
-            (Some((left_k, _)), Some((right_k, _))) => Some(if left_k < right_k {
-                let (left_k, left_v) = self.left.next().unwrap();
-                Item::Left(left_k, left_v)
-            } else if left_k > right_k {
-                let (right_k, right_v) = self.right.next().unwrap();
-                Item::Right(right_k, right_v)
-            } else {
-                let (left_k, left_v) = self.left.next().unwrap();
-                let (right_k, right_v) = self.right.next().unwrap();
-                assert!(left_k == right_k);
-                Item::Both(left_k, left_v, right_v)
+            (Some((left_k, _)), Some((right_k, _))) => Some(match left_k.cmp(&right_k) {
+                Ordering::Less => {
+                    let (left_k, left_v) = self.left.next().unwrap();
+                    Item::Left(left_k, left_v)
+                }
+                Ordering::Greater => {
+                    let (right_k, right_v) = self.right.next().unwrap();
+                    Item::Right(right_k, right_v)
+                }
+                Ordering::Equal => {
+                    let (left_k, left_v) = self.left.next().unwrap();
+                    let (right_k, right_v) = self.right.next().unwrap();
+                    assert!(left_k == right_k);
+                    Item::Both(left_k, left_v, right_v)
+                }
             }),
             (Some(_), None) => {
                 let (left_k, left_v) = self.left.next().unwrap();
