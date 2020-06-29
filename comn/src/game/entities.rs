@@ -160,12 +160,14 @@ impl PlayerEntity {
     pub fn interp(&self, other: &PlayerEntity, alpha: f32) -> PlayerEntity {
         PlayerEntity {
             pos: self.pos + alpha * (other.pos - self.pos),
-            size_skew: self.size_skew + alpha * (other.size_skew - self.size_skew),
             angle: if geom::angle_dist(self.angle, other.angle).abs() < std::f32::consts::PI / 2.0 {
                 geom::interp_angle(self.angle, other.angle, alpha)
             } else {
                 self.angle
             },
+            size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
+            size_skew: self.size_skew + alpha * (other.size_skew - self.size_skew),
+            size_bump: self.size_bump + alpha * (other.size_bump - self.size_bump),
             ..self.clone()
         }
     }
