@@ -293,7 +293,14 @@ impl Game {
                     * 0.8
                     + 0.2
             };
-            let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
+            let move_scale = if let Some(Hook {
+                state: HookState::Attached { .. },
+            }) = ent.hook.as_ref()
+            {
+                0.5
+            } else {
+                ent.vel.norm() / PLAYER_MOVE_SPEED
+            };
             let target_size_skew = PLAYER_SIZE_SKEW * move_scale * turn_scale;
 
             ent.size_skew = geom::smooth_to_target_f32(
