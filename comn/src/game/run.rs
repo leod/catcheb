@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rand::Rng;
+use rand::{seq::IteratorRandom, Rng};
 
 use crate::entities::{Bullet, Food};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
-    Input, PlayerEntity, PlayerId, Vector,
+    Input, PlayerEntity, PlayerId, PlayerMap, PlayerState, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -15,7 +15,6 @@ pub const PLAYER_SIT_L: f32 = 40.0;
 pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
-pub const PLAYER_TRANSITION_SPEED: f32 = 4.0;
 pub const PLAYER_ACCEL_FACTOR: f32 = 30.0;
 pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
 pub const PLAYER_DASH_DURATION: GameTime = 0.6;
@@ -25,9 +24,16 @@ pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
 pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
 pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
-pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 20.0;
-pub const PLAYER_SIZE_SCALE: f32 = 0.5;
+pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
+pub const PLAYER_SIZE_SKEW: f32 = 0.5;
 pub const PLAYER_TURN_DURATION: GameTime = 0.5;
+pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
+pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
+pub const PLAYER_CATCH_FOOD: u32 = 10;
+pub const PLAYER_TAKE_FOOD_SIZE_BUMP: f32 = 25.0;
+pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
+pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
+pub const PLAYER_MAX_SIZE_BUMP: f32 = 50.0;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -69,7 +75,35 @@ pub struct RunContext {
 
 impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
+        assert!(!context.is_predicting);
+
         let time = self.game_time();
+
+        if let Some(catcher) = self.catcher {
+            let catcher_alive = self
+                .players
+                .get(&catcher)
+                .map_or(false, |player| player.state == PlayerState::Alive);
+            if !catcher_alive {
+                self.catcher = None;
+            }
+        }
+
+        if self.catcher.is_none() {
+            // TODO: Random
+            let mut rng = rand::thread_rng();
+            self.catcher = self
+                .players
+                .iter()
+                .filter(|(_, player)| player.state == PlayerState::Alive)
+                .map(|(player_id, _)| *player_id)
+                .choose(&mut rng);
+            if let Some(catcher) = self.catcher {
+                context
+                    .events
+                    .push(Event::NewCatcher { player_id: catcher });
+            }
+        }
 
         // TODO: clone
         let entities = self.entities.clone();
@@ -178,14 +212,7 @@ impl Game {
 
             let mut ent = ent.clone();
 
-            self.run_player_entity_input(
-                player_id,
-                input,
-                input_state,
-                context,
-                entity_id,
-                &mut ent,
-            )?;
+            self.run_player_entity_input(input, input_state, context, entity_id, &mut ent)?;
 
             self.entities.insert(entity_id, Entity::Player(ent));
         }
@@ -195,7 +222,6 @@ impl Game {
 
     fn run_player_entity_input(
         &mut self,
-        player_id: PlayerId,
         input: &Input,
         input_state: Option<&Game>,
         context: &mut RunContext,
@@ -271,13 +297,46 @@ impl Game {
                     * 0.8
                     + 0.2
             };
-            let move_scale = ent.vel.norm() / PLAYER_MOVE_SPEED;
-            ent.target_size_scale = PLAYER_SIZE_SCALE * move_scale * turn_scale;
+            let move_scale = if let Some(Hook {
+                state: HookState::Attached { .. },
+            }) = ent.hook.as_ref()
+            {
+                0.5
+            } else {
+                ent.vel.norm() / PLAYER_MOVE_SPEED
+            };
+            let target_size_skew = PLAYER_SIZE_SKEW * move_scale * turn_scale;
 
+            ent.size_skew = geom::smooth_to_target_f32(
+                PLAYER_SIZE_SKEW_FACTOR,
+                ent.size_skew,
+                target_size_skew,
+                dt,
+            );
+        }
+        {
+            let is_catcher = self.catcher == Some(ent.owner);
+            let target_size_scale = if is_catcher {
+                PLAYER_CATCHER_SIZE_SCALE
+            } else {
+                1.0
+            };
+            ent.size_bump = geom::smooth_to_target_f32(
+                PLAYER_SIZE_BUMP_FACTOR,
+                ent.size_bump,
+                ent.target_size_bump,
+                dt,
+            );
+            ent.target_size_bump = geom::smooth_to_target_f32(
+                PLAYER_TARGET_SIZE_BUMP_FACTOR,
+                ent.target_size_bump,
+                0.0,
+                dt,
+            );
             ent.size_scale = geom::smooth_to_target_f32(
                 PLAYER_SIZE_SCALE_FACTOR,
                 ent.size_scale,
-                ent.target_size_scale,
+                target_size_scale,
                 dt,
             );
         }
@@ -403,9 +462,12 @@ impl Game {
         let mut offset = ent.vel * dt;
         let mut flip_axis = None;
 
-        for (_, entity) in input_state.entities.iter() {
-            let (other_shape, flip) = match entity {
-                Entity::Player(other_ent) if other_ent.owner != player_id => {
+        let mut caught_players = BTreeSet::new();
+
+        // TODO: Should probably use auth state for player-player collisions?
+        for (other_entity_id, other_entity) in input_state.entities.iter() {
+            let (other_shape, flip) = match other_entity {
+                Entity::Player(other_ent) if other_ent.owner != ent.owner => {
                     (Some(other_ent.rect()), false)
                 }
                 Entity::Wall(other_ent) => (Some(other_ent.rect.to_rect()), true),
@@ -419,9 +481,22 @@ impl Game {
             if let Some(collision) = other_shape
                 .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset))
             {
-                offset += collision.resolution_vector;
-                if flip {
-                    flip_axis = Some(collision.axis);
+                let mut collide = true;
+
+                if let Entity::Player(_) = other_entity {
+                    // TODO: Decide whom to favor regarding catching... or if
+                    // we should even make it happen over a longer duration.
+                    if self.catcher == Some(ent.owner) && current_dash.is_some() {
+                        caught_players.insert(*other_entity_id);
+                        collide = false;
+                    }
+                }
+
+                if collide {
+                    offset += collision.resolution_vector;
+                    if flip {
+                        flip_axis = Some(collision.axis);
+                    }
                 }
             }
         }
@@ -468,7 +543,7 @@ impl Game {
 
             if delta.norm() > 0.0 && input.use_item {
                 context.new_entities.push(Entity::Bullet(Bullet {
-                    owner: Some(player_id),
+                    owner: Some(ent.owner),
                     start_time: input_time,
                     start_pos: ent.pos,
                     vel: delta.normalize() * BULLET_MOVE_SPEED,
@@ -500,7 +575,7 @@ impl Game {
                         killed = Some(DeathReason::TouchedTheDanger);
                     }
                 }
-                Entity::Bullet(bullet) if bullet.owner != Some(player_id) => {
+                Entity::Bullet(bullet) if bullet.owner != Some(ent.owner) => {
                     if ent.rect().contains_point(bullet.pos(input_time)) {
                         context.removed_entities.insert(*entity_id);
                         killed = Some(DeathReason::ShotBy(bullet.owner));
@@ -510,34 +585,16 @@ impl Game {
             }
         }
 
-        if let Some(killed) = killed {
-            context.killed_players.insert(player_id, killed);
+        // Dying
+        if let Some(reason) = killed {
+            self.kill_player(entity_id, reason, context)?;
+        }
 
-            if !context.is_predicting {
-                let player = self.players.get_mut(&ent.owner).unwrap();
-                let spawn_food = player
-                    .food
-                    .min(PLAYER_MAX_LOSE_FOOD)
-                    .max(PLAYER_MIN_LOSE_FOOD);
-                player.food -= spawn_food.min(player.food);
-
-                for _ in 0..spawn_food {
-                    // TODO: Random
-                    let angle = rand::thread_rng().gen::<f32>() * std::f32::consts::PI * 2.0;
-                    let speed = rand::thread_rng().gen_range(FOOD_MIN_SPEED, FOOD_MAX_SPEED);
-                    let start_vel = Vector::new(speed * angle.cos(), speed * angle.sin());
-                    let factor =
-                        rand::thread_rng().gen_range(FOOD_SPEED_MIN_FACTOR, FOOD_SPEED_MAX_FACTOR);
-
-                    let food = Food {
-                        start_time: self.game_time(),
-                        start_pos: ent.pos,
-                        start_vel,
-                        factor,
-                        amount: 1,
-                    };
-                    context.new_entities.push(Entity::Food(food));
-                }
+        for caught_entity_id in caught_players {
+            // If we are doing reconciliation, the entity might no longer exist in auth state.
+            if self.entities.contains_key(&caught_entity_id) {
+                self.kill_player(caught_entity_id, DeathReason::CaughtBy(ent.owner), context)?;
+                Self::take_food(&mut self.players, ent, PLAYER_CATCH_FOOD);
             }
         }
 
@@ -556,7 +613,7 @@ impl Game {
                         {
                             spawn.has_food = false;
                             spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
-                            self.players.get_mut(&ent.owner).unwrap().food += 1;
+                            Self::take_food(&mut self.players, ent, 1);
                         }
                     }
                     Entity::Food(food) => {
@@ -567,11 +624,76 @@ impl Game {
                         )
                         .is_some()
                         {
-                            self.players.get_mut(&ent.owner).unwrap().food += 1;
+                            Self::take_food(&mut self.players, ent, food.amount);
                             context.removed_entities.insert(*entity_id);
                         }
                     }
                     _ => (),
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn take_food(players: &mut PlayerMap, ent: &mut PlayerEntity, amount: u32) {
+        players.get_mut(&ent.owner).unwrap().food += amount;
+        ent.target_size_bump += PLAYER_TAKE_FOOD_SIZE_BUMP * amount as f32;
+        ent.target_size_bump = ent.target_size_bump.min(PLAYER_MAX_SIZE_BUMP);
+    }
+
+    fn kill_player(
+        &mut self,
+        entity_id: EntityId,
+        reason: DeathReason,
+        context: &mut RunContext,
+    ) -> GameResult<()> {
+        let ent = self.get_entity(entity_id)?.player()?.clone();
+        context.killed_players.insert(ent.owner, reason);
+
+        if !context.is_predicting {
+            let player = self.players.get_mut(&ent.owner).unwrap();
+            let spawn_food = player
+                .food
+                .min(PLAYER_MAX_LOSE_FOOD)
+                .max(PLAYER_MIN_LOSE_FOOD);
+            player.food -= spawn_food.min(player.food);
+
+            for _ in 0..spawn_food {
+                // TODO: Random
+                let angle = rand::thread_rng().gen::<f32>() * std::f32::consts::PI * 2.0;
+                let speed = rand::thread_rng().gen_range(FOOD_MIN_SPEED, FOOD_MAX_SPEED);
+                let start_vel = Vector::new(speed * angle.cos(), speed * angle.sin());
+                let factor =
+                    rand::thread_rng().gen_range(FOOD_SPEED_MIN_FACTOR, FOOD_SPEED_MAX_FACTOR);
+
+                let food = Food {
+                    start_time: self.game_time(),
+                    start_pos: ent.pos,
+                    start_vel,
+                    factor,
+                    amount: 1,
+                };
+                context.new_entities.push(Entity::Food(food));
+            }
+
+            if self.catcher == Some(ent.owner) {
+                // Choose a new catcher
+                self.catcher = self
+                    .entities
+                    .iter()
+                    .filter(|(other_id, _)| **other_id != entity_id)
+                    .filter_map(|(_, other_entity)| {
+                        other_entity.player().ok().map(|other_player| {
+                            (other_player.owner, (ent.pos - other_player.pos).norm())
+                        })
+                    })
+                    .min_by(|(_, dist1), (_, dist2)| dist1.partial_cmp(dist2).unwrap())
+                    .map(|(other_owner, _)| other_owner);
+                if let Some(catcher) = self.catcher {
+                    context
+                        .events
+                        .push(Event::NewCatcher { player_id: catcher });
                 }
             }
         }
