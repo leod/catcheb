@@ -260,8 +260,10 @@ impl Prediction {
                     // there is a better way to go about it, because
                     // this will replay prediction too often.
                     *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                    Some((*id, server.clone()))
+                } else {
+                    None
                 }
-                Some((*id, server.clone()))
             }
         }
     }
