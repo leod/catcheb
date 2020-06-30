@@ -104,6 +104,7 @@ pub struct Stats {
     pub num_inputs_per_player_tick: stats::Var,
     pub input_delay: stats::Var,
     pub last_sent_len: stats::Var,
+    pub tick_message_size: stats::Var,
 }
 
 pub struct JoinMessage {
@@ -175,6 +176,7 @@ impl Runner {
                 );
                 debug!("input delay:          {}", self.stats.input_delay);
                 debug!("last sent len:        {}", self.stats.last_sent_len);
+                debug!("tick message size:    {}", self.stats.tick_message_size);
             }
 
             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -351,6 +353,11 @@ impl Runner {
 
     fn send(&mut self, peer: SocketAddr, message: comn::ServerMessage) {
         let data = message.serialize();
+
+        if let comn::ServerMessage::Tick(_) = message {
+            self.stats.tick_message_size.record(data.len() as f32);
+        }
+
         let message_out = webrtc::MessageOut { peer, data };
 
         if self.send_message_tx.send(message_out).is_err() {
@@ -525,8 +532,8 @@ impl Runner {
         let game_id = comn::GameId(Uuid::new_v4());
         let mut game = Game::new(self.config.game_settings.clone());
 
-        game.join("bot1".into(), true);
-        game.join("bot2".into(), true);
+        /*game.join("bot1".into(), true);
+        game.join("bot2".into(), true);*/
 
         assert!(!self.games.contains_key(&game_id));
         self.games.insert(game_id, game);
@@ -543,7 +550,7 @@ impl Runner {
             .map(|game_id| (*game_id, Vec::new()))
             .collect();
 
-        for (player_token, player) in self.players.iter_mut() {
+        for player in self.players.values_mut() {
             let game = &self.games[&player.game_id].state;
 
             // We explicitly buffer player inputs for some time, so that we can
@@ -574,7 +581,7 @@ impl Runner {
                 // We did not receive the matching input in time, just reuse the
                 // previous one.
                 if let Some((last_input_num, last_input)) = player.last_input.clone() {
-                    //debug!("Reusing input for player {:?}", player_token);
+                    debug!("Reusing input for player {:?}", player.player_id);
 
                     player_tick_inputs.push((player.player_id, last_input_num.next(), last_input));
                 }

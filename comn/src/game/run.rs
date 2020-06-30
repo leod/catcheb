@@ -481,17 +481,30 @@ impl Game {
                 _ => (None, false),
             };
 
-            if let Some(collision) = other_shape
-                .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset))
-            {
+            let collision = other_shape
+                .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset));
+
+            if let Some(collision) = collision {
                 let mut collide = true;
 
                 if let Entity::Player(_) | Entity::PlayerView(_) = other_entity {
                     // TODO: Decide whom to favor regarding catching... or if
                     // we should even make it happen over a longer duration.
-                    if self.catcher == Some(ent.owner) && current_dash.is_some() {
-                        caught_players.insert(*other_entity_id);
-                        collide = false;
+                    if self.catcher == Some(ent.owner) {
+                        if current_dash.is_some() {
+                            caught_players.insert(*other_entity_id);
+                        }
+
+                        // To prevent prediction errors, we disable collision
+                        // even some time _after_ dashing as the catcher.
+                        // (The prediction error happens because we cannot
+                        // predict locally that we caught the other player, so
+                        // we collide if the dash stops while we are still on
+                        // top.)
+                        if ent.last_dash.map_or(false, |(dash_time, _)| 
+                            input_time >= dash_time && input_time <= dash_time + 1.5 * PLAYER_DASH_DURATION) {
+                            collide = false;
+                        }
                     }
                 }
 
@@ -593,11 +606,13 @@ impl Game {
             self.kill_player(entity_id, reason, context)?;
         }
 
-        for caught_entity_id in caught_players {
-            // If we are doing reconciliation, the entity might no longer exist in auth state.
-            if self.entities.contains_key(&caught_entity_id) {
-                self.kill_player(caught_entity_id, DeathReason::CaughtBy(ent.owner), context)?;
-                Self::take_food(&mut self.players, ent, PLAYER_CATCH_FOOD);
+        if !context.is_predicting {
+            for caught_entity_id in caught_players {
+                // If we are doing reconciliation, the entity might no longer exist in auth state.
+                if self.entities.contains_key(&caught_entity_id) {
+                    self.kill_player(caught_entity_id, DeathReason::CaughtBy(ent.owner), context)?;
+                    Self::take_food(&mut self.players, ent, PLAYER_CATCH_FOOD);
+                }
             }
         }
 
