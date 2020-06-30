@@ -393,10 +393,10 @@ impl Runner {
 
                 if input_age < 0.0 || input_age > MAX_PLAYER_INPUT_AGE {
                     // TODO: Inform the client if they are lagging behind too much?
-                    warn!(
+                    /*warn!(
                         "Received input {:?} by player {:?} with age {}, ignoring",
                         input_num, player_token, input_age,
-                    );
+                    );*/
                     continue;
                 }
             }
@@ -574,7 +574,7 @@ impl Runner {
                 // We did not receive the matching input in time, just reuse the
                 // previous one.
                 if let Some((last_input_num, last_input)) = player.last_input.clone() {
-                    debug!("Reusing input for player {:?}", player_token);
+                    //debug!("Reusing input for player {:?}", player_token);
 
                     player_tick_inputs.push((player.player_id, last_input_num.next(), last_input));
                 }
@@ -601,31 +601,34 @@ impl Runner {
 
         // Attempt to do delta encoding w.r.t. a previous state if
         // possible.
-        let (diff_base, diff) = if let (Some(ack_num), Some((_, sent_state))) =
-            (player.last_ack_tick, player.last_sent.front().as_ref())
-        {
-            if ack_num == sent_state.tick_num && ack_num.0 + MAX_DIFF_TICKS > state.tick_num.0 {
-                // Re-send all the events that happened since the base
-                // tick.
-                for (sent_events, sent_state) in player.last_sent.iter() {
-                    if !sent_events.is_empty() {
-                        events.push((sent_state.tick_num, sent_events.clone()));
-                    }
-                }
+        let ack_num_and_sent_state = player
+            .last_ack_tick
+            .and_then(|ack_num| {
+                player
+                    .last_sent
+                    .front()
+                    .as_ref()
+                    .map(|(_, sent_state)| (ack_num, sent_state))
+            })
+            .filter(|(ack_num, sent_state)| {
+                *ack_num == sent_state.tick_num && ack_num.0 + MAX_DIFF_TICKS > state.tick_num.0
+            });
 
-                // Okay, we know that the player has acknowledged a tick for
-                // which we also still have the state. We can use this state as
-                // the basis for delta encoding.
-                (Some(ack_num), sent_state.diff(&state))
-            } else {
-                info!(
-                    "Sending tick {:?} from scratch to {:?} (last ack: {:?})",
-                    game.state.tick_num, player.player_id, player.last_ack_tick,
-                );
-                let base_state = comn::Game::new(game.state.settings.clone());
-                (None, base_state.diff(&state))
+        let (diff_base, diff) = if let Some((ack_num, sent_state)) = ack_num_and_sent_state {
+            // Okay, we know that the player has acknowledged a tick for which
+            // we also still have the state. We can use this state as the basis
+            // for delta encoding.
+
+            // Re-send all the events that happened since the base tick.
+            for (sent_events, sent_state) in player.last_sent.iter() {
+                if !sent_events.is_empty() {
+                    events.push((sent_state.tick_num, sent_events.clone()));
+                }
             }
+
+            (Some(ack_num), sent_state.diff(&state))
         } else {
+            // We cannot do delta encoding.
             info!(
                 "Sending tick {:?} from scratch to {:?} (last ack: {:?})",
                 game.state.tick_num, player.player_id, player.last_ack_tick,
@@ -644,22 +647,20 @@ impl Runner {
         // Prune the state memory. This should be rarely necessary, since we
         // already prune states when we receive acknowledgements.
         if player.last_sent.len() > MAX_DIFF_TICKS as usize {
-            warn!(
+            /*warn!(
                 "Player {:?}'s state memory grew too long ({}), pruning",
                 player.player_id,
                 player.last_sent.len(),
-            );
+            );*/
 
             player.last_sent.pop_front();
         }
 
-        let tick = comn::Tick {
+        comn::Tick {
             diff_base,
             diff,
             events,
             your_last_input: player.last_input.clone().map(|(num, _)| num),
-        };
-
-        tick
+        }
     }
 }
