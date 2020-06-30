@@ -27,7 +27,7 @@ pub const MAX_PLAYER_INPUT_AGE: f32 = 1.0;
 pub const MAX_DIFF_TICKS: u32 = 50;
 
 #[derive(Debug, Clone)]
-pub struct Player {
+struct Player {
     /// Each player is in exactly one running game.
     pub game_id: comn::GameId,
 
@@ -273,132 +273,33 @@ impl Runner {
         recv_time: Instant,
         message: comn::SignedClientMessage,
     ) {
-        if let Some(player) = self.players.get_mut(&message.0) {
-            if Some(peer) != player.peer {
-                debug!("Changing peer from {:?} to {:?}", player.peer, peer);
-                player.peer = Some(peer);
-            }
-
-            match message.1 {
-                comn::ClientMessage::Ping(sequence_num) => {
-                    self.send(peer, comn::ServerMessage::Pong(sequence_num));
-                }
-                comn::ClientMessage::Pong(sequence_num) => {
-                    if player.ping.record_pong(recv_time, sequence_num).is_err() {
-                        warn!("Ignoring pong with invalid sequence number from {:?}", peer);
-                    }
-                }
-                comn::ClientMessage::Input(inputs) => {
-                    let game = &self.games[&player.game_id].state();
-
-                    if inputs.is_empty() || inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
-                        warn!(
-                            "Received invalid number of inputs ({}) from {:?}, ignoring",
-                            inputs.len(),
-                            message.0,
-                        );
-                        return;
-                    }
-
-                    let max_input_num = inputs.iter().map(|(tick_num, _)| *tick_num).max();
-
-                    for (tick_num, input) in inputs {
-                        if tick_num > game.tick_num {
-                            // Clients try to stay behind the server in time, since
-                            // they always interpolate behind old received state.
-                            // Thus, with a correct client, this case should not
-                            // happen. Ignoring input here may help prevent speed
-                            // hacking.
-                            warn!(
-                                "Ignoring input {:?} by player {:?}, which is ahead of our tick num {:?}",
-                                tick_num,
-                                message.0,
-                                game.tick_num,
-                            );
-                            continue;
-                        }
-
-                        {
-                            let input_age = game.game_time() - game.tick_game_time(tick_num);
-
-                            if input_age > MAX_PLAYER_INPUT_AGE {
-                                // TODO: Inform the client if they are lagging behind too much?
-                                warn!(
-                                    "Ignoring input {:?} by player {:?}, which is too old with age {}",
-                                    tick_num, player.game_id, input_age,
-                                );
-                                continue;
-                            }
-                        }
-
-                        // Ignore inputs for ticks that we have already
-                        // performed for this player. This case is expected to
-                        // happen regularly, since clients resend old inputs in
-                        // order to tape over packet loss.
-                        if player
-                            .last_input
-                            .as_ref()
-                            .map_or(false, |(last_num, _)| tick_num <= *last_num)
-                        {
-                            continue;
-                        }
-
-                        // Sorted insert of the new input, so that inputs are
-                        // sorted by tick number descending.
-                        match player
-                            .inputs
-                            .binary_search_by(|(ex_tick_num, _)| tick_num.cmp(ex_tick_num))
-                        {
-                            Ok(_) => {
-                                // We have received input for the same tick
-                                // more than once, just ignore.
-                            }
-                            Err(pos) => {
-                                player.inputs.insert(pos, (tick_num, input));
-                            }
-                        }
-
-                        // Keep track of when we receive player input, so that
-                        // we can predict when to receive the next player input.
-                        // This results in a mapping from our game time to the
-                        // receive game time.
-                        if Some(tick_num) == max_input_num {
-                            player
-                                .recv_input_time
-                                .record_tick(game.game_time(), game.tick_game_time(tick_num));
-                        }
-                    }
-                }
-                comn::ClientMessage::AckTick(ack_num) => {
-                    let game = &self.games[&player.game_id].state();
-
-                    if ack_num > game.tick_num {
-                        warn!(
-                            "Received AckTick from {:?} which is ahead of us ({:?} vs {:?}), ignoring",
-                            message.0,
-                            game.tick_num,
-                            ack_num,
-                        );
-                    } else if player
-                        .last_ack_tick
-                        .map_or(true, |last_ack_num| ack_num > last_ack_num)
-                    {
-                        player.last_ack_tick = Some(ack_num);
-
-                        // We can now forget all the states that are older than
-                        // the one whose acknowledgment we just received.
-                        while player
-                            .last_sent
-                            .front()
-                            .map_or(false, |(_events, state)| state.tick_num < ack_num)
-                        {
-                            player.last_sent.pop_front();
-                        }
-                    }
-                }
-            }
+        let player = if let Some(player) = self.players.get_mut(&message.0) {
+            player
         } else {
             warn!("Received message with unknown token, ignoring");
+            return;
+        };
+
+        if Some(peer) != player.peer {
+            debug!("Changing peer from {:?} to {:?}", player.peer, peer);
+            player.peer = Some(peer);
+        }
+
+        match message.1 {
+            comn::ClientMessage::Ping(sequence_num) => {
+                self.send(peer, comn::ServerMessage::Pong(sequence_num));
+            }
+            comn::ClientMessage::Pong(sequence_num) => {
+                if player.ping.record_pong(recv_time, sequence_num).is_err() {
+                    warn!("Ignoring pong with invalid sequence number from {:?}", peer);
+                }
+            }
+            comn::ClientMessage::Input(inputs) => {
+                self.record_player_input(message.0, &inputs);
+            }
+            comn::ClientMessage::AckTick(ack_num) => {
+                self.record_player_ack_tick(message.0, ack_num);
+            }
         }
     }
 
@@ -574,6 +475,116 @@ impl Runner {
 
         if self.send_message_tx.send(message_out).is_err() {
             info!("send_message_tx closed, will terminate thread");
+        }
+    }
+
+    fn record_player_input(
+        &mut self,
+        player_token: comn::PlayerToken,
+        inputs: &[(comn::TickNum, comn::Input)],
+    ) {
+        let player = self.players.get_mut(&player_token).unwrap();
+        let game = &self.games[&player.game_id].state();
+
+        if inputs.is_empty() || inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
+            warn!(
+                "Received invalid number of inputs ({}) from {:?}, ignoring",
+                inputs.len(),
+                player_token,
+            );
+            return;
+        }
+
+        // Keep track of when we receive player input, so that we can predict
+        // when we'll receive the next player input. This results in a mapping
+        // from our game time to the player's input game time as we receive it.
+        {
+            let max_input_num = inputs.iter().map(|(tick_num, _)| *tick_num).max().unwrap();
+            player
+                .recv_input_time
+                .record_tick(game.game_time(), game.tick_game_time(max_input_num));
+        }
+
+        for (input_num, input) in inputs {
+            // Ignore inputs that are ahead from our time.
+            if *input_num > game.tick_num {
+                // Clients try to stay behind the server in time, since they
+                // always interpolate behind old received state. Thus, with a
+                // correct client, this case should not happen. Ignoring input
+                // here may help prevent speed hacking.
+                warn!(
+                    "Ignoring input {:?} by player {:?}, which is ahead of our tick num {:?}",
+                    input_num, player_token, game.tick_num,
+                );
+                continue;
+            }
+
+            // Ignore inputs that are too far in the past.
+            {
+                let input_age = game.game_time() - game.tick_game_time(*input_num);
+
+                if input_age > MAX_PLAYER_INPUT_AGE {
+                    // TODO: Inform the client if they are lagging behind too much?
+                    warn!(
+                        "Ignoring input {:?} by player {:?}, which is too old with age {}",
+                        input_num, player_token, input_age,
+                    );
+                    continue;
+                }
+            }
+
+            // Ignore inputs for ticks that we have already performed for this
+            // player. This case is expected to happen regularly, since clients
+            // resend old inputs in order to tape over packet loss.
+            if player
+                .last_input
+                .as_ref()
+                .map_or(false, |(last_input_num, _)| *input_num <= *last_input_num)
+            {
+                continue;
+            }
+
+            // Sorted insert of the new input, so that inputs are sorted by tick
+            // number descending.
+            match player
+                .inputs
+                .binary_search_by(|(other_input_num, _)| input_num.cmp(other_input_num))
+            {
+                Ok(_) => {
+                    // We have received input for the same tick
+                    // more than once, just ignore.
+                }
+                Err(pos) => {
+                    player.inputs.insert(pos, (*input_num, input.clone()));
+                }
+            }
+        }
+    }
+
+    fn record_player_ack_tick(&mut self, player_token: comn::PlayerToken, ack_num: comn::TickNum) {
+        let player = self.players.get_mut(&player_token).unwrap();
+        let game = &self.games[&player.game_id].state();
+
+        if ack_num > game.tick_num {
+            warn!(
+                "Received AckTick from {:?} which is ahead of us ({:?} vs {:?}), ignoring",
+                player_token, game.tick_num, ack_num,
+            );
+        } else if player
+            .last_ack_tick
+            .map_or(true, |last_ack_num| ack_num > last_ack_num)
+        {
+            player.last_ack_tick = Some(ack_num);
+
+            // We can now forget all the states that are older than the one
+            // whose acknowledgment we just received.
+            while player
+                .last_sent
+                .front()
+                .map_or(false, |(_events, state)| state.tick_num < ack_num)
+            {
+                player.last_sent.pop_front();
+            }
         }
     }
 
