@@ -161,79 +161,6 @@ impl Runner {
         self.join_tx.clone()
     }
 
-    pub fn try_join_game(&mut self, request: comn::JoinRequest) -> comn::JoinReply {
-        let (game_id, game) = if let Some(game_id) = request.game_id {
-            // The player requested to join a specific game.
-            match self.games.get_mut(&game_id) {
-                Some(game) => {
-                    if game.is_full() {
-                        info!("Game is full");
-                        return Err(comn::JoinError::FullGame);
-                    } else {
-                        (game_id, game)
-                    }
-                }
-                None => {
-                    info!("game_id is invalid");
-                    return Err(comn::JoinError::InvalidGameId);
-                }
-            }
-        } else {
-            // The player wants to join just any game.
-            let non_full_games = self
-                .games
-                .iter_mut()
-                .filter(|(_game_id, game)| !game.is_full());
-
-            match non_full_games.choose(&mut rand::thread_rng()) {
-                Some((&game_id, game)) => (game_id, game),
-                None => {
-                    // All games are full.
-                    assert!(self.games.len() <= self.config.max_num_games);
-                    if self.games.len() == self.config.max_num_games {
-                        // Reached game limit.
-                        warn!(
-                            "All games are full and we have reached the game limit of {}",
-                            self.config.max_num_games
-                        );
-                        return Err(comn::JoinError::FullGame);
-                    } else {
-                        // Create a new game.
-                        let game_id = comn::GameId(Uuid::new_v4());
-                        let mut game = Game::new(self.config.game_settings.clone());
-
-                        game.join("bot1".into(), true);
-                        game.join("bot2".into(), true);
-
-                        self.games.insert(game_id, game);
-
-                        info!(
-                            "All games are full, created a new one with id {:?}",
-                            game_id
-                        );
-
-                        (game_id, self.games.get_mut(&game_id).unwrap())
-                    }
-                }
-            }
-        };
-
-        let player_token = comn::PlayerToken(Uuid::new_v4());
-        let player_id = game.join(request.player_name, false);
-
-        let player = Player::new(game.settings().tick_period(), game_id, player_id);
-
-        assert!(!self.players.contains_key(&player_token));
-        self.players.insert(player_token, player);
-
-        Ok(comn::JoinSuccess {
-            game_id,
-            game_settings: game.settings().clone(),
-            your_token: player_token,
-            your_player_id: player_id,
-        })
-    }
-
     pub fn run(mut self) {
         while !self.shutdown {
             self.run_update();
@@ -286,10 +213,6 @@ impl Runner {
 
             match signed_message {
                 Some(signed_message) => {
-                    /*debug!(
-                        "Received message from {:?}: {:?}",
-                        message_in.peer, signed_message
-                    );*/
                     self.handle_message(message_in.peer, message_in.recv_time, signed_message);
                 }
                 None => {
@@ -362,13 +285,7 @@ impl Runner {
                 }
                 comn::ClientMessage::Pong(sequence_num) => {
                     if player.ping.record_pong(recv_time, sequence_num).is_err() {
-                        warn!("Ignoring out-of-order pong from {:?}", peer);
-                    } else {
-                        /*debug!(
-                            "Received pong from {:?} -> estimation {:?}",
-                            peer,
-                            player.ping.estimate()
-                        );*/
+                        warn!("Ignoring pong with invalid sequence number from {:?}", peer);
                     }
                 }
                 comn::ClientMessage::Input(inputs) => {
@@ -651,12 +568,90 @@ impl Runner {
         }
     }
 
-    pub fn send(&mut self, peer: SocketAddr, message: comn::ServerMessage) {
+    fn send(&mut self, peer: SocketAddr, message: comn::ServerMessage) {
         let data = message.serialize();
         let message_out = webrtc::MessageOut { peer, data };
 
         if self.send_message_tx.send(message_out).is_err() {
             info!("send_message_tx closed, will terminate thread");
         }
+    }
+
+    fn try_join_game(&mut self, request: comn::JoinRequest) -> comn::JoinReply {
+        let game_id = self.get_non_full_game_to_join(request.game_id)?;
+        let game = self.games.get_mut(&game_id).unwrap();
+        assert!(!game.is_full());
+
+        let player_token = comn::PlayerToken(Uuid::new_v4());
+        assert!(!self.players.contains_key(&player_token));
+
+        let player_id = game.join(request.player_name, false);
+        let player = Player::new(game.settings().tick_period(), game_id, player_id);
+        self.players.insert(player_token, player);
+
+        Ok(comn::JoinSuccess {
+            game_id,
+            game_settings: game.settings().clone(),
+            your_token: player_token,
+            your_player_id: player_id,
+        })
+    }
+
+    fn get_non_full_game_to_join(
+        &mut self,
+        game_id: Option<comn::GameId>,
+    ) -> Result<comn::GameId, comn::JoinError> {
+        if let Some(game_id) = game_id {
+            // The player requested to join a specific game.
+            if let Some(game) = self.games.get(&game_id) {
+                if game.is_full() {
+                    info!("Game is full");
+                    Err(comn::JoinError::FullGame)
+                } else {
+                    Ok(game_id)
+                }
+            } else {
+                info!("game_id is invalid");
+                Err(comn::JoinError::InvalidGameId)
+            }
+        } else {
+            // The player wants to join just any game.
+            let non_full_games = self.games.iter().filter(|(_, game)| !game.is_full());
+
+            if let Some((game_id, _)) = non_full_games.choose(&mut rand::thread_rng()) {
+                Ok(*game_id)
+            } else if self.games.len() == self.config.max_num_games {
+                // All games are full, and we have reached the game limit.
+                // Reject the join request.
+                warn!(
+                    "All games are full and we have reached the game limit of {}",
+                    self.config.max_num_games
+                );
+                Err(comn::JoinError::FullGame)
+            } else {
+                // We still have capacity, create a new game.
+                assert!(self.games.len() < self.config.max_num_games);
+
+                let game_id = self.add_game();
+                info!(
+                    "All games are full, created a new one with id {:?}",
+                    game_id
+                );
+                Ok(game_id)
+            }
+        }
+    }
+
+    fn add_game(&mut self) -> comn::GameId {
+        let game_id = comn::GameId(Uuid::new_v4());
+        let mut game = Game::new(self.config.game_settings.clone());
+
+        game.join("bot1".into(), true);
+        game.join("bot2".into(), true);
+
+        assert!(!self.games.contains_key(&game_id));
+        self.games.insert(game_id, game);
+
+        game_id
     }
 }
