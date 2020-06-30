@@ -18,7 +18,7 @@ js-sys = "0.3.37"
 wasm-bindgen = { version = "0.2.60", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.10"
 
-quicksilver = { version = "=0.4.0-alpha0.5", default-features = false, features = ["web-sys", "font", "ttf"] }
+quicksilver = { version = "=0.4.0-alpha0.5", default-features = false, features = ["web-sys", "font", "ttf", "easy-log"] }
 mint = "0.5"
 nalgebra = { version = "0.21", features = ["mint"] }
 instant = "0.1"

@@ -82,7 +82,6 @@ where
                 delayed_message = self.delay_queue.next().fuse() => {
                     match delayed_message {
                         Some(Ok(delayed_message)) => {
-                            //debug!("got delayed message");
                             if self.new_tx.send(delayed_message.into_inner()).is_err() {
                                 warn!("new_tx closed, terminating");
                                 return;
@@ -93,8 +92,6 @@ where
                             warn!("Error when reading DelayQueue: {:?}", err);
                         }
                         None => {
-                            // Ok to ignore I think, stream will resume.
-
                             // Unfortunately, DelayQueue immediately produces
                             // None if the queue is empty. Thus, the following
                             // yield is apparently very important, so that the
@@ -102,6 +99,7 @@ where
                             // short-circuiting into this path. If we don't
                             // have this, messages are not received in the
                             // other select arm.
+                            // FIXME: This is not a good use of DelayQueue.
                             tokio::task::yield_now().await;
                         }
                     }
