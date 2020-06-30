@@ -18,16 +18,17 @@ pub struct PlayerMeta {
 
 pub struct Game {
     pub state: comn::Game,
-    pub next_entity_id: comn::EntityId,
-
-    pub players_meta: BTreeMap<comn::PlayerId, PlayerMeta>,
-
-    /// Previous states, used for reconciliation.
-    pub prev_states: VecDeque<comn::Game>,
 
     /// Events produced in the last update. We keep these around so that we
     /// can send them to the players in this game in `Runner`.
     pub last_events: Vec<comn::Event>,
+
+    next_entity_id: comn::EntityId,
+
+    players_meta: BTreeMap<comn::PlayerId, PlayerMeta>,
+
+    /// Previous states, used for reconciliation.
+    prev_states: VecDeque<comn::Game>,
 }
 
 impl Game {
@@ -53,10 +54,6 @@ impl Game {
     pub fn is_full(&self) -> bool {
         assert!(self.state.players.len() <= self.settings().max_num_players);
         self.state.players.len() == self.settings().max_num_players
-    }
-
-    pub fn state(&self) -> &comn::Game {
-        &self.state
     }
 
     pub fn settings(&self) -> &comn::Settings {

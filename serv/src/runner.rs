@@ -364,7 +364,7 @@ impl Runner {
         inputs: &[(comn::TickNum, comn::Input)],
     ) {
         let player = self.players.get_mut(&player_token).unwrap();
-        let game = &self.games[&player.game_id].state();
+        let game = &self.games[&player.game_id].state;
 
         if inputs.is_empty() || inputs.len() > comn::MAX_INPUTS_PER_MESSAGE {
             warn!(
@@ -431,7 +431,7 @@ impl Runner {
 
     fn record_player_ack_tick(&mut self, player_token: comn::PlayerToken, ack_num: comn::TickNum) {
         let player = self.players.get_mut(&player_token).unwrap();
-        let game = &self.games[&player.game_id].state();
+        let game = &self.games[&player.game_id].state;
 
         if ack_num > game.tick_num {
             warn!(
@@ -544,7 +544,7 @@ impl Runner {
             .collect();
 
         for (player_token, player) in self.players.iter_mut() {
-            let game = &self.games[&player.game_id].state();
+            let game = &self.games[&player.game_id].state;
 
             // We explicitly buffer player inputs for some time, so that we can
             // deal with jitter.
