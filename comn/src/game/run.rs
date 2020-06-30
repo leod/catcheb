@@ -486,7 +486,7 @@ impl Game {
             {
                 let mut collide = true;
 
-                if let Entity::Player(_) = other_entity {
+                if let Entity::Player(_) | Entity::PlayerView(_) = other_entity {
                     // TODO: Decide whom to favor regarding catching... or if
                     // we should even make it happen over a longer duration.
                     if self.catcher == Some(ent.owner) && current_dash.is_some() {
