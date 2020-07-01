@@ -227,9 +227,11 @@ impl Prediction {
                 {
                     *error += (predicted.pos.x - server.pos.x).abs();
                     *error += (predicted.pos.y - server.pos.y).abs();
-                    *error += match (predicted.last_dash, server.last_dash) {
-                        (Some((t1, d1)), Some((t2, d2))) => {
-                            (t1 - t2).abs() + (d1.x - d2.x).abs() + (d1.y - d2.y).abs()
+                    *error += match (predicted.dash.as_ref(), server.dash.as_ref()) {
+                        (Some(d1), Some(d2)) => {
+                            (d1.time_left - d2.time_left).abs()
+                                + (d1.dir.x - d2.dir.y).abs()
+                                + (d1.dir.y - d2.dir.y).abs()
                         }
                         (None, None) => 0.0,
                         _ => 100.0,
