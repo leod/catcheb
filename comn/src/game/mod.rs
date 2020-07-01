@@ -362,5 +362,5 @@ pub struct Tick {
     pub diff_base: Option<TickNum>,
     pub diff: GameDiff,
     pub events: Vec<(TickNum, Vec<Event>)>,
-    pub your_last_input: Option<TickNum>,
+    pub your_last_input_num: Option<TickNum>,
 }

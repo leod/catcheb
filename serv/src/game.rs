@@ -10,6 +10,7 @@ use crate::bot::Bot;
 pub const FIRST_SPAWN_DURATION: comn::GameTime = 0.5;
 pub const RESPAWN_DURATION: comn::GameTime = 2.0;
 pub const KEEP_PREV_STATES_DURATION: comn::GameTime = 1.0;
+pub const MAX_RECONCILIATION_DURATION: comn::GameTime = 0.2;
 
 pub struct PlayerMeta {
     pub last_input_num: Option<comn::TickNum>,
@@ -18,16 +19,17 @@ pub struct PlayerMeta {
 
 pub struct Game {
     pub state: comn::Game,
-    pub next_entity_id: comn::EntityId,
-
-    pub players_meta: BTreeMap<comn::PlayerId, PlayerMeta>,
-
-    /// Previous states, used for reconciliation.
-    pub prev_states: VecDeque<comn::Game>,
 
     /// Events produced in the last update. We keep these around so that we
     /// can send them to the players in this game in `Runner`.
     pub last_events: Vec<comn::Event>,
+
+    next_entity_id: comn::EntityId,
+
+    players_meta: BTreeMap<comn::PlayerId, PlayerMeta>,
+
+    /// Previous states, used for reconciliation. Sorted by tick number.
+    prev_states: VecDeque<comn::Game>,
 }
 
 impl Game {
@@ -53,10 +55,6 @@ impl Game {
     pub fn is_full(&self) -> bool {
         assert!(self.state.players.len() <= self.settings().max_num_players);
         self.state.players.len() == self.settings().max_num_players
-    }
-
-    pub fn state(&self) -> &comn::Game {
-        &self.state
     }
 
     pub fn settings(&self) -> &comn::Settings {
@@ -108,14 +106,38 @@ impl Game {
 
         // TODO: Sort player input by tick num
         for (player_id, input_tick_num, input) in inputs {
+            // Look up the state in which the player performed this input, so
+            // that we can do reconciliation. In case the input is too far in
+            // the past, we use the previous state closest in time instead.
             let input_state = self
                 .prev_states
                 .iter()
-                .find(|state| state.tick_num == *input_tick_num);
+                .filter(|prev_state| {
+                    self.state.game_time() - prev_state.game_time() <= MAX_RECONCILIATION_DURATION
+                })
+                .min_by_key(|prev_state| {
+                    (prev_state.tick_num.0 as isize - input_tick_num.0 as isize).abs()
+                });
+
+            // Debugging
+            if let Some(input_state) = input_state.as_ref() {
+                if input_state.tick_num != *input_tick_num {
+                    debug!(
+                        "Resorting to input_state {:?} for {:?}'s input {:?}",
+                        input_state.tick_num, player_id, input_tick_num
+                    );
+                }
+            } else {
+                debug!(
+                    "Do not have any input_state for {:?}'s input {:?}",
+                    player_id, input_tick_num
+                );
+            }
 
             self.state
                 .run_player_input(*player_id, input, input_state, &mut context)
                 .unwrap();
+
             self.players_meta
                 .get_mut(&player_id)
                 .unwrap()

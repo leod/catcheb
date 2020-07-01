@@ -95,8 +95,6 @@ impl PingEstimation {
     }
 
     fn calculate_estimate(&self) -> Duration {
-        // TODO: Do some statistical thingy other than average for estimating
-        // ping
         if self.last_rtts.is_empty() {
             Duration::from_millis(INITIAL_ESTIMATE_MS)
         } else {
