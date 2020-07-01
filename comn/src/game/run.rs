@@ -239,7 +239,6 @@ impl Game {
         if let Some(dash) = ent.dash.as_ref() {
             // Movement is constricted while dashing.
             ent.target_angle = dash.dir.y.atan2(dash.dir.x);
-            ent.last_turn = input_time;
         } else {
             // Normal movement when not dashing.
             let mut delta = Vector::new(0.0, 0.0);
@@ -263,17 +262,20 @@ impl Game {
         }
 
         // Smooth turning and scaling
+        ent.turn_time_left = (ent.turn_time_left - dt).max(0.0);
+
         if (ent.target_angle - prev_target_angle).abs() >= 0.001 {
             let angle_dist = geom::angle_dist(ent.target_angle, prev_target_angle);
             if (angle_dist.abs() - std::f32::consts::PI).abs() < 0.01 {
                 ent.angle += ent.target_angle - prev_target_angle;
             } else {
-                ent.last_turn = input_time;
+                ent.turn_time_left = PLAYER_TURN_DURATION;
             }
         }
         {
             let angle_dist = geom::angle_dist(ent.target_angle, ent.angle);
-            let time_since_turn = (input_time - ent.last_turn).min(PLAYER_TURN_DURATION);
+            let time_since_turn =
+                (PLAYER_TURN_DURATION - ent.turn_time_left).min(PLAYER_TURN_DURATION);
             let factor = if ent.dash.is_some() {
                 PLAYER_DASH_TURN_FACTOR
             } else {
@@ -517,7 +519,7 @@ impl Game {
             let reflected_dash_dir = dash.dir - 2.0 * dash.dir.dot(&flip_axis) * flip_axis;
             dash.dir = reflected_dash_dir;
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
-            ent.last_turn = input_time;
+            ent.turn_time_left = PLAYER_TURN_DURATION;
             ent.angle = ent.vel.y.atan2(ent.vel.x);
             ent.target_angle = reflected_dash_dir.y.atan2(reflected_dash_dir.x);
             offset += flip_axis * 10.0;

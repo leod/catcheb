@@ -230,7 +230,7 @@ impl Prediction {
                     *error += match (predicted.dash.as_ref(), server.dash.as_ref()) {
                         (Some(d1), Some(d2)) => {
                             (d1.time_left - d2.time_left).abs()
-                                + (d1.dir.x - d2.dir.y).abs()
+                                + (d1.dir.x - d2.dir.x).abs()
                                 + (d1.dir.y - d2.dir.y).abs()
                         }
                         (None, None) => 0.0,
