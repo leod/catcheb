@@ -24,13 +24,6 @@ impl GameTimeEstimation {
                 // Received packages out of order, just ignore
                 return;
             }
-
-            // I think the following assumption can be broken by `fake_bad_net`.
-            //assert!(recv_time >= *last_recv_time);
-
-            /*if recv_time < *last_recv_time {
-                return;
-            }*/
         }
 
         self.recv_times.push_back((recv_time, game_time));
@@ -45,17 +38,6 @@ impl GameTimeEstimation {
     }
 
     pub fn recv_delay_std_dev(&self) -> Option<f32> {
-        /*self.shifted_recv_times().map(|samples| {
-            let samples: Vec<(f32, f32)> = samples.collect();
-            let line = stats::linear_regression_with_beta(1.0, samples.iter().copied());
-
-            let recv_delay = samples
-                .iter()
-                .map(|(delta_time, delta_game_time)| line.eval(*delta_time) - delta_game_time);
-
-            stats::std_dev(recv_delay)
-        })*/
-
         if !self.recv_times.is_empty() {
             Some(stats::std_dev(
                 self.recv_times
