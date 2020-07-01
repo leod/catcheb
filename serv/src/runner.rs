@@ -667,7 +667,7 @@ impl Runner {
             diff_base,
             diff,
             events,
-            your_last_input: player.last_input.clone().map(|(num, _)| num),
+            your_last_input_num: player.last_input.clone().map(|(num, _)| num),
         }
     }
 }

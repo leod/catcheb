@@ -54,13 +54,14 @@ impl Prediction {
 
         // If we have a server state for the tick, apply corrections for our
         // previous prediction.
-        let server_state_and_my_last_input =
-            server_state.and_then(|state| state.my_last_input.map(|input| (state, input)));
+        let server_state_and_my_last_input_num =
+            server_state.and_then(|state| state.my_last_input_num.map(|input| (state, input)));
 
-        if let Some((server_state, my_last_input)) = server_state_and_my_last_input {
+        if let Some((server_state, my_last_input_num)) = server_state_and_my_last_input_num {
             let mut last_state = server_state.game.clone();
 
-            let prediction_error = if let Some(record) = self.log.get_mut(&my_last_input.next()) {
+            let prediction_error = if let Some(record) = self.log.get_mut(&my_last_input_num.next())
+            {
                 Self::correct_prediction(
                     self.my_player_id,
                     &mut record.entities,
@@ -77,7 +78,7 @@ impl Prediction {
             // We can now forget about any older predictions in the log.
             self.log = std::mem::replace(&mut self.log, BTreeMap::new())
                 .into_iter()
-                .filter(|&(tick_num, _)| tick_num > my_last_input)
+                .filter(|&(tick_num, _)| tick_num > my_last_input_num)
                 .collect();
 
             // Check if we need to replay our inputs following the corrected state.
