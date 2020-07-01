@@ -26,7 +26,7 @@ impl LossEstimation {
         if let (Some(&first), Some(&last)) = (first, last) {
             assert!(last >= first);
             if last - first > 20 {
-                // If we include fisrt/last in the range, we will underestimate loss.
+                // If we include first/last in the range, we will underestimate loss.
                 let num_received = self
                     .received
                     .iter()

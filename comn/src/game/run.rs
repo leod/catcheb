@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rand::{seq::IteratorRandom, Rng};
 
-use crate::entities::{Bullet, Food};
+use crate::entities::{Bullet, Dash, Food};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
@@ -233,16 +233,12 @@ impl Game {
         let input_time = input_state.game_time();
 
         // Movement
-        let current_dash = ent.last_dash.filter(|(dash_time, _)| {
-            input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
-        });
-
         let prev_target_angle = ent.target_angle;
         let mut any_move_key = false;
 
-        if let Some((_dash_time, dash_dir)) = current_dash {
+        if let Some(dash) = ent.dash.as_ref() {
             // Movement is constricted while dashing.
-            ent.target_angle = dash_dir.y.atan2(dash_dir.x);
+            ent.target_angle = dash.dir.y.atan2(dash.dir.x);
             ent.last_turn = input_time;
         } else {
             // Normal movement when not dashing.
@@ -278,15 +274,15 @@ impl Game {
         {
             let angle_dist = geom::angle_dist(ent.target_angle, ent.angle);
             let time_since_turn = (input_time - ent.last_turn).min(PLAYER_TURN_DURATION);
-            let factor = if current_dash.is_some() {
+            let factor = if ent.dash.is_some() {
                 PLAYER_DASH_TURN_FACTOR
             } else {
                 PLAYER_TURN_FACTOR
             };
             ent.angle += angle_dist * factor;
 
-            let turn_scale = if let Some((dash_time, _)) = current_dash {
-                let dash_delta = input_time - dash_time;
+            let turn_scale = if let Some(dash) = ent.dash.as_ref() {
+                let dash_delta = PLAYER_DASH_DURATION - dash.time_left;
                 (dash_delta * std::f32::consts::PI / PLAYER_TURN_DURATION)
                     .cos()
                     .powf(2.0)
@@ -343,14 +339,14 @@ impl Game {
 
         // Acceleration
         {
-            let target_vel = if let Some((_, dash_dir)) = current_dash {
-                dash_dir * PLAYER_DASH_SPEED
+            let target_vel = if let Some(dash) = ent.dash.as_ref() {
+                dash.dir * PLAYER_DASH_SPEED
             } else {
                 Vector::new(ent.angle.cos(), ent.angle.sin())
                     * PLAYER_MOVE_SPEED
                     * (any_move_key as usize as f32)
             };
-            let factor = if current_dash.is_some() {
+            let factor = if ent.dash.is_some() {
                 PLAYER_DASH_ACCEL_FACTOR
             } else {
                 PLAYER_ACCEL_FACTOR
@@ -491,7 +487,7 @@ impl Game {
                     // TODO: Decide whom to favor regarding catching... or if
                     // we should even make it happen over a longer duration.
                     if self.catcher == Some(ent.owner) {
-                        if current_dash.is_some() {
+                        if ent.dash.is_some() {
                             caught_players.insert(*other_entity_id);
                         }
 
@@ -501,10 +497,7 @@ impl Game {
                         // predict locally that we caught the other player, so
                         // we collide if the dash stops while we are still on
                         // top.)
-                        if ent.last_dash.map_or(false, |(dash_time, _)| {
-                            input_time >= dash_time
-                                && input_time <= dash_time + 1.5 * PLAYER_DASH_DURATION
-                        }) {
+                        if PLAYER_DASH_COOLDOWN - ent.dash_cooldown < 1.5 * PLAYER_DASH_DURATION {
                             collide = false;
                         }
                     }
@@ -520,9 +513,9 @@ impl Game {
         }
 
         // Allow reflecting off walls when dashing
-        if let (Some((dash_time, dash_dir)), Some(flip_axis)) = (current_dash, flip_axis) {
-            let reflected_dash_dir = dash_dir - 2.0 * dash_dir.dot(&flip_axis) * flip_axis;
-            ent.last_dash = Some((dash_time, reflected_dash_dir));
+        if let (Some(dash), Some(flip_axis)) = (ent.dash.as_mut(), flip_axis) {
+            let reflected_dash_dir = dash.dir - 2.0 * dash.dir.dot(&flip_axis) * flip_axis;
+            dash.dir = reflected_dash_dir;
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
             ent.last_turn = input_time;
             ent.angle = ent.vel.y.atan2(ent.vel.x);
@@ -544,14 +537,26 @@ impl Game {
             .min(self.settings.size.y - PLAYER_SIT_W / 2.0)
             .max(PLAYER_SIT_W / 2.0);
 
-        // Start dashing
-        if input.use_item
-            && ent.last_dash.map_or(true, |(dash_time, _)| {
-                dash_time + PLAYER_DASH_COOLDOWN <= input_time
+        // Start or dashing
+        ent.dash_cooldown = (ent.dash_cooldown - dt).max(0.0);
+        ent.dash = if let Some(mut dash) = ent.dash.clone() {
+            dash.time_left -= dt;
+
+            if dash.time_left <= 0.0 {
+                None
+            } else {
+                Some(dash)
+            }
+        } else if input.use_item && ent.dash_cooldown == 0.0 {
+            ent.dash_cooldown = PLAYER_DASH_COOLDOWN;
+
+            Some(Dash {
+                time_left: PLAYER_DASH_DURATION,
+                dir: Vector::new(ent.angle.cos(), ent.angle.sin()),
             })
-        {
-            ent.last_dash = Some((input_time, Vector::new(ent.angle.cos(), ent.angle.sin())));
-        }
+        } else {
+            None
+        };
 
         // Shooting
         /*if input_time >= ent.next_shot_time {

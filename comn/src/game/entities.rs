@@ -108,6 +108,12 @@ pub struct Hook {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Dash {
+    pub time_left: GameTime,
+    pub dir: Vector,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
     pub owner: PlayerId,
     pub pos: Point,
@@ -121,7 +127,8 @@ pub struct PlayerEntity {
     pub target_size_bump: f32,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
-    pub last_dash: Option<(GameTime, Vector)>,
+    pub dash: Option<Dash>,
+    pub dash_cooldown: GameTime,
     pub hook: Option<Hook>,
 }
 
@@ -140,7 +147,8 @@ impl PlayerEntity {
             target_size_bump: 0.0,
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
-            last_dash: None,
+            dash: None,
+            dash_cooldown: 0.0,
             hook: None,
         }
     }
