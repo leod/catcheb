@@ -12,7 +12,7 @@ use crate::{prediction::Prediction, webrtc};
 
 pub struct ReceivedState {
     pub game: comn::Game,
-    pub my_last_input: Option<comn::TickNum>,
+    pub my_last_input_num: Option<comn::TickNum>,
 }
 
 /// Statistics for debugging.
@@ -439,10 +439,10 @@ impl Game {
 
         // Keep some statistics for debugging...
         self.stats.loss.record_received(recv_tick_num.0 as usize);
-        if let Some(my_last_input) = tick.your_last_input.as_ref() {
+        if let Some(my_last_input_num) = tick.your_last_input_num.as_ref() {
             self.stats
                 .input_delay
-                .record((recv_tick_num.0 - my_last_input.0) as f32 - 1.0);
+                .record((recv_tick_num.0 - my_last_input_num.0) as f32 - 1.0);
         }
 
         if recv_game_time < self.interp_game_time {
@@ -530,7 +530,7 @@ impl Game {
             recv_tick_num,
             ReceivedState {
                 game: new_state,
-                my_last_input: tick.your_last_input,
+                my_last_input_num: tick.your_last_input_num,
             },
         );
 

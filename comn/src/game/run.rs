@@ -501,8 +501,10 @@ impl Game {
                         // predict locally that we caught the other player, so
                         // we collide if the dash stops while we are still on
                         // top.)
-                        if ent.last_dash.map_or(false, |(dash_time, _)| 
-                            input_time >= dash_time && input_time <= dash_time + 1.5 * PLAYER_DASH_DURATION) {
+                        if ent.last_dash.map_or(false, |(dash_time, _)| {
+                            input_time >= dash_time
+                                && input_time <= dash_time + 1.5 * PLAYER_DASH_DURATION
+                        }) {
                             collide = false;
                         }
                     }
