@@ -5,8 +5,8 @@ use rand::{seq::IteratorRandom, Rng};
 use crate::entities::{Bullet, Dash, Food};
 use crate::{
     geom::{self, Ray},
-    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
-    Input, PlayerEntity, PlayerId, PlayerMap, PlayerState, Vector,
+    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, Input,
+    PlayerEntity, PlayerId, PlayerMap, PlayerState, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -295,10 +295,7 @@ impl Game {
                     * 0.8
                     + 0.2
             };
-            let move_scale = if let Some(Hook {
-                state: HookState::Attached { .. },
-            }) = ent.hook.as_ref()
-            {
+            let move_scale = if let Some(Hook::Attached { .. }) = ent.hook.as_ref() {
                 0.5
             } else {
                 ent.vel.norm() / PLAYER_MOVE_SPEED
@@ -362,8 +359,8 @@ impl Game {
 
         // Experimental hook stuff
         ent.hook = if let Some(hook) = ent.hook.clone() {
-            match hook.state {
-                HookState::Shooting {
+            match hook {
+                Hook::Shooting {
                     pos,
                     vel,
                     time_left,
@@ -371,23 +368,13 @@ impl Game {
                     let next_time_left = (time_left - dt).max(0.0);
 
                     if !input.use_action || next_time_left <= 0.0 {
-                        Some(Hook {
-                            state: HookState::Contracting { pos },
-                        })
+                        Some(Hook::Contracting { pos })
                     } else {
                         let pos_delta = dt * vel;
                         let pos_delta_norm = pos_delta.norm();
                         let ray = Ray {
                             origin: pos,
                             dir: pos_delta / pos_delta_norm,
-                        };
-
-                        let moved_hook = Hook {
-                            state: HookState::Shooting {
-                                pos: pos + pos_delta,
-                                vel,
-                                time_left: next_time_left,
-                            },
                         };
 
                         let hook = input_state
@@ -402,17 +389,22 @@ impl Game {
                                     .map(|t| (other_id, other_ent, t))
                             })
                             .min_by(|(_, _, t1), (_, _, t2)| t1.partial_cmp(t2).unwrap())
-                            .map_or(moved_hook, |(other_id, other_ent, t)| Hook {
-                                state: HookState::Attached {
+                            .map_or(
+                                Hook::Shooting {
+                                    pos: pos + pos_delta,
+                                    vel,
+                                    time_left: next_time_left,
+                                },
+                                |(other_id, other_ent, t)| Hook::Attached {
                                     target: *other_id,
                                     offset: ray.origin + t * ray.dir - other_ent.pos(input_time),
                                 },
-                            });
+                            );
 
                         Some(hook)
                     }
                 }
-                HookState::Attached { target, offset } => {
+                Hook::Attached { target, offset } => {
                     input_state
                         .entities
                         .get(&target)
@@ -421,37 +413,29 @@ impl Game {
 
                             if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE
                             {
-                                Some(Hook {
-                                    state: HookState::Contracting { pos: hook_pos },
-                                })
+                                Some(Hook::Contracting { pos: hook_pos })
                             } else {
                                 ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
 
-                                Some(Hook {
-                                    state: HookState::Attached { target, offset },
-                                })
+                                Some(Hook::Attached { target, offset })
                             }
                         })
                 }
-                HookState::Contracting { pos } => {
+                Hook::Contracting { pos } => {
                     let new_pos = geom::smooth_to_target_point(10.0, ent.pos, pos, dt);
 
                     if (new_pos - ent.pos).norm() < 5.0 {
                         None
                     } else {
-                        Some(Hook {
-                            state: HookState::Contracting { pos: new_pos },
-                        })
+                        Some(Hook::Contracting { pos: new_pos })
                     }
                 }
             }
         } else if input.use_action && ent.hook.is_none() {
-            Some(Hook {
-                state: HookState::Shooting {
-                    pos: ent.pos,
-                    vel: Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED,
-                    time_left: HOOK_MAX_SHOOT_DURATION,
-                },
+            Some(Hook::Shooting {
+                pos: ent.pos,
+                vel: Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED,
+                time_left: HOOK_MAX_SHOOT_DURATION,
             })
         } else {
             None

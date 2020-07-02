@@ -357,18 +357,18 @@ fn render_hook(
     pos: comn::Point,
     hook: &comn::Hook,
 ) -> quicksilver::Result<()> {
-    let (hook_pos, dead) = match hook.state {
-        comn::HookState::Shooting {
+    let (hook_pos, dead) = match hook {
+        comn::Hook::Shooting {
             pos: hook_pos,
             vel: _,
             time_left: _,
-        } => (hook_pos, false),
-        comn::HookState::Attached { target, offset } => {
-            let hook_pos = interp_entity(state, next_entities, time, target)
+        } => (*hook_pos, false),
+        comn::Hook::Attached { target, offset } => {
+            let hook_pos = interp_entity(state, next_entities, time, *target)
                 .map_or(pos, |interp_target| interp_target.pos(time) + offset);
             (hook_pos, false)
         }
-        comn::HookState::Contracting { pos: hook_pos } => (hook_pos, true),
+        comn::Hook::Contracting { pos: hook_pos } => (*hook_pos, true),
     };
 
     let a: mint::Vector2<f32> = pos.coords.into();
