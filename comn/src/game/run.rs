@@ -2,11 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rand::{seq::IteratorRandom, Rng};
 
-use crate::entities::{Bullet, Food};
+use crate::entities::{Bullet, Dash, Food};
 use crate::{
     geom::{self, Ray},
-    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, HookState,
-    Input, PlayerEntity, PlayerId, PlayerMap, PlayerState, Vector,
+    DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, Input,
+    PlayerEntity, PlayerId, PlayerMap, PlayerState, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -41,6 +41,7 @@ pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
 pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
+pub const HOOK_COOLDOWN: f32 = 2.5;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -233,17 +234,12 @@ impl Game {
         let input_time = input_state.game_time();
 
         // Movement
-        let current_dash = ent.last_dash.filter(|(dash_time, _)| {
-            input_time >= *dash_time && input_time <= dash_time + PLAYER_DASH_DURATION
-        });
-
         let prev_target_angle = ent.target_angle;
         let mut any_move_key = false;
 
-        if let Some((_dash_time, dash_dir)) = current_dash {
+        if let Some(dash) = ent.dash.as_ref() {
             // Movement is constricted while dashing.
-            ent.target_angle = dash_dir.y.atan2(dash_dir.x);
-            ent.last_turn = input_time;
+            ent.target_angle = dash.dir.y.atan2(dash.dir.x);
         } else {
             // Normal movement when not dashing.
             let mut delta = Vector::new(0.0, 0.0);
@@ -267,26 +263,29 @@ impl Game {
         }
 
         // Smooth turning and scaling
+        ent.turn_time_left = (ent.turn_time_left - dt).max(0.0);
+
         if (ent.target_angle - prev_target_angle).abs() >= 0.001 {
             let angle_dist = geom::angle_dist(ent.target_angle, prev_target_angle);
             if (angle_dist.abs() - std::f32::consts::PI).abs() < 0.01 {
                 ent.angle += ent.target_angle - prev_target_angle;
             } else {
-                ent.last_turn = input_time;
+                ent.turn_time_left = PLAYER_TURN_DURATION;
             }
         }
         {
             let angle_dist = geom::angle_dist(ent.target_angle, ent.angle);
-            let time_since_turn = (input_time - ent.last_turn).min(PLAYER_TURN_DURATION);
-            let factor = if current_dash.is_some() {
+            let time_since_turn =
+                (PLAYER_TURN_DURATION - ent.turn_time_left).min(PLAYER_TURN_DURATION);
+            let factor = if ent.dash.is_some() {
                 PLAYER_DASH_TURN_FACTOR
             } else {
                 PLAYER_TURN_FACTOR
             };
             ent.angle += angle_dist * factor;
 
-            let turn_scale = if let Some((dash_time, _)) = current_dash {
-                let dash_delta = input_time - dash_time;
+            let turn_scale = if let Some(dash) = ent.dash.as_ref() {
+                let dash_delta = PLAYER_DASH_DURATION - dash.time_left;
                 (dash_delta * std::f32::consts::PI / PLAYER_TURN_DURATION)
                     .cos()
                     .powf(2.0)
@@ -297,10 +296,7 @@ impl Game {
                     * 0.8
                     + 0.2
             };
-            let move_scale = if let Some(Hook {
-                state: HookState::Attached { .. },
-            }) = ent.hook.as_ref()
-            {
+            let move_scale = if let Some(Hook::Attached { .. }) = ent.hook.as_ref() {
                 0.5
             } else {
                 ent.vel.norm() / PLAYER_MOVE_SPEED
@@ -343,14 +339,14 @@ impl Game {
 
         // Acceleration
         {
-            let target_vel = if let Some((_, dash_dir)) = current_dash {
-                dash_dir * PLAYER_DASH_SPEED
+            let target_vel = if let Some(dash) = ent.dash.as_ref() {
+                dash.dir * PLAYER_DASH_SPEED
             } else {
                 Vector::new(ent.angle.cos(), ent.angle.sin())
                     * PLAYER_MOVE_SPEED
                     * (any_move_key as usize as f32)
             };
-            let factor = if current_dash.is_some() {
+            let factor = if ent.dash.is_some() {
                 PLAYER_DASH_ACCEL_FACTOR
             } else {
                 PLAYER_ACCEL_FACTOR
@@ -363,100 +359,92 @@ impl Game {
         }
 
         // Experimental hook stuff
-        if let Some(hook) = ent.hook.clone() {
-            match hook.state {
-                HookState::Shooting {
-                    start_time,
-                    start_pos,
+        ent.hook_cooldown = (ent.hook_cooldown - dt).max(0.0);
+        ent.hook = if let Some(hook) = ent.hook.clone() {
+            match hook {
+                Hook::Shooting {
+                    pos,
                     vel,
+                    time_left,
                 } => {
-                    let pos = start_pos + (input_time - start_time) * vel;
-                    let next_pos =
-                        start_pos + (input_time - start_time + self.settings.tick_period()) * vel;
-                    let pos_delta = next_pos - pos;
-                    let pos_delta_norm = pos_delta.norm();
-                    let ray = Ray {
-                        origin: pos,
-                        dir: pos_delta / pos_delta_norm,
-                    };
+                    let next_time_left = (time_left - dt).max(0.0);
 
-                    if !input.use_action || input_time - start_time > HOOK_MAX_SHOOT_DURATION {
-                        let duration = (pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
-                        ent.hook = Some(Hook {
-                            state: HookState::Contracting {
-                                start_time: input_time,
-                                start_pos: pos,
-                                duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
-                            },
-                        });
+                    if !input.use_action || next_time_left <= 0.0 {
+                        Some(Hook::Contracting { pos })
                     } else {
-                        // TODO: Closest hook intersection
-                        for (target_id, target) in input_state.entities.iter() {
-                            if entity_id != *target_id && target.can_hook_attach() {
-                                if let Some(intersection_t) = ray
-                                    .intersects(&target.intersection_shape(input_time))
+                        let pos_delta = dt * vel;
+                        let pos_delta_norm = pos_delta.norm();
+                        let ray = Ray {
+                            origin: pos,
+                            dir: pos_delta / pos_delta_norm,
+                        };
+
+                        let hook = input_state
+                            .entities
+                            .iter()
+                            .filter(|(other_id, other_ent)| {
+                                **other_id != entity_id && other_ent.can_hook_attach()
+                            })
+                            .filter_map(|(other_id, other_ent)| {
+                                ray.intersects(&other_ent.intersection_shape(input_time))
                                     .filter(|t| *t <= pos_delta_norm)
-                                {
-                                    let intersection_p = ray.origin + intersection_t * ray.dir;
-                                    ent.hook = Some(Hook {
-                                        state: HookState::Attached {
-                                            start_time: input_time
-                                                + intersection_t / pos_delta_norm
-                                                    * self.settings.tick_period(),
-                                            target: *target_id,
-                                            offset: intersection_p - target.pos(input_time),
-                                        },
-                                    });
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                HookState::Attached {
-                    start_time: _,
-                    target,
-                    offset,
-                } => {
-                    if let Some(target_entity) = input_state.entities.get(&target) {
-                        let hook_pos = target_entity.pos(input_time) + offset;
-
-                        if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE {
-                            let duration = (hook_pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
-                            ent.hook = Some(Hook {
-                                state: HookState::Contracting {
-                                    start_time: input_time,
-                                    start_pos: hook_pos,
-                                    duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
+                                    .map(|t| (other_id, other_ent, t))
+                            })
+                            .min_by(|(_, _, t1), (_, _, t2)| t1.partial_cmp(t2).unwrap())
+                            .map_or(
+                                Hook::Shooting {
+                                    pos: pos + pos_delta,
+                                    vel,
+                                    time_left: next_time_left,
                                 },
-                            });
-                        } else {
-                            ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
-                        }
-                    } else {
-                        ent.hook = None;
+                                |(other_id, other_ent, t)| Hook::Attached {
+                                    target: *other_id,
+                                    offset: ray.origin + t * ray.dir - other_ent.pos(input_time),
+                                },
+                            );
+
+                        Some(hook)
                     }
                 }
-                HookState::Contracting {
-                    start_time,
-                    duration,
-                    ..
-                } => {
-                    if input_time - start_time >= duration {
-                        ent.hook = None;
+                Hook::Attached { target, offset } => {
+                    input_state
+                        .entities
+                        .get(&target)
+                        .map_or(None, |target_ent| {
+                            let hook_pos = target_ent.pos(input_time) + offset;
+
+                            if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE
+                            {
+                                Some(Hook::Contracting { pos: hook_pos })
+                            } else {
+                                ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
+
+                                Some(Hook::Attached { target, offset })
+                            }
+                        })
+                }
+                Hook::Contracting { pos } => {
+                    let new_pos = geom::smooth_to_target_point(5.0, ent.pos, pos, dt);
+
+                    if (new_pos - ent.pos).norm() < 5.0 {
+                        ent.hook_cooldown = HOOK_COOLDOWN;
+
+                        None
+                    } else {
+                        Some(Hook::Contracting { pos: new_pos })
                     }
                 }
             }
-        } else if input.use_action && ent.hook.is_none() {
-            // TODO: Trace ray when spawning hook?
-            ent.hook = Some(Hook {
-                state: HookState::Shooting {
-                    start_time: input_time,
-                    start_pos: ent.pos,
-                    vel: Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED,
-                },
-            });
-        }
+        } else if input.use_action && ent.hook.is_none() && ent.hook_cooldown == 0.0 {
+            let vel = Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED;
+            Some(Hook::Shooting {
+                pos: ent.pos + vel * 0.05,
+                vel,
+                time_left: HOOK_MAX_SHOOT_DURATION,
+            })
+        } else {
+            None
+        };
 
         // Check for collisions
         let mut offset = ent.vel * dt;
@@ -491,7 +479,7 @@ impl Game {
                     // TODO: Decide whom to favor regarding catching... or if
                     // we should even make it happen over a longer duration.
                     if self.catcher == Some(ent.owner) {
-                        if current_dash.is_some() {
+                        if ent.dash.is_some() {
                             caught_players.insert(*other_entity_id);
                         }
 
@@ -501,10 +489,7 @@ impl Game {
                         // predict locally that we caught the other player, so
                         // we collide if the dash stops while we are still on
                         // top.)
-                        if ent.last_dash.map_or(false, |(dash_time, _)| {
-                            input_time >= dash_time
-                                && input_time <= dash_time + 1.5 * PLAYER_DASH_DURATION
-                        }) {
+                        if PLAYER_DASH_COOLDOWN - ent.dash_cooldown < 1.5 * PLAYER_DASH_DURATION {
                             collide = false;
                         }
                     }
@@ -520,11 +505,11 @@ impl Game {
         }
 
         // Allow reflecting off walls when dashing
-        if let (Some((dash_time, dash_dir)), Some(flip_axis)) = (current_dash, flip_axis) {
-            let reflected_dash_dir = dash_dir - 2.0 * dash_dir.dot(&flip_axis) * flip_axis;
-            ent.last_dash = Some((dash_time, reflected_dash_dir));
+        if let (Some(dash), Some(flip_axis)) = (ent.dash.as_mut(), flip_axis) {
+            let reflected_dash_dir = dash.dir - 2.0 * dash.dir.dot(&flip_axis) * flip_axis;
+            dash.dir = reflected_dash_dir;
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
-            ent.last_turn = input_time;
+            ent.turn_time_left = PLAYER_TURN_DURATION;
             ent.angle = ent.vel.y.atan2(ent.vel.x);
             ent.target_angle = reflected_dash_dir.y.atan2(reflected_dash_dir.x);
             offset += flip_axis * 10.0;
@@ -544,14 +529,26 @@ impl Game {
             .min(self.settings.size.y - PLAYER_SIT_W / 2.0)
             .max(PLAYER_SIT_W / 2.0);
 
-        // Start dashing
-        if input.use_item
-            && ent.last_dash.map_or(true, |(dash_time, _)| {
-                dash_time + PLAYER_DASH_COOLDOWN <= input_time
+        // Start or dashing
+        ent.dash_cooldown = (ent.dash_cooldown - dt).max(0.0);
+        ent.dash = if let Some(mut dash) = ent.dash.clone() {
+            dash.time_left -= dt;
+
+            if dash.time_left <= 0.0 {
+                None
+            } else {
+                Some(dash)
+            }
+        } else if input.use_item && ent.dash_cooldown == 0.0 {
+            ent.dash_cooldown = PLAYER_DASH_COOLDOWN;
+
+            Some(Dash {
+                time_left: PLAYER_DASH_DURATION,
+                dir: Vector::new(ent.angle.cos(), ent.angle.sin()),
             })
-        {
-            ent.last_dash = Some((input_time, Vector::new(ent.angle.cos(), ent.angle.sin())));
-        }
+        } else {
+            None
+        };
 
         // Shooting
         /*if input_time >= ent.next_shot_time {
