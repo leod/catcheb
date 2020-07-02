@@ -79,6 +79,7 @@ impl Game {
         assert!(!context.is_predicting);
 
         let time = self.game_time();
+        let dt = self.settings.tick_period();
 
         if let Some(catcher) = self.catcher {
             let catcher_alive = self
@@ -192,6 +193,20 @@ impl Game {
                 Entity::Food(food) => {
                     if time - food.start_time > FOOD_MAX_LIFETIME {
                         context.removed_entities.insert(*entity_id);
+                    } else {
+                        for entity_b in entities.values() {
+                            if entity_b.is_wall_like() {
+                                if entity_b.shape(time).contains_point(food.pos(time)) {
+                                    // Replace the Food by a non-moving one
+                                    context.removed_entities.insert(*entity_id);
+                                    context.new_entities.push(Entity::Food(Food {
+                                        start_pos: food.pos(time - dt / 2.0),
+                                        start_vel: Vector::zeros(),
+                                        ..food.clone()
+                                    }));
+                                }
+                            }
+                        }
                     }
                 }
                 _ => (),
@@ -386,7 +401,7 @@ impl Game {
                                 **other_id != entity_id && other_ent.can_hook_attach()
                             })
                             .filter_map(|(other_id, other_ent)| {
-                                ray.intersects(&other_ent.intersection_shape(input_time))
+                                ray.intersects(&other_ent.shape(input_time))
                                     .filter(|t| *t <= 1.0)
                                     .map(|t| (other_id, other_ent, t))
                             })
