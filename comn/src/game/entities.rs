@@ -102,16 +102,23 @@ pub enum Hook {
 impl Hook {
     pub fn interp(&self, other: &Hook, alpha: f32) -> Hook {
         match (self, other) {
-            (Hook::Shooting { pos: pos_a, vel, time_left }, Hook::Shooting { pos: pos_b, .. }) =>
+            (
                 Hook::Shooting {
-                    pos: pos_a + alpha * (pos_b - pos_a),
-                    vel: *vel,
-                    time_left: *time_left,
+                    pos: pos_a,
+                    vel,
+                    time_left,
                 },
-            (Hook::Contracting { pos: pos_a }, Hook::Contracting { pos: pos_b }) =>
+                Hook::Shooting { pos: pos_b, .. },
+            ) => Hook::Shooting {
+                pos: pos_a + alpha * (pos_b - pos_a),
+                vel: *vel,
+                time_left: *time_left,
+            },
+            (Hook::Contracting { pos: pos_a }, Hook::Contracting { pos: pos_b }) => {
                 Hook::Contracting {
                     pos: pos_a + alpha * (pos_b - pos_a),
-                },
+                }
+            }
             _ => self.clone(),
         }
     }
@@ -140,6 +147,7 @@ pub struct PlayerEntity {
     pub dash: Option<Dash>,
     pub dash_cooldown: GameTime,
     pub hook: Option<Hook>,
+    pub hook_cooldown: GameTime,
 }
 
 impl PlayerEntity {
@@ -160,6 +168,7 @@ impl PlayerEntity {
             dash: None,
             dash_cooldown: 0.0,
             hook: None,
+            hook_cooldown: 0.0,
         }
     }
 

@@ -41,6 +41,7 @@ pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
 pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
+pub const HOOK_COOLDOWN: f32 = 2.5;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -358,6 +359,7 @@ impl Game {
         }
 
         // Experimental hook stuff
+        ent.hook_cooldown = (ent.hook_cooldown - dt).max(0.0);
         ent.hook = if let Some(hook) = ent.hook.clone() {
             match hook {
                 Hook::Shooting {
@@ -422,19 +424,22 @@ impl Game {
                         })
                 }
                 Hook::Contracting { pos } => {
-                    let new_pos = geom::smooth_to_target_point(10.0, ent.pos, pos, dt);
+                    let new_pos = geom::smooth_to_target_point(5.0, ent.pos, pos, dt);
 
                     if (new_pos - ent.pos).norm() < 5.0 {
+                        ent.hook_cooldown = HOOK_COOLDOWN;
+
                         None
                     } else {
                         Some(Hook::Contracting { pos: new_pos })
                     }
                 }
             }
-        } else if input.use_action && ent.hook.is_none() {
+        } else if input.use_action && ent.hook.is_none() && ent.hook_cooldown == 0.0 {
+            let vel = Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED;
             Some(Hook::Shooting {
-                pos: ent.pos,
-                vel: Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED,
+                pos: ent.pos + vel * 0.05,
+                vel,
                 time_left: HOOK_MAX_SHOOT_DURATION,
             })
         } else {

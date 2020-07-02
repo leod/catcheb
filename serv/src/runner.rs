@@ -532,8 +532,8 @@ impl Runner {
         let game_id = comn::GameId(Uuid::new_v4());
         let mut game = Game::new(self.config.game_settings.clone());
 
-        /*game.join("bot1".into(), true);
-        game.join("bot2".into(), true);*/
+        game.join("bot1".into(), true);
+        game.join("bot2".into(), true);
 
         assert!(!self.games.contains_key(&game_id));
         self.games.insert(game_id, game);
