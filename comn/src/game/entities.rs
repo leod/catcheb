@@ -84,27 +84,50 @@ impl Entity {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum HookState {
+pub enum Hook {
     Shooting {
-        start_time: GameTime,
-        start_pos: Point,
+        pos: Point,
         vel: Vector,
+        time_left: GameTime,
     },
     Attached {
-        start_time: GameTime,
         target: EntityId,
         offset: Vector,
     },
     Contracting {
-        start_time: GameTime,
-        duration: GameTime,
-        start_pos: Point,
+        pos: Point,
     },
 }
 
+impl Hook {
+    pub fn interp(&self, other: &Hook, alpha: f32) -> Hook {
+        match (self, other) {
+            (
+                Hook::Shooting {
+                    pos: pos_a,
+                    vel,
+                    time_left,
+                },
+                Hook::Shooting { pos: pos_b, .. },
+            ) => Hook::Shooting {
+                pos: pos_a + alpha * (pos_b - pos_a),
+                vel: *vel,
+                time_left: *time_left,
+            },
+            (Hook::Contracting { pos: pos_a }, Hook::Contracting { pos: pos_b }) => {
+                Hook::Contracting {
+                    pos: pos_a + alpha * (pos_b - pos_a),
+                }
+            }
+            _ => self.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Hook {
-    pub state: HookState,
+pub struct Dash {
+    pub time_left: GameTime,
+    pub dir: Vector,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -113,7 +136,7 @@ pub struct PlayerEntity {
     pub pos: Point,
     pub vel: Vector,
     pub angle: f32,
-    pub last_turn: GameTime,
+    pub turn_time_left: GameTime,
     pub target_angle: f32,
     pub size_scale: f32,
     pub size_skew: f32,
@@ -121,8 +144,10 @@ pub struct PlayerEntity {
     pub target_size_bump: f32,
     pub next_shot_time: GameTime,
     pub shots_left: u32,
-    pub last_dash: Option<(GameTime, Vector)>,
+    pub dash: Option<Dash>,
+    pub dash_cooldown: GameTime,
     pub hook: Option<Hook>,
+    pub hook_cooldown: GameTime,
 }
 
 impl PlayerEntity {
@@ -132,7 +157,7 @@ impl PlayerEntity {
             pos,
             vel: Vector::zeros(),
             angle: 0.0,
-            last_turn: 0.0,
+            turn_time_left: 0.0,
             target_angle: 0.0,
             size_scale: 1.0,
             size_skew: 1.0,
@@ -140,8 +165,10 @@ impl PlayerEntity {
             target_size_bump: 0.0,
             next_shot_time: 0.0,
             shots_left: run::MAGAZINE_SIZE,
-            last_dash: None,
+            dash: None,
+            dash_cooldown: 0.0,
             hook: None,
+            hook_cooldown: 0.0,
         }
     }
 
@@ -177,6 +204,11 @@ impl PlayerEntity {
             size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
             size_skew: self.size_skew + alpha * (other.size_skew - self.size_skew),
             size_bump: self.size_bump + alpha * (other.size_bump - self.size_bump),
+            hook: if let (Some(hook_a), Some(hook_b)) = (&self.hook, &other.hook) {
+                Some(hook_a.interp(hook_b, alpha))
+            } else {
+                self.hook.clone()
+            },
             ..self.clone()
         }
     }

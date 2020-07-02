@@ -217,35 +217,40 @@ impl Prediction {
         item: join::Item<&comn::EntityId, &comn::Entity, &comn::Entity>,
         error: &mut f32,
     ) -> Option<(comn::EntityId, comn::Entity)> {
+        use comn::Entity::*;
+        use join::Item::*;
+
         match item {
-            join::Item::Both(id, predicted, server) => match (predicted, server) {
-                (comn::Entity::Player(predicted), comn::Entity::Player(server))
-                    if Self::is_predicted(
-                        my_player_id,
-                        &comn::Entity::Player(predicted.clone()),
-                    ) =>
+            Both(id, predicted, server) => match (predicted, server) {
+                (Player(predicted), Player(server))
+                    if Self::is_predicted(my_player_id, &Player(predicted.clone())) =>
                 {
-                    *error += (predicted.pos.x - server.pos.x).abs();
-                    *error += (predicted.pos.y - server.pos.y).abs();
-                    *error += match (predicted.last_dash, server.last_dash) {
-                        (Some((t1, d1)), Some((t2, d2))) => {
-                            (t1 - t2).abs() + (d1.x - d2.x).abs() + (d1.y - d2.y).abs()
+                    *error += match (predicted.dash.as_ref(), server.dash.as_ref()) {
+                        (Some(d1), Some(d2)) => {
+                            (d1.time_left - d2.time_left).abs() + (d1.dir - d2.dir).norm()
                         }
                         (None, None) => 0.0,
-                        _ => 100.0,
+                        _ => MIN_PREDICTION_ERROR_FOR_REPLAY,
                     };
 
                     Some((
                         *id,
-                        comn::Entity::Player(comn::PlayerEntity {
-                            pos: Self::correct_point(predicted.pos, server.pos),
+                        Player(comn::PlayerEntity {
+                            pos: Self::correct_point(predicted.pos, server.pos, error),
+                            hook: match (&predicted.hook, &server.hook) {
+                                (Some(a), Some(b)) => Some(Self::correct_hook(a, b, error)),
+                                _ => {
+                                    *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                                    server.hook.clone()
+                                }
+                            },
                             ..server.clone()
                         }),
                     ))
                 }
                 _ => Some((*id, server.clone())),
             },
-            join::Item::Left(_, predicted) => {
+            Left(_, predicted) => {
                 if Self::is_predicted(my_player_id, predicted) {
                     // An entity that we predicted (most likely the
                     // PlayerEntity) no longer exists in the authorative
@@ -254,7 +259,7 @@ impl Prediction {
                 }
                 None
             }
-            join::Item::Right(id, server) => {
+            Right(id, server) => {
                 if Self::is_predicted(my_player_id, server) {
                     // Server has a new entity, make sure to replay
                     // prediction so that we include it. Might be that
@@ -269,14 +274,78 @@ impl Prediction {
         }
     }
 
-    fn correct_point(predicted: comn::Point, server: comn::Point) -> comn::Point {
+    fn correct_point(predicted: comn::Point, server: comn::Point, error: &mut f32) -> comn::Point {
         let delta = server - predicted;
+
+        *error += delta.norm();
 
         if delta.norm() < 0.01 || delta.norm() > 200.0 {
             server
         } else {
             // Smoothly correct prediction over time
             predicted + delta * 0.2
+        }
+    }
+
+    fn correct_vector(
+        predicted: comn::Vector,
+        server: comn::Vector,
+        error: &mut f32,
+    ) -> comn::Vector {
+        let delta = server - predicted;
+
+        *error += delta.norm();
+
+        if delta.norm() < 0.01 || delta.norm() > 200.0 {
+            server
+        } else {
+            // Smoothly correct prediction over time
+            predicted + delta * 0.2
+        }
+    }
+
+    fn correct_hook(predicted: &comn::Hook, server: &comn::Hook, error: &mut f32) -> comn::Hook {
+        use comn::Hook::*;
+
+        match (predicted, server) {
+            (
+                Shooting { pos: a, .. },
+                Shooting {
+                    pos: b,
+                    vel,
+                    time_left,
+                },
+            ) => Shooting {
+                pos: Self::correct_point(*a, *b, error),
+                vel: *vel,
+                time_left: *time_left,
+            },
+            (
+                Attached {
+                    target: target_a,
+                    offset: offset_a,
+                },
+                Attached {
+                    target: target_b,
+                    offset: offset_b,
+                },
+            ) => {
+                if target_a != target_b {
+                    *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                }
+
+                Attached {
+                    target: *target_b,
+                    offset: Self::correct_vector(*offset_a, *offset_b, error),
+                }
+            }
+            (Contracting { pos: a }, Contracting { pos: b }) => Contracting {
+                pos: Self::correct_point(*a, *b, error),
+            },
+            _ => {
+                *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                server.clone()
+            }
         }
     }
 
