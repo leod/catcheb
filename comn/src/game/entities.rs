@@ -86,19 +86,16 @@ impl Entity {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum HookState {
     Shooting {
-        start_time: GameTime,
-        start_pos: Point,
+        pos: Point,
         vel: Vector,
+        time_left: GameTime,
     },
     Attached {
-        start_time: GameTime,
         target: EntityId,
         offset: Vector,
     },
     Contracting {
-        start_time: GameTime,
-        duration: GameTime,
-        start_pos: Point,
+        pos: Point,
     },
 }
 

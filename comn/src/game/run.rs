@@ -361,100 +361,101 @@ impl Game {
         }
 
         // Experimental hook stuff
-        if let Some(hook) = ent.hook.clone() {
+        ent.hook = if let Some(hook) = ent.hook.clone() {
             match hook.state {
                 HookState::Shooting {
-                    start_time,
-                    start_pos,
+                    pos,
                     vel,
+                    time_left,
                 } => {
-                    let pos = start_pos + (input_time - start_time) * vel;
-                    let next_pos =
-                        start_pos + (input_time - start_time + self.settings.tick_period()) * vel;
-                    let pos_delta = next_pos - pos;
-                    let pos_delta_norm = pos_delta.norm();
-                    let ray = Ray {
-                        origin: pos,
-                        dir: pos_delta / pos_delta_norm,
-                    };
+                    let next_time_left = (time_left - dt).max(0.0);
 
-                    if !input.use_action || input_time - start_time > HOOK_MAX_SHOOT_DURATION {
-                        let duration = (pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
-                        ent.hook = Some(Hook {
-                            state: HookState::Contracting {
-                                start_time: input_time,
-                                start_pos: pos,
-                                duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
-                            },
-                        });
+                    if !input.use_action || next_time_left <= 0.0 {
+                        Some(Hook {
+                            state: HookState::Contracting { pos },
+                        })
                     } else {
-                        // TODO: Closest hook intersection
-                        for (target_id, target) in input_state.entities.iter() {
-                            if entity_id != *target_id && target.can_hook_attach() {
-                                if let Some(intersection_t) = ray
-                                    .intersects(&target.intersection_shape(input_time))
-                                    .filter(|t| *t <= pos_delta_norm)
-                                {
-                                    let intersection_p = ray.origin + intersection_t * ray.dir;
-                                    ent.hook = Some(Hook {
-                                        state: HookState::Attached {
-                                            start_time: input_time
-                                                + intersection_t / pos_delta_norm
-                                                    * self.settings.tick_period(),
-                                            target: *target_id,
-                                            offset: intersection_p - target.pos(input_time),
-                                        },
-                                    });
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                HookState::Attached {
-                    start_time: _,
-                    target,
-                    offset,
-                } => {
-                    if let Some(target_entity) = input_state.entities.get(&target) {
-                        let hook_pos = target_entity.pos(input_time) + offset;
+                        let pos_delta = dt * vel;
+                        let pos_delta_norm = pos_delta.norm();
+                        let ray = Ray {
+                            origin: pos,
+                            dir: pos_delta / pos_delta_norm,
+                        };
 
-                        if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE {
-                            let duration = (hook_pos - ent.pos).norm() / HOOK_CONTRACT_SPEED;
-                            ent.hook = Some(Hook {
-                                state: HookState::Contracting {
-                                    start_time: input_time,
-                                    start_pos: hook_pos,
-                                    duration: duration.min(HOOK_MAX_CONTRACT_DURATION),
+                        let moved_hook = Hook {
+                            state: HookState::Shooting {
+                                pos: pos + pos_delta,
+                                vel,
+                                time_left: next_time_left,
+                            },
+                        };
+
+                        let hook = input_state
+                            .entities
+                            .iter()
+                            .filter(|(other_id, other_ent)| {
+                                **other_id != entity_id && other_ent.can_hook_attach()
+                            })
+                            .filter_map(|(other_id, other_ent)| {
+                                ray.intersects(&other_ent.intersection_shape(input_time))
+                                    .filter(|t| *t <= pos_delta_norm)
+                                    .map(|t| (other_id, other_ent, t))
+                            })
+                            .min_by(|(_, _, t1), (_, _, t2)| t1.partial_cmp(t2).unwrap())
+                            .map_or(moved_hook, |(other_id, other_ent, t)| Hook {
+                                state: HookState::Attached {
+                                    target: *other_id,
+                                    offset: ray.origin + t * ray.dir - other_ent.pos(input_time),
                                 },
                             });
-                        } else {
-                            ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
-                        }
-                    } else {
-                        ent.hook = None;
+
+                        Some(hook)
                     }
                 }
-                HookState::Contracting {
-                    start_time,
-                    duration,
-                    ..
-                } => {
-                    if input_time - start_time >= duration {
-                        ent.hook = None;
+                HookState::Attached { target, offset } => {
+                    input_state
+                        .entities
+                        .get(&target)
+                        .map_or(None, |target_ent| {
+                            let hook_pos = target_ent.pos(input_time) + offset;
+
+                            if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE
+                            {
+                                Some(Hook {
+                                    state: HookState::Contracting { pos: hook_pos },
+                                })
+                            } else {
+                                ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
+
+                                Some(Hook {
+                                    state: HookState::Attached { target, offset },
+                                })
+                            }
+                        })
+                }
+                HookState::Contracting { pos } => {
+                    let new_pos = geom::smooth_to_target_point(10.0, ent.pos, pos, dt);
+
+                    if (new_pos - ent.pos).norm() < 5.0 {
+                        None
+                    } else {
+                        Some(Hook {
+                            state: HookState::Contracting { pos: new_pos },
+                        })
                     }
                 }
             }
         } else if input.use_action && ent.hook.is_none() {
-            // TODO: Trace ray when spawning hook?
-            ent.hook = Some(Hook {
+            Some(Hook {
                 state: HookState::Shooting {
-                    start_time: input_time,
-                    start_pos: ent.pos,
+                    pos: ent.pos,
                     vel: Vector::new(ent.angle.cos(), ent.angle.sin()) * HOOK_SHOOT_SPEED,
+                    time_left: HOOK_MAX_SHOOT_DURATION,
                 },
-            });
-        }
+            })
+        } else {
+            None
+        };
 
         // Check for collisions
         let mut offset = ent.vel * dt;

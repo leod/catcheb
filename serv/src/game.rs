@@ -241,31 +241,10 @@ impl Game {
     }
 
     pub fn prepare_state_for_player(&self, observer_id: comn::PlayerId, state: &mut comn::Game) {
-        let state_time = state.game_time();
         for entity in state.entities.values_mut() {
             match entity {
                 comn::Entity::Player(player) if player.owner != observer_id => {
-                    let mut player_view = player.to_view();
-
-                    if let Some(last_input_num) = self.players_meta[&player.owner].last_input_num {
-                        let time_lag = state_time - self.state.tick_game_time(last_input_num);
-
-                        if let Some(hook) = &mut player_view.hook {
-                            match &mut hook.state {
-                                comn::HookState::Shooting { start_time, .. } => {
-                                    *start_time += time_lag;
-                                }
-                                comn::HookState::Attached { start_time, .. } => {
-                                    *start_time += time_lag;
-                                }
-                                comn::HookState::Contracting { start_time, .. } => {
-                                    *start_time += time_lag;
-                                }
-                            }
-                        }
-                    }
-
-                    *entity = comn::Entity::PlayerView(player_view);
+                    *entity = comn::Entity::PlayerView(player.to_view());
                 }
                 _ => (),
             }

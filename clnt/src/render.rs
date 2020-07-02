@@ -357,37 +357,22 @@ fn render_hook(
     pos: comn::Point,
     hook: &comn::Hook,
 ) -> quicksilver::Result<()> {
-    let (a, b, dead) = match hook.state {
+    let (hook_pos, dead) = match hook.state {
         comn::HookState::Shooting {
-            start_time,
-            start_pos,
-            vel,
-        } => (pos, start_pos + (time - start_time) * vel, false),
-        comn::HookState::Attached {
-            start_time: _,
-            target,
-            offset,
-        } => {
-            let b = interp_entity(state, next_entities, time, target)
+            pos: hook_pos,
+            vel: _,
+            time_left: _,
+        } => (hook_pos, false),
+        comn::HookState::Attached { target, offset } => {
+            let hook_pos = interp_entity(state, next_entities, time, target)
                 .map_or(pos, |interp_target| interp_target.pos(time) + offset);
-            (pos, b, false)
+            (hook_pos, false)
         }
-        comn::HookState::Contracting {
-            start_time,
-            duration,
-            start_pos,
-        } => {
-            let delta = pos - start_pos;
-            (
-                pos,
-                start_pos + ((time - start_time) / duration).min(1.0) * delta,
-                true,
-            )
-        }
+        comn::HookState::Contracting { pos: hook_pos } => (hook_pos, true),
     };
 
-    let a: mint::Vector2<f32> = a.coords.into();
-    let b: mint::Vector2<f32> = b.coords.into();
+    let a: mint::Vector2<f32> = pos.coords.into();
+    let b: mint::Vector2<f32> = hook_pos.coords.into();
     if !dead {
         gfx.stroke_path(&[a.into(), b.into()], Color::from_rgba(100, 100, 100, 1.0));
         gfx.fill_circle(
