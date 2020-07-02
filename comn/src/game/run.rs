@@ -375,8 +375,8 @@ impl Game {
                         let pos_delta = dt * vel;
                         let pos_delta_norm = pos_delta.norm();
                         let ray = Ray {
-                            origin: pos,
-                            dir: pos_delta / pos_delta_norm,
+                            origin: ent.pos,
+                            dir: pos + pos_delta - ent.pos,
                         };
 
                         let hook = input_state
@@ -387,7 +387,7 @@ impl Game {
                             })
                             .filter_map(|(other_id, other_ent)| {
                                 ray.intersects(&other_ent.intersection_shape(input_time))
-                                    .filter(|t| *t <= pos_delta_norm)
+                                    .filter(|t| *t <= 1.0)
                                     .map(|t| (other_id, other_ent, t))
                             })
                             .min_by(|(_, _, t1), (_, _, t2)| t1.partial_cmp(t2).unwrap())
