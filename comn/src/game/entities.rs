@@ -84,7 +84,7 @@ impl Entity {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum HookState {
+pub enum Hook {
     Shooting {
         pos: Point,
         vel: Vector,
@@ -99,9 +99,22 @@ pub enum HookState {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Hook {
-    pub state: HookState,
+impl Hook {
+    pub fn interp(&self, other: &Hook, alpha: f32) -> Hook {
+        match (self, other) {
+            (Hook::Shooting { pos: pos_a, vel, time_left }, Hook::Shooting { pos: pos_b, .. }) =>
+                Hook::Shooting {
+                    pos: pos_a + alpha * (pos_b - pos_a),
+                    vel: *vel,
+                    time_left: *time_left,
+                },
+            (Hook::Contracting { pos: pos_a }, Hook::Contracting { pos: pos_b }) =>
+                Hook::Contracting {
+                    pos: pos_a + alpha * (pos_b - pos_a),
+                },
+            _ => self.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -182,6 +195,11 @@ impl PlayerEntity {
             size_scale: self.size_scale + alpha * (other.size_scale - self.size_scale),
             size_skew: self.size_skew + alpha * (other.size_skew - self.size_skew),
             size_bump: self.size_bump + alpha * (other.size_bump - self.size_bump),
+            hook: if let (Some(hook_a), Some(hook_b)) = (&self.hook, &other.hook) {
+                Some(hook_a.interp(hook_b, alpha))
+            } else {
+                self.hook.clone()
+            },
             ..self.clone()
         }
     }

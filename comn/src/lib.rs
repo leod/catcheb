@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 pub use crate::{
     game::{
-        entities::{DangerGuy, Hook, HookState, PlayerEntity, PlayerView},
+        entities::{DangerGuy, Hook, PlayerEntity, PlayerView},
         DeathReason, Entity, EntityId, EntityMap, Event, Game, Input, Item, Matrix, Player,
         PlayerId, PlayerMap, PlayerState, Point, Settings, Tick, TickNum, Time, Vector,
     },
