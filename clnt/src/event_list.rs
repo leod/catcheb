@@ -39,6 +39,10 @@ impl EventList {
 
     pub fn push(&mut self, now: Instant, event: Event) {
         self.events.push_back((now, event));
+
+        if self.events.len() > self.config.num_lines {
+            self.events.pop_front();
+        }
     }
 
     pub fn render(
@@ -50,11 +54,11 @@ impl EventList {
     ) -> quicksilver::Result<()> {
         // Remove events that are too old.
         while let Some((oldest_time, _)) = self.events.front() {
-            if now.duration_since(*oldest_time) > self.config.max_age {
-                self.events.pop_front();
-            } else {
+            if now.duration_since(*oldest_time) <= self.config.max_age {
                 break;
             }
+
+            self.events.pop_front();
         }
 
         // Display events.
