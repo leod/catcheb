@@ -230,7 +230,7 @@ impl Prediction {
                             (d1.time_left - d2.time_left).abs() + (d1.dir - d2.dir).norm()
                         }
                         (None, None) => 0.0,
-                        _ => MIN_PREDICTION_ERROR_FOR_REPLAY,
+                        _ => 1.0 * MIN_PREDICTION_ERROR_FOR_REPLAY,
                     };
 
                     Some((
@@ -239,8 +239,9 @@ impl Prediction {
                             pos: Self::correct_point(predicted.pos, server.pos, error),
                             hook: match (&predicted.hook, &server.hook) {
                                 (Some(a), Some(b)) => Some(Self::correct_hook(a, b, error)),
+                                (None, None) => None,
                                 _ => {
-                                    *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                                    *error += 2.0 * MIN_PREDICTION_ERROR_FOR_REPLAY;
                                     server.hook.clone()
                                 }
                             },
@@ -255,7 +256,7 @@ impl Prediction {
                     // An entity that we predicted (most likely the
                     // PlayerEntity) no longer exists in the authorative
                     // state. Make sure to replay.
-                    *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                    *error += 3.0 * MIN_PREDICTION_ERROR_FOR_REPLAY;
                 }
                 None
             }
@@ -265,7 +266,7 @@ impl Prediction {
                     // prediction so that we include it. Might be that
                     // there is a better way to go about it, because
                     // this will replay prediction too often.
-                    *error += MIN_PREDICTION_ERROR_FOR_REPLAY;
+                    *error += 4.0 * MIN_PREDICTION_ERROR_FOR_REPLAY;
                     Some((*id, server.clone()))
                 } else {
                     None
