@@ -1,5 +1,6 @@
 use std::iter::once;
 
+use nalgebra as na;
 use serde::{Deserialize, Serialize};
 
 use crate::{Point, Vector};
@@ -238,6 +239,7 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
 
 pub fn rect_circle_collision(rect: &Rect, circle: &Circle, delta: Vector) -> Option<Collision> {
     // TODO: rect_circle_collision
+    // https://stackoverflow.com/questions/18704999/how-to-fix-circle-and-rectangle-overlap-in-collision-response/18790389#18790389
     None
 }
 
@@ -283,7 +285,25 @@ impl Ray {
                     Some(t_min)
                 }
             }
-            Shape::Rect(_) => None,
+            Shape::Rect(rect) => {
+                // Rotate both ray and rectangle so that the rectangle is axis-
+                // aligned, with the rectangle at origin.
+
+                let aa_rect_origin = AaRect::new_center(
+                    Point::origin(),
+                    Vector::new(rect.x_edge.norm(), rect.y_edge.norm()),
+                );
+
+                let theta = rect.x_edge.y.atan2(rect.x_edge.x);
+                let rotation = na::Rotation2::new(theta);
+
+                let ray_rotated = Ray {
+                    origin: rotation * (self.origin - rect.center.coords),
+                    dir: rotation * self.dir,
+                };
+
+                ray_rotated.intersects(&Shape::AaRect(aa_rect_origin))
+            }
             Shape::Circle(circle) => {
                 // https://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm
 
