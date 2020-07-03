@@ -92,6 +92,10 @@ pub fn interp_angle(alpha: f32, beta: f32, t: f32) -> f32 {
 // Awesome resource:
 // https://www.codeproject.com/Articles/15573/2D-Polygon-Collision-Detection
 
+pub struct Collision {
+    pub resolution_vector: Vector,
+}
+
 pub struct AxisProjection {
     pub min: f32,
     pub max: f32,
@@ -150,11 +154,14 @@ impl Rect {
 
         uv.x >= -0.5 && uv.x <= 0.5 && uv.y >= -0.5 && uv.y <= 0.5
     }
-}
 
-pub struct Collision {
-    pub resolution_vector: Vector,
-    pub axis: Vector,
+    pub fn collision(&self, other: &Shape, delta: Vector) -> Option<Collision> {
+        match other {
+            Shape::Rect(other) => rect_collision(self, other, delta),
+            Shape::AaRect(other) => rect_collision(self, &other.to_rect(), delta),
+            Shape::Circle(other) => rect_circle_collision(self, other, delta),
+        }
+    }
 }
 
 pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
@@ -223,11 +230,15 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
     if will_intersect {
         Some(Collision {
             resolution_vector: translation_axis * min_interval_distance,
-            axis: translation_axis,
         })
     } else {
         None
     }
+}
+
+pub fn rect_circle_collision(rect: &Rect, circle: &Circle, delta: Vector) -> Option<Collision> {
+    // TODO: rect_circle_collision
+    None
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -272,10 +283,7 @@ impl Ray {
                     Some(t_min)
                 }
             }
-            Shape::Rect(_) => {
-                // TODO: Ray-Rect
-                None
-            }
+            Shape::Rect(_) => None,
             Shape::Circle(circle) => {
                 // https://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm
 
