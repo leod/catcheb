@@ -413,7 +413,7 @@ impl FoodSpawn {
             .rotate(time * run::FOOD_ROTATION_SPEED)
     }
 
-    pub fn shape(&self, time: GameTime) -> Shape {
+    pub fn shape(&self, _: GameTime) -> Shape {
         Shape::Circle(Circle {
             center: self.pos,
             radius: run::FOOD_SIZE * 2.0f32.sqrt(),

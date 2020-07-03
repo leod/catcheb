@@ -388,7 +388,6 @@ impl Game {
                         Some(Hook::Contracting { pos })
                     } else {
                         let pos_delta = dt * vel;
-                        let pos_delta_norm = pos_delta.norm();
                         let ray = Ray {
                             origin: ent.pos,
                             dir: pos + pos_delta - ent.pos,
@@ -471,21 +470,21 @@ impl Game {
         for (other_entity_id, other_entity) in input_state.entities.iter() {
             let (other_shape, flip) = match other_entity {
                 Entity::Player(other_ent) if other_ent.owner != ent.owner => {
-                    (Some(other_ent.rect()), false)
+                    (Some(other_ent.shape()), false)
                 }
                 Entity::PlayerView(other_ent) if other_ent.owner != ent.owner => {
-                    (Some(other_ent.rect()), false)
+                    (Some(other_ent.shape()), false)
                 }
-                Entity::Wall(other_ent) => (Some(other_ent.rect.to_rect()), true),
+                Entity::Wall(other_ent) => (Some(other_ent.shape()), true),
                 Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
                     //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
-                    (Some(other_ent.aa_rect(self.game_time()).to_rect()), true)
+                    (Some(other_ent.shape(self.game_time())), true)
                 }
                 _ => (None, false),
             };
 
-            let collision = other_shape
-                .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset));
+            let collision =
+                other_shape.and_then(|other_shape| ent.rect().collision(&other_shape, offset));
 
             if let Some(collision) = collision {
                 let mut collide = true;
@@ -513,7 +512,7 @@ impl Game {
                 if collide {
                     offset += collision.resolution_vector;
                     if flip {
-                        flip_axis = Some(collision.axis);
+                        flip_axis = Some(collision.resolution_vector.normalize());
                     }
                 }
             }
