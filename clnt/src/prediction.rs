@@ -16,6 +16,7 @@ struct Record {
 
 pub struct Prediction {
     my_player_id: comn::PlayerId,
+    // TODO: Maximal size for prediction log
     log: BTreeMap<comn::TickNum, Record>,
     last_server_state_scratch: Option<comn::Game>,
 }

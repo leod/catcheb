@@ -44,6 +44,7 @@ pub struct Game {
 
     last_inputs: VecDeque<(comn::TickNum, comn::Input)>,
 
+    // TODO: Maximal size for received states
     received_states: BTreeMap<comn::TickNum, ReceivedState>,
     received_events: BTreeMap<comn::TickNum, Vec<comn::Event>>,
     prediction: Option<Prediction>,
