@@ -41,7 +41,7 @@ pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
 pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
-pub const HOOK_COOLDOWN: f32 = 2.5;
+pub const HOOK_COOLDOWN: f32 = 0.5;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -79,6 +79,7 @@ impl Game {
         assert!(!context.is_predicting);
 
         let time = self.game_time();
+        let dt = self.settings.tick_period();
 
         if let Some(catcher) = self.catcher {
             let catcher_alive = self
@@ -190,8 +191,28 @@ impl Game {
                     }
                 }
                 Entity::Food(food) => {
+                    if context.removed_entities.contains(entity_id) {
+                        // Already eaten by a player this tick, early exit to
+                        // prevent flickering
+                    }
+
                     if time - food.start_time > FOOD_MAX_LIFETIME {
                         context.removed_entities.insert(*entity_id);
+                    } else {
+                        for entity_b in entities.values() {
+                            if entity_b.is_wall_like() {
+                                if entity_b.shape(time).contains_point(food.pos(time)) {
+                                    // Replace the Food by a non-moving one
+                                    context.removed_entities.insert(*entity_id);
+                                    context.new_entities.push(Entity::Food(Food {
+                                        start_pos: food.pos(time - dt / 2.0),
+                                        start_vel: Vector::zeros(),
+                                        ..food.clone()
+                                    }));
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
                 _ => (),
@@ -373,7 +394,6 @@ impl Game {
                         Some(Hook::Contracting { pos })
                     } else {
                         let pos_delta = dt * vel;
-                        let pos_delta_norm = pos_delta.norm();
                         let ray = Ray {
                             origin: ent.pos,
                             dir: pos + pos_delta - ent.pos,
@@ -386,7 +406,8 @@ impl Game {
                                 **other_id != entity_id && other_ent.can_hook_attach()
                             })
                             .filter_map(|(other_id, other_ent)| {
-                                ray.intersects(&other_ent.intersection_shape(input_time))
+                                ray.intersections(&other_ent.shape(input_time))
+                                    .first()
                                     .filter(|t| *t <= 1.0)
                                     .map(|t| (other_id, other_ent, t))
                             })
@@ -456,21 +477,22 @@ impl Game {
         for (other_entity_id, other_entity) in input_state.entities.iter() {
             let (other_shape, flip) = match other_entity {
                 Entity::Player(other_ent) if other_ent.owner != ent.owner => {
-                    (Some(other_ent.rect()), false)
+                    (Some(other_ent.shape()), false)
                 }
                 Entity::PlayerView(other_ent) if other_ent.owner != ent.owner => {
-                    (Some(other_ent.rect()), false)
+                    (Some(other_ent.shape()), false)
                 }
-                Entity::Wall(other_ent) => (Some(other_ent.rect.to_rect()), true),
+                Entity::Wall(other_ent) => (Some(other_ent.shape()), true),
                 Entity::DangerGuy(other_ent) if !other_ent.is_hot => {
                     //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
-                    (Some(other_ent.aa_rect(self.game_time()).to_rect()), true)
+                    (Some(other_ent.shape(self.game_time())), true)
                 }
+                Entity::Turret(other_ent) => (Some(other_ent.shape()), true),
                 _ => (None, false),
             };
 
-            let collision = other_shape
-                .and_then(|other_shape| geom::rect_collision(&ent.rect(), &other_shape, offset));
+            let collision =
+                other_shape.and_then(|other_shape| ent.rect().collision(&other_shape, offset));
 
             if let Some(collision) = collision {
                 let mut collide = true;
@@ -498,7 +520,7 @@ impl Game {
                 if collide {
                     offset += collision.resolution_vector;
                     if flip {
-                        flip_axis = Some(collision.axis);
+                        flip_axis = Some(collision.resolution_vector.normalize());
                     }
                 }
             }
