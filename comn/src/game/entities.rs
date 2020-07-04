@@ -247,6 +247,11 @@ impl PlayerView {
             pos: self.pos + alpha * (other.pos - self.pos),
             angle: interp_angle(self.angle, other.angle, alpha),
             size: self.size + alpha * (other.size - self.size),
+            hook: if let (Some(hook_a), Some(hook_b)) = (&self.hook, &other.hook) {
+                Some(hook_a.interp(hook_b, alpha))
+            } else {
+                self.hook.clone()
+            },
             ..self.clone()
         }
     }
