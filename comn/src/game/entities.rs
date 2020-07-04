@@ -62,6 +62,14 @@ impl Entity {
         }
     }
 
+    pub fn is_wall_like(&self) -> bool {
+        match self {
+            Entity::Wall(_) => true,
+            Entity::Turret(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn shape(&self, time: f32) -> Shape {
         match self {
             Entity::Player(entity) => entity.shape(),
@@ -72,13 +80,6 @@ impl Entity {
             Entity::Wall(entity) => entity.shape(),
             Entity::FoodSpawn(entity) => entity.shape(time),
             Entity::Food(entity) => entity.shape(time),
-        }
-    }
-
-    pub fn intersection_shape(&self, time: f32) -> Shape {
-        match self {
-            Entity::FoodSpawn(entity) => entity.intersection_shape(time),
-            _ => self.shape(time),
         }
     }
 }
@@ -412,11 +413,7 @@ impl FoodSpawn {
             .rotate(time * run::FOOD_ROTATION_SPEED)
     }
 
-    pub fn shape(&self, time: GameTime) -> Shape {
-        Shape::Rect(self.rect(time))
-    }
-
-    pub fn intersection_shape(&self, _: GameTime) -> Shape {
+    pub fn shape(&self, _: GameTime) -> Shape {
         Shape::Circle(Circle {
             center: self.pos,
             radius: run::FOOD_SIZE * 2.0f32.sqrt(),
