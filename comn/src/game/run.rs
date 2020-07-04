@@ -191,11 +191,6 @@ impl Game {
                     }
                 }
                 Entity::Food(food) => {
-                    if context.removed_entities.contains(entity_id) {
-                        // Already eaten by a player this tick, early exit to
-                        // prevent flickering
-                    }
-
                     if time - food.start_time > FOOD_MAX_LIFETIME {
                         context.removed_entities.insert(*entity_id);
                     } else {
@@ -656,6 +651,11 @@ impl Game {
                         }
                     }
                     Entity::Food(food) => {
+                        if context.removed_entities.contains(entity_id) {
+                            // Already eaten or removed; prevent flickering.
+                            continue;
+                        }
+
                         if geom::rect_collision(
                             &food.rect(input_time),
                             &ent.rect(),
