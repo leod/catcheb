@@ -41,7 +41,7 @@ pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
 pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
-pub const HOOK_COOLDOWN: f32 = 0.0; //2.5;
+pub const HOOK_COOLDOWN: f32 = 0.5;
 
 pub const BULLET_MOVE_SPEED: f32 = 300.0;
 pub const BULLET_RADIUS: f32 = 8.0;
@@ -191,6 +191,11 @@ impl Game {
                     }
                 }
                 Entity::Food(food) => {
+                    if context.removed_entities.contains(entity_id) {
+                        // Already eaten by a player this tick, early exit to
+                        // prevent flickering
+                    }
+
                     if time - food.start_time > FOOD_MAX_LIFETIME {
                         context.removed_entities.insert(*entity_id);
                     } else {
@@ -204,6 +209,7 @@ impl Game {
                                         start_vel: Vector::zeros(),
                                         ..food.clone()
                                     }));
+                                    break;
                                 }
                             }
                         }
@@ -400,7 +406,8 @@ impl Game {
                                 **other_id != entity_id && other_ent.can_hook_attach()
                             })
                             .filter_map(|(other_id, other_ent)| {
-                                ray.intersects(&other_ent.shape(input_time))
+                                ray.intersections(&other_ent.shape(input_time))
+                                    .first()
                                     .filter(|t| *t <= 1.0)
                                     .map(|t| (other_id, other_ent, t))
                             })
@@ -480,6 +487,7 @@ impl Game {
                     //Some(other_ent.aa_rect(input_time + self.settings.tick_period()).to_rect())
                     (Some(other_ent.shape(self.game_time())), true)
                 }
+                Entity::Turret(other_ent) => (Some(other_ent.shape()), true),
                 _ => (None, false),
             };
 
