@@ -432,6 +432,15 @@ impl Game {
         }
     }
 
+    pub fn disconnect(&mut self) {
+        // Send unreliable message a few times to increase chance of arrival.
+        for _ in 0..3 {
+            self.send(comn::ClientMessage::Disconnect);
+        }
+
+        self.disconnected = true;
+    }
+
     fn send(&self, message: comn::ClientMessage) {
         coarse_prof::profile!("send");
 
