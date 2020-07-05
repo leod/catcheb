@@ -13,6 +13,9 @@ mod webrtc;
 use std::{path::PathBuf, time::Duration};
 
 use clap::Arg;
+use log::{info, warn};
+
+use tokio::sync::oneshot;
 
 use fake_bad_net::FakeBadNet;
 
@@ -104,18 +107,64 @@ async fn main() {
         (recv_message_rx, send_message_rx)
     };
 
+    let (shutdown_http_tx, shutdown_http_rx) = oneshot::channel();
+    let (shutdown_runner_tx, shutdown_runner_rx) = oneshot::channel();
+    let (shutdown_webrtc_tx, shutdown_webrtc_rx) = oneshot::channel();
+
     let webrtc_server = webrtc::Server::new(config.webrtc_server, recv_message_tx, send_message_rx)
         .await
-        .unwrap();
+        .expect("Error starting WebRTC server");
     let session_endpoint = webrtc_server.session_endpoint();
 
-    let runner = runner::Runner::new(config.runner, recv_message_rx, send_message_tx);
+    let runner = runner::Runner::new(
+        config.runner,
+        recv_message_rx,
+        send_message_tx,
+        shutdown_runner_rx,
+    );
     let join_tx = runner.join_tx();
-    let runner_thread = tokio::task::spawn_blocking(move || runner.run());
 
     let http_server = http::Server::new(config.http_server, join_tx, session_endpoint);
 
-    let (_, http_server_result, _) =
-        futures::join!(runner_thread, http_server.serve(), webrtc_server.serve(),);
-    http_server_result.expect("HTTP server died");
+    let runner_thread = tokio::task::spawn_blocking(move || runner.run());
+    let http_server_task =
+        tokio::task::spawn(async move { http_server.serve(shutdown_http_rx).await });
+    let webrtc_server_task =
+        tokio::task::spawn(async move { webrtc_server.serve(shutdown_webrtc_rx).await });
+
+    // Shutdown handling...
+    ctrlc::set_handler_mut({
+        let mut shutdown_http_tx = Some(shutdown_http_tx);
+
+        move || {
+            info!("Received Ctrl-C signal, shutting down tasks");
+
+            if let Some(shutdown_http_tx) = shutdown_http_tx.take() {
+                shutdown_http_tx
+                    .send(())
+                    .expect("Failed to send shutdown to HTTP server");
+            }
+        }
+    })
+    .expect("Error setting Ctrl-C handler");
+
+    if let Err(err) = http_server_task.await.expect("Failed to join HTTP server") {
+        warn!("HTTP server died: {:?}", err);
+    }
+
+    info!("HTTP server terminated, shutting down runner thread");
+    shutdown_runner_tx
+        .send(())
+        .expect("Failed to send shutdown to runner thread");
+
+    runner_thread.await.expect("Failed to join runner thread");
+
+    info!("Runner thread terminated, shutting down WebRTC server");
+    if let Err(_) = shutdown_webrtc_tx.send(()) {
+        info!("WebRTC server has already shut down");
+    }
+
+    webrtc_server_task
+        .await
+        .expect("Failed to join WebRTC server");
 }

@@ -128,7 +128,9 @@ pub struct Runner {
     recv_message_rx: RecvMessageRx,
     send_message_tx: SendMessageTx,
 
+    shutdown_rx: oneshot::Receiver<()>,
     shutdown: bool,
+
     tick_timer: Timer,
 
     stats: Stats,
@@ -140,6 +142,7 @@ impl Runner {
         config: Config,
         recv_message_rx: RecvMessageRx,
         send_message_tx: SendMessageTx,
+        shutdown_rx: oneshot::Receiver<()>,
     ) -> Self {
         let (join_tx, join_rx) = mpsc::unbounded_channel();
         let tick_timer =
@@ -152,6 +155,7 @@ impl Runner {
             join_rx,
             recv_message_rx,
             send_message_tx,
+            shutdown_rx,
             shutdown: false,
             tick_timer,
             stats: Stats::default(),
@@ -184,6 +188,13 @@ impl Runner {
     }
 
     fn run_update(&mut self) {
+        // Handle external shutdown requests.
+        if self.shutdown_rx.try_recv().is_ok() {
+            info!("Shutting down");
+            self.shutdown = true;
+            return;
+        }
+
         // Handle incoming join requests via HTTP channel.
         while let Some(join_message) = match self.join_rx.try_recv() {
             Ok(join_message) => Some(join_message),

@@ -38,7 +38,10 @@ impl Server {
         }
     }
 
-    pub fn serve(&self) -> impl Future<Output = Result<(), hyper::Error>> + '_ {
+    pub fn serve(
+        &self,
+        shutdown_rx: oneshot::Receiver<()>,
+    ) -> impl Future<Output = Result<(), hyper::Error>> + '_ {
         info!("Starting HTTP server at {:?}", self.config.listen_addr);
         info!("Will serve client directory {:?}", self.config.clnt_dir);
 
@@ -61,7 +64,11 @@ impl Server {
             }
         });
 
-        hyper::Server::bind(&self.config.listen_addr).serve(make_service)
+        hyper::Server::bind(&self.config.listen_addr)
+            .serve(make_service)
+            .with_graceful_shutdown(async {
+                shutdown_rx.await.expect("Failed to read shutdown_rx")
+            })
     }
 }
 
