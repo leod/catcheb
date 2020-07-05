@@ -57,6 +57,7 @@ pub enum ServerMessage {
     Ping(SequenceNum),
     Pong(SequenceNum),
     Tick(Tick),
+    Disconnect,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +67,7 @@ pub enum ClientMessage {
     Input(Vec<(TickNum, Input)>),
     // TODO: Send some kind of hash with the AckTick
     AckTick(TickNum),
+    Disconnect,
 }
 
 pub const MAX_INPUTS_PER_MESSAGE: usize = 5;

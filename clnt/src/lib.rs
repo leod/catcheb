@@ -148,11 +148,6 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             continue;
         }
 
-        if !game.is_good() {
-            // TODO: Graceful error handling in client
-            panic!("Game lost connection");
-        }
-
         let start_time = Instant::now();
         let last_dt = start_time.duration_since(last_time);
         last_time = start_time;
@@ -166,7 +161,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         //Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
         now += smoothed_dt;
 
-        {
+        if game.is_good() {
             coarse_prof::profile!("update");
 
             let events = game.update(now, smoothed_dt, &current_input(&pressed_keys));
@@ -205,6 +200,15 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 game.interp_game_time(),
                 game.my_player_id(),
                 camera.transform(),
+            )?;
+        }
+
+        if !game.is_good() {
+            resources.font.draw(
+                &mut gfx,
+                "Lost connection to server",
+                Color::RED,
+                Vector::new(10.0, 25.0),
             )?;
         }
 

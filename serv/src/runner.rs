@@ -303,6 +303,13 @@ impl Runner {
             comn::ClientMessage::AckTick(ack_num) => {
                 self.record_player_ack_tick(message.0, ack_num);
             }
+            comn::ClientMessage::Disconnect => {
+                debug!("Player {:?} disconnected", message.0);
+
+                let game = self.games.get_mut(&player.game_id).unwrap();
+                game.remove_player(player.player_id);
+                self.players.remove(&message.0);
+            }
         }
     }
 
