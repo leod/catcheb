@@ -7,9 +7,12 @@ mod render;
 mod scoreboard;
 mod webrtc;
 
-use std::{collections::HashSet, time::Duration};
+use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Duration};
 
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::{
+    prelude::{wasm_bindgen, Closure},
+    JsCast,
+};
 
 use instant::Instant;
 use log::info;
@@ -77,7 +80,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
     let mut resources = render::Resources::load(&mut gfx).await?;
 
     // TODO: Graceful error handling in client
-    let mut game = join::join_and_connect(
+    let game = join::join_and_connect(
         comn::JoinRequest {
             game_id: None,
             player_name: "Pioneer".to_string(),
@@ -85,7 +88,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         &mut input,
     )
     .await
-    .unwrap();
+    .expect("Failed to connect");
 
     let mut camera = camera::Camera::new(config.camera, game.settings().size);
 
@@ -100,6 +103,20 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
     let mut dt_smoothing = stats::Var::new(Duration::from_millis(100));
     let mut now = last_time;
     //let mut dt_smoothing = 16.6666667;
+
+    // Wrap Game in RefCell so that it can be used in Window callback
+    let game = Rc::new(RefCell::new(game));
+    let on_before_unload = Closure::wrap(Box::new({
+        let game = game.clone();
+        move |_: &web_sys::Event| {
+            info!("Disconnecting...");
+            game.borrow_mut().disconnect();
+        }
+    }) as Box<dyn FnMut(&web_sys::Event)>);
+
+    web_sys::window()
+        .expect("Failed to get Window")
+        .set_onbeforeunload(Some(on_before_unload.as_ref().unchecked_ref()));
 
     loop {
         coarse_prof::profile!("loop");
@@ -142,6 +159,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         }
 
         coarse_prof::profile!("frame");
+
+        let mut game = game.borrow_mut();
 
         if lag_frames > 0 {
             lag_frames -= 1;
