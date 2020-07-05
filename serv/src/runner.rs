@@ -190,7 +190,27 @@ impl Runner {
     fn run_update(&mut self) {
         // Handle external shutdown requests.
         if self.shutdown_rx.try_recv().is_ok() {
-            info!("Shutting down");
+            info!("Sending disconnect messages to clients...");
+
+            // Send unreliable disconnect messages a few times to increase
+            // chance of arrival.
+            let peers: Vec<_> = self
+                .players
+                .values()
+                .filter_map(|player| player.peer)
+                .collect();
+
+            for _ in 0..3 {
+                for &peer in &peers {
+                    self.send(peer, comn::ServerMessage::Disconnect);
+                }
+            }
+
+            // Wait a little bit to allow WebRTC to send packages.
+            std::thread::sleep(Duration::from_secs(1));
+
+            info!("Finished shutting down");
+
             self.shutdown = true;
             return;
         }
