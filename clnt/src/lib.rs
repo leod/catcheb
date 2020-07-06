@@ -1,10 +1,7 @@
-mod camera;
-mod event_list;
 mod game;
 mod join;
 mod prediction;
-mod render;
-mod scoreboard;
+mod view;
 mod webrtc;
 
 use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Duration};
@@ -25,6 +22,8 @@ use quicksilver::{
 };
 
 use comn::util::stats;
+
+use crate::view::View;
 
 const SCREEN_SIZE: Vector = Vector {
     x: 1280.0,
@@ -67,17 +66,11 @@ struct Stats {
     frame_ms: stats::Var,
 }
 
-#[derive(Debug, Clone, Default)]
-struct Config {
-    event_list: event_list::Config,
-    camera: camera::Config,
-}
-
 async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver::Result<()> {
     info!("Starting up");
 
-    let config = Config::default();
-    let mut resources = render::Resources::load(&mut gfx).await?;
+    let config = view::Config::default();
+    let resources = view::Resources::load(&mut gfx).await?;
 
     // TODO: Graceful error handling in client
     let game = join::join_and_connect(
@@ -90,9 +83,14 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
     .await
     .expect("Failed to connect");
 
-    let mut camera = camera::Camera::new(config.camera, game.settings().size);
-
-    let mut event_list = event_list::EventList::new(config.event_list);
+    let mut view = View::new(
+        config,
+        game.settings().clone(),
+        game.my_player_id(),
+        resources,
+        comn::Vector::new(window.size().x, window.size().y),
+        window.scale_factor(),
+    );
 
     let mut stats = Stats::default();
     let mut show_stats = false;
@@ -180,50 +178,45 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         //Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
         now += smoothed_dt;
 
-        if game.is_good() {
+        let game_events = if game.is_good() {
             coarse_prof::profile!("update");
 
-            let events = game.update(now, smoothed_dt, &current_input(&pressed_keys));
+            game.update(now, smoothed_dt, &current_input(&pressed_keys))
+        } else {
+            Vec::new()
+        };
 
-            for event in events {
-                event_list.push(now, event);
-            }
-        }
-
-        {
-            let follow_entity = game.state().and_then(|state| {
-                state
-                    .get_player_entity(game.my_player_id())
-                    .map(|(_id, e)| comn::Entity::Player(e.clone()))
-            });
-            camera.update(
-                smoothed_dt,
-                &pressed_keys,
-                follow_entity,
-                game.interp_game_time(),
-                comn::Vector::new(window.size().x, window.size().y) * window.scale_factor(),
-            );
-        }
+        let state = game.state();
+        view.set_window_size(
+            comn::Vector::new(window.size().x, window.size().y),
+            window.scale_factor(),
+        );
+        view.update(
+            now,
+            last_dt,
+            &pressed_keys,
+            state.as_ref(),
+            &game_events,
+            game.interp_game_time(),
+        );
 
         coarse_prof::profile!("render");
         gfx.clear(Color::WHITE);
 
-        let state = game.state();
-        if let Some(state) = state.as_ref() {
-            coarse_prof::profile!("game");
-            render::render_game(
+        {
+            coarse_prof::profile!("view");
+
+            view.render(
+                now,
                 &mut gfx,
-                &mut resources,
-                &state,
+                state.as_ref(),
                 &game.next_entities(),
                 game.interp_game_time(),
-                game.my_player_id(),
-                camera.transform(),
             )?;
         }
 
         if !game.is_good() {
-            resources.font.draw(
+            view.resources_mut().font.draw(
                 &mut gfx,
                 "Lost connection to server",
                 Color::RED,
@@ -233,25 +226,15 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
         let mut debug_y: f32 = 15.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {
-            resources
-                .font_small
-                .draw(&mut gfx, s, Color::BLACK, Vector::new(10.0, debug_y))?;
+            view.resources_mut().font_small.draw(
+                &mut gfx,
+                s,
+                Color::BLACK,
+                Vector::new(10.0, debug_y),
+            )?;
             debug_y += 12.0;
             Ok(())
         };
-
-        /*if let Some((_, my_entity)) = game
-            .state()
-            .and_then(|state| state.get_player_entity(game.my_player_id()).unwrap())
-        {
-            let cooldown = (my_entity.next_shot_time - game.interp_game_time()).max(0.0);
-            debug(&format!("gun cooldown: {:>3.1}", cooldown))?;
-            debug(&format!("shots left:   {}", my_entity.shots_left))?;
-        } else {
-            // lol
-            debug("")?;
-            debug("")?;
-        }*/
 
         if show_stats {
             coarse_prof::profile!("stats");
@@ -303,28 +286,6 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             ))?;
             debug(&format!("tick interp:       {}", game.stats().tick_interp))?;
             debug(&format!("input delay:       {}", game.stats().input_delay))?;
-        }
-
-        {
-            coarse_prof::profile!("event_list");
-            event_list.render(
-                now,
-                &mut gfx,
-                &mut resources.font_small,
-                Vector::new(1000.0, 30.0),
-            )?;
-
-            //if pressed_keys.contains(&Key::Tab) {
-            if let Some(state) = state.as_ref() {
-                scoreboard::render(
-                    &mut gfx,
-                    &mut resources.font_small,
-                    state,
-                    Vector::new(1000.0, 100.0),
-                    Vector::new(300.0, 300.0),
-                )?;
-            }
-            //}
         }
 
         {
