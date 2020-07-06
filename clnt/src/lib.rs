@@ -4,7 +4,7 @@ mod prediction;
 mod view;
 mod webrtc;
 
-use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
 use wasm_bindgen::{
     prelude::{wasm_bindgen, Closure},
@@ -62,7 +62,6 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
 #[derive(Default)]
 struct Stats {
     dt_ms: stats::Var,
-    smoothed_dt_ms: stats::Var,
     frame_ms: stats::Var,
 }
 
@@ -98,9 +97,6 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
-    let mut dt_smoothing = stats::Var::new(Duration::from_millis(100));
-    let mut now = last_time;
-    //let mut dt_smoothing = 16.6666667;
 
     // Wrap Game in RefCell so that it can be used in Window callback
     let game = Rc::new(RefCell::new(game));
@@ -169,19 +165,10 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         let last_dt = start_time.duration_since(last_time);
         last_time = start_time;
 
-        //dt_smoothing += 0.1 * (last_dt.as_secs_f32() - dt_smoothing);
-        //let dt = Duration::from_secs_f32(dt_smoothing);
-
-        // TODO: dt smoothing is just not a good idea
-        dt_smoothing.record(last_dt.as_secs_f32());
-        let smoothed_dt = last_dt;
-        //Duration::from_secs_f32(dt_smoothing.mean().unwrap_or(last_dt.as_secs_f32()));
-        now += smoothed_dt;
-
         let game_events = if game.is_good() {
             coarse_prof::profile!("update");
 
-            game.update(now, smoothed_dt, &current_input(&pressed_keys))
+            game.update(start_time, last_dt, &current_input(&pressed_keys))
         } else {
             Vec::new()
         };
@@ -192,7 +179,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             window.scale_factor(),
         );
         view.update(
-            now,
+            start_time,
             last_dt,
             &pressed_keys,
             state.as_ref(),
@@ -207,7 +194,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             coarse_prof::profile!("view");
 
             view.render(
-                now,
+                start_time,
                 &mut gfx,
                 state.as_ref(),
                 &game.next_entities(),
@@ -273,7 +260,6 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             debug("")?;
             debug("                        cur      min      max     mean   stddev")?;
             debug(&format!("dt (ms):           {}", stats.dt_ms))?;
-            debug(&format!("smoothed dt (ms):  {}", stats.smoothed_dt_ms))?;
             debug(&format!("frame (ms):        {}", stats.frame_ms))?;
             debug(&format!("time lag (ms):     {}", game.stats().time_lag_ms))?;
             debug(&format!(
@@ -295,9 +281,6 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
         // Keep some statistics for debugging...
         stats.dt_ms.record(last_dt.as_secs_f32() * 1000.0);
-        stats
-            .smoothed_dt_ms
-            .record(smoothed_dt.as_secs_f32() * 1000.0);
         stats
             .frame_ms
             .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);
