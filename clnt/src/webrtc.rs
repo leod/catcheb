@@ -312,7 +312,7 @@ async fn request_session(
     let request = web_sys::Request::new_with_str_and_init(&address, &opts)
         .map_err(ConnectError::NewRequest)?;
 
-    let window = web_sys::window().unwrap();
+    let window = web_sys::window().expect("Failed to get Window");
     let response_value: JsValue = JsFuture::from(window.fetch_with_request(&request))
         .await
         .map_err(ConnectError::Fetch)?;
