@@ -4,7 +4,7 @@ use log::{info, warn};
 
 use comn::{game::RunContext, util::join};
 
-use crate::game::ReceivedState;
+use crate::runner::ReceivedState;
 
 const MIN_PREDICTION_ERROR_FOR_REPLAY: f32 = 0.001;
 

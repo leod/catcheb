@@ -195,17 +195,17 @@ impl Game {
                         context.removed_entities.insert(*entity_id);
                     } else {
                         for entity_b in entities.values() {
-                            if entity_b.is_wall_like() {
-                                if entity_b.shape(time).contains_point(food.pos(time)) {
-                                    // Replace the Food by a non-moving one
-                                    context.removed_entities.insert(*entity_id);
-                                    context.new_entities.push(Entity::Food(Food {
-                                        start_pos: food.pos(time - dt / 2.0),
-                                        start_vel: Vector::zeros(),
-                                        ..food.clone()
-                                    }));
-                                    break;
-                                }
+                            if entity_b.is_wall_like()
+                                && entity_b.shape(time).contains_point(food.pos(time))
+                            {
+                                // Replace the Food by a non-moving one
+                                context.removed_entities.insert(*entity_id);
+                                context.new_entities.push(Entity::Food(Food {
+                                    start_pos: food.pos(time - dt / 2.0),
+                                    start_vel: Vector::zeros(),
+                                    ..food.clone()
+                                }));
+                                break;
                             }
                         }
                     }
@@ -423,21 +423,17 @@ impl Game {
                     }
                 }
                 Hook::Attached { target, offset } => {
-                    input_state
-                        .entities
-                        .get(&target)
-                        .map_or(None, |target_ent| {
-                            let hook_pos = target_ent.pos(input_time) + offset;
+                    input_state.entities.get(&target).and_then(|target_ent| {
+                        let hook_pos = target_ent.pos(input_time) + offset;
 
-                            if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE
-                            {
-                                Some(Hook::Contracting { pos: hook_pos })
-                            } else {
-                                ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
+                        if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE {
+                            Some(Hook::Contracting { pos: hook_pos })
+                        } else {
+                            ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
 
-                                Some(Hook::Attached { target, offset })
-                            }
-                        })
+                            Some(Hook::Attached { target, offset })
+                        }
+                    })
                 }
                 Hook::Contracting { pos } => {
                     let new_pos = geom::smooth_to_target_point(5.0, ent.pos, pos, dt);

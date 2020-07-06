@@ -4,14 +4,10 @@ use nalgebra as na;
 
 use quicksilver::{
     geom::{Circle, Rectangle, Transform, Vector},
-    golem::TextureFilter,
     graphics::{
         //blend::{BlendEquation, BlendFunction, BlendMode, BlendOperation, BlendFactor, BlendChannel, BlendInput},
         Color,
-        FontRenderer,
         Graphics,
-        Image,
-        VectorFont,
     },
 };
 
@@ -21,33 +17,7 @@ use comn::{
     util::join,
 };
 
-pub struct Resources {
-    pub ttf: VectorFont,
-    pub font_small: FontRenderer,
-    pub font: FontRenderer,
-    pub font_large: FontRenderer,
-    pub hirsch: Image,
-}
-
-impl Resources {
-    pub async fn load(gfx: &mut Graphics) -> quicksilver::Result<Self> {
-        let ttf = VectorFont::load("kongtext.ttf").await?;
-        let font_small = ttf.to_renderer(gfx, 9.0)?;
-        let font = ttf.to_renderer(gfx, 18.0)?;
-        let font_large = ttf.to_renderer(gfx, 40.0)?;
-        let hirsch = Image::load(gfx, "hirsch.png").await?;
-        hirsch.set_magnification(TextureFilter::Nearest)?;
-        hirsch.set_minification(TextureFilter::Nearest)?;
-
-        Ok(Self {
-            ttf,
-            font_small,
-            font,
-            font_large,
-            hirsch,
-        })
-    }
-}
+use crate::view::Resources;
 
 pub fn interp_entities<'a>(
     state: &'a comn::Game,
