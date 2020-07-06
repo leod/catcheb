@@ -119,6 +119,7 @@ impl Server {
                     }
                 }
                 _ = shutdown_rx => {
+                    return;
                 }
             };
         }
