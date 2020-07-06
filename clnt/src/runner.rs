@@ -35,7 +35,7 @@ const MAX_TICKS_PER_UPDATE: usize = 5;
 const MAX_TIME_LAG_DEVIATION: f32 = 0.075;
 const KEEP_STATES_BUFFER: u32 = 5;
 
-pub struct Game {
+pub struct Runner {
     settings: comn::Settings,
     my_token: comn::PlayerToken,
     my_player_id: comn::PlayerId,
@@ -62,7 +62,7 @@ pub struct Game {
     stats: Stats,
 }
 
-impl Game {
+impl Runner {
     pub fn new(join: comn::JoinSuccess, webrtc_client: webrtc::Client) -> Self {
         let prediction = Some(Prediction::new(join.your_player_id));
         let recv_tick_time = GameTimeEstimation::new(join.game_settings.tick_period());

@@ -393,12 +393,10 @@ impl Ray {
             } else {
                 Some((t2, t2))
             }
+        } else if t2 < 0.0 {
+            Some((t1, t1))
         } else {
-            if t2 < 0.0 {
-                Some((t1, t1))
-            } else {
-                Some((t1, t2))
-            }
+            Some((t1, t2))
         })
     }
 }

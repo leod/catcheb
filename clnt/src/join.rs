@@ -5,7 +5,7 @@ use wasm_bindgen_futures::JsFuture;
 
 use quicksilver::input::Input;
 
-use crate::{game::Game, webrtc};
+use crate::{runner::Runner, webrtc};
 
 #[derive(Debug, Clone)]
 pub enum JoinAndConnectError {
@@ -17,7 +17,7 @@ pub enum JoinAndConnectError {
 pub async fn join_and_connect(
     request: comn::JoinRequest,
     input: &mut Input,
-) -> Result<Game, JoinAndConnectError> {
+) -> Result<Runner, JoinAndConnectError> {
     let join_success = join_request(request)
         .await
         .map_err(JoinAndConnectError::Request)?
@@ -44,7 +44,7 @@ pub async fn join_and_connect(
         // TODO: Timeout
     }
 
-    Ok(Game::new(join_success, webrtc_client))
+    Ok(Runner::new(join_success, webrtc_client))
 }
 
 pub async fn join_request(request: comn::JoinRequest) -> Result<comn::JoinReply, JsValue> {
