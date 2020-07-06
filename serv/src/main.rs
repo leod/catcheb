@@ -160,7 +160,7 @@ async fn main() {
     runner_thread.await.expect("Failed to join runner thread");
 
     info!("Runner thread terminated, shutting down WebRTC server");
-    if let Err(_) = shutdown_webrtc_tx.send(()) {
+    if shutdown_webrtc_tx.send(()).is_err() {
         info!("WebRTC server has already shut down");
     }
 
