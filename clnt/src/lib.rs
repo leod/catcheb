@@ -1,6 +1,6 @@
-mod game;
 mod join;
 mod prediction;
+mod runner;
 mod view;
 mod webrtc;
 
@@ -72,7 +72,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
     let resources = view::Resources::load(&mut gfx).await?;
 
     // TODO: Graceful error handling in client
-    let game = join::join_and_connect(
+    let runner = join::join_and_connect(
         comn::JoinRequest {
             game_id: None,
             player_name: "Pioneer".to_string(),
@@ -84,8 +84,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
     let mut view = View::new(
         config,
-        game.settings().clone(),
-        game.my_player_id(),
+        runner.settings().clone(),
+        runner.my_player_id(),
         resources,
         comn::Vector::new(window.size().x, window.size().y),
         window.scale_factor(),
@@ -98,13 +98,13 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
     let mut pressed_keys: HashSet<Key> = HashSet::new();
     let mut last_time = Instant::now();
 
-    // Wrap Game in RefCell so that it can be used in Window callback
-    let game = Rc::new(RefCell::new(game));
+    // Wrap the Runner in RefCell so that it can be used in Window callback
+    let runner = Rc::new(RefCell::new(runner));
     let on_before_unload = Closure::wrap(Box::new({
-        let game = game.clone();
+        let runner = runner.clone();
         move |_: &web_sys::Event| {
             info!("Disconnecting...");
-            game.borrow_mut().disconnect();
+            runner.borrow_mut().disconnect();
         }
     }) as Box<dyn FnMut(&web_sys::Event)>);
 
@@ -154,7 +154,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
         coarse_prof::profile!("frame");
 
-        let mut game = game.borrow_mut();
+        let mut runner = runner.borrow_mut();
 
         if lag_frames > 0 {
             lag_frames -= 1;
@@ -165,15 +165,15 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         let last_dt = start_time.duration_since(last_time);
         last_time = start_time;
 
-        let game_events = if game.is_good() {
+        let game_events = if runner.is_good() {
             coarse_prof::profile!("update");
 
-            game.update(start_time, last_dt, &current_input(&pressed_keys))
+            runner.update(start_time, last_dt, &current_input(&pressed_keys))
         } else {
             Vec::new()
         };
 
-        let state = game.state();
+        let state = runner.state();
         view.set_window_size(
             comn::Vector::new(window.size().x, window.size().y),
             window.scale_factor(),
@@ -184,7 +184,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
             &pressed_keys,
             state.as_ref(),
             &game_events,
-            game.interp_game_time(),
+            runner.interp_game_time(),
         );
 
         coarse_prof::profile!("render");
@@ -197,12 +197,12 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 start_time,
                 &mut gfx,
                 state.as_ref(),
-                &game.next_entities(),
-                game.interp_game_time(),
+                &runner.next_entities(),
+                runner.interp_game_time(),
             )?;
         }
 
-        if !game.is_good() {
+        if !runner.is_good() {
             view.resources_mut().font.draw(
                 &mut gfx,
                 "Lost connection to server",
@@ -232,46 +232,56 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
             debug(&format!(
                 "ping:               {:>7.3}",
-                game.ping().estimate().as_secs_f32() * 1000.0
+                runner.ping().estimate().as_secs_f32() * 1000.0
             ))?;
             debug(&format!(
                 "recv stddev:        {:>7.3}",
-                1000.0 * game.stats().recv_delay_std_dev,
+                1000.0 * runner.stats().recv_delay_std_dev,
             ))?;
             debug(&format!(
                 "loss (%):           {:>7.3}",
-                game.stats().loss.estimate().map_or(100.0, |p| p * 100.0)
+                runner.stats().loss.estimate().map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
                 "skip loss (%):      {:>7.3}",
-                game.stats()
+                runner
+                    .stats()
                     .skip_loss
                     .estimate()
                     .map_or(100.0, |p| p * 100.0)
             ))?;
             debug(&format!(
                 "recv rate (kB/s):   {:>7.3}",
-                game.stats().recv_rate / 1000.0
+                runner.stats().recv_rate / 1000.0
             ))?;
             debug(&format!(
                 "send rate (kB/s):   {:>7.3}",
-                game.stats().send_rate / 1000.0
+                runner.stats().send_rate / 1000.0
             ))?;
             debug("")?;
             debug("                        cur      min      max     mean   stddev")?;
             debug(&format!("dt (ms):           {}", stats.dt_ms))?;
             debug(&format!("frame (ms):        {}", stats.frame_ms))?;
-            debug(&format!("time lag (ms):     {}", game.stats().time_lag_ms))?;
+            debug(&format!(
+                "time lag (ms):     {}",
+                runner.stats().time_lag_ms
+            ))?;
             debug(&format!(
                 "time lag dev (ms): {}",
-                game.stats().time_lag_deviation_ms
+                runner.stats().time_lag_deviation_ms
             ))?;
             debug(&format!(
                 "time warp:         {}",
-                game.stats().time_warp_factor
+                runner.stats().time_warp_factor
             ))?;
-            debug(&format!("tick interp:       {}", game.stats().tick_interp))?;
-            debug(&format!("input delay:       {}", game.stats().input_delay))?;
+            debug(&format!(
+                "tick interp:       {}",
+                runner.stats().tick_interp
+            ))?;
+            debug(&format!(
+                "input delay:       {}",
+                runner.stats().input_delay
+            ))?;
         }
 
         {
