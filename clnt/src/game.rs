@@ -41,6 +41,7 @@ pub struct Game {
     my_player_id: comn::PlayerId,
 
     webrtc_client: webrtc::Client,
+    disconnected: bool,
 
     last_inputs: VecDeque<(comn::TickNum, comn::Input)>,
 
@@ -71,6 +72,7 @@ impl Game {
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,
+            disconnected: false,
             last_inputs: VecDeque::new(),
             received_states: BTreeMap::new(),
             received_events: BTreeMap::new(),
@@ -91,6 +93,8 @@ impl Game {
 
     pub fn is_good(&self) -> bool {
         self.webrtc_client.status() == webrtc::Status::Open
+            && !self.disconnected
+            && !self.ping.is_timeout(Instant::now())
     }
 
     pub fn settings(&self) -> &comn::Settings {
@@ -118,6 +122,8 @@ impl Game {
     }
 
     pub fn update(&mut self, now: Instant, dt: Duration, input: &comn::Input) -> Vec<comn::Event> {
+        assert!(self.is_good());
+
         {
             coarse_prof::profile!("webrtc");
 
@@ -326,6 +332,8 @@ impl Game {
         events
     }
 
+    // TODO: Both `state` and `next_entities` need to be revised
+
     pub fn state(&self) -> Option<comn::Game> {
         // Due to loss, we might not always have an authorative state for the
         // current tick num. Take the closest one then.
@@ -418,7 +426,19 @@ impl Game {
             comn::ServerMessage::Tick(tick) => {
                 self.record_server_tick(recv_time, tick);
             }
+            comn::ServerMessage::Disconnect => {
+                self.disconnected = true;
+            }
         }
+    }
+
+    pub fn disconnect(&mut self) {
+        // Send unreliable message a few times to increase chance of arrival.
+        for _ in 0..3 {
+            self.send(comn::ClientMessage::Disconnect);
+        }
+
+        self.disconnected = true;
     }
 
     fn send(&self, message: comn::ClientMessage) {

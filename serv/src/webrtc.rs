@@ -1,9 +1,9 @@
 use std::{net::SocketAddr, time::Instant};
 
-use log::warn;
+use log::{info, warn};
 
 use futures::{select, FutureExt};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 pub struct MessageIn {
     pub peer: SocketAddr,
@@ -69,7 +69,9 @@ impl Server {
         self.webrtc_server.session_endpoint()
     }
 
-    pub async fn serve(mut self) {
+    pub async fn serve(mut self, shutdown_rx: oneshot::Receiver<()>) {
+        let mut shutdown_rx = shutdown_rx.fuse();
+
         // TODO: Check size of `message_buf` for receiving WebRTC messages
         let mut message_buf = vec![0; 0x10000];
 
@@ -93,7 +95,7 @@ impl Server {
                             }
                         }
                         None => {
-                            warn!("send_message_rx closed, terminating");
+                            info!("send_message_rx closed, terminating");
                             return;
                         }
                     }
@@ -107,7 +109,7 @@ impl Server {
                                 recv_time: Instant::now(),
                             };
                             if self.recv_message_tx.send(message_in).is_err() {
-                                warn!("recv_message_tx closed, terminating");
+                                info!("recv_message_tx closed, terminating");
                                 return;
                             }
                         }
@@ -115,6 +117,9 @@ impl Server {
                             warn!("Could not receive message: {}", err);
                         }
                     }
+                }
+                _ = shutdown_rx => {
+                    return;
                 }
             };
         }
