@@ -29,6 +29,15 @@ pub struct Server {
     session_endpoint: SessionEndpoint,
 }
 
+pub const STATIC_FILES: &[(&str, &str, &str)] = &[
+    ("/", "index.html", "text/html"),
+    ("/index.html", "index.html", "text/html"),
+    ("/clnt.js", "clnt.js.gz", "text/javascript"),
+    ("/clnt_bg.wasm", "clnt_bg.wasm.gz", "application/wasm"),
+    ("/kongtext.ttf", "kongtext.ttf", "font/ttf"),
+    ("/sprint.png", "sprint.png", "image/png"),
+];
+
 impl Server {
     pub fn new(config: Config, join_tx: JoinTx, session_endpoint: SessionEndpoint) -> Self {
         Self {
@@ -83,16 +92,18 @@ async fn service(
 
     match (req.method(), req.uri().path()) {
         // Serve static files
-        (&Method::GET, "/") | (&Method::GET, "/index.html") => {
-            send_file(config, "index.html", "text/html").await
+        (&Method::GET, file) => {
+            let item = STATIC_FILES
+                .iter()
+                .filter(|(key, _, _)| *key == file)
+                .next();
+
+            if let Some((_, filename, content_type)) = item {
+                send_file(config, filename, content_type).await
+            } else {
+                Ok(not_found())
+            }
         }
-        (&Method::GET, "/clnt.js") => send_file(config, "clnt.js.gz", "text/javascript").await,
-        (&Method::GET, "/clnt_bg.wasm") => {
-            send_file(config, "clnt_bg.wasm.gz", "application/wasm").await
-        }
-        (&Method::GET, "/Munro-2LYe.ttf") => send_file(config, "Munro-2LYe.ttf", "font/ttf").await,
-        (&Method::GET, "/kongtext.ttf") => send_file(config, "kongtext.ttf", "font/ttf").await,
-        (&Method::GET, "/hirsch.png") => send_file(config, "hirsch.png", "image/png").await,
 
         // Establish a WebRTC connection
         (&Method::POST, "/connect_webrtc") => {
