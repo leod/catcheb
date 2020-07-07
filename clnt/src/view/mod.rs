@@ -125,7 +125,7 @@ impl View {
             now,
             gfx,
             &mut self.resources.font_small,
-            Vector::new(1000.0, 30.0),
+            Vector::new(10.0, 10.0),
         )?;
 
         if let Some(state) = state {
@@ -133,7 +133,7 @@ impl View {
                 gfx,
                 &mut self.resources.font_small,
                 state,
-                Vector::new(1000.0, 100.0),
+                Vector::new(1010.0, 10.0),
                 Vector::new(300.0, 300.0),
             )?;
         }

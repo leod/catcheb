@@ -9,6 +9,8 @@ use quicksilver::{
 
 use comn::{DeathReason, Event};
 
+use crate::view::overlay;
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub num_lines: usize,
@@ -62,6 +64,15 @@ impl EventList {
         }
 
         // Display events.
+        if !self.events.is_empty() {
+            overlay::box_thing(
+                gfx,
+                pos - Vector::new(0.0, 6.0),
+                Vector::new(260.0, 12.0 * self.events.len() as f32 + 14.0),
+            )?;
+            pos += Vector::new(10.0, 10.0);
+        }
+
         for (_, event) in self.events.iter() {
             if let Some(string) = Self::event_to_string(event) {
                 font.draw(gfx, &string, Color::BLACK, pos)?;
