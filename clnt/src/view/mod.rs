@@ -1,5 +1,6 @@
 mod camera;
 mod event_list;
+mod overlay;
 mod render;
 mod resources;
 mod scoreboard;
@@ -109,9 +110,17 @@ impl View {
                 self.my_player_id,
                 self.camera.transform(),
             )?;
+
+            coarse_prof::profile!("overlay");
+            overlay::render(
+                gfx,
+                &mut self.resources,
+                state.get_player_entity(self.my_player_id).map(|(_, e)| e),
+                Vector::new(self.window_size.x, self.window_size.y),
+            )?;
         }
 
-        coarse_prof::profile!("overlay");
+        coarse_prof::profile!("text");
         self.event_list.render(
             now,
             gfx,

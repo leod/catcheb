@@ -36,6 +36,7 @@ pub const STATIC_FILES: &[(&str, &str, &str)] = &[
     ("/clnt_bg.wasm", "clnt_bg.wasm.gz", "application/wasm"),
     ("/kongtext.ttf", "kongtext.ttf", "font/ttf"),
     ("/sprint.png", "sprint.png", "image/png"),
+    ("/robot-grab.png", "robot-grab.png", "image/png"),
 ];
 
 impl Server {
