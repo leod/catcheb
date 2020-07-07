@@ -13,7 +13,10 @@ const HEIGHT: f32 = ICON_SIZE;
 const ICON_SIZE: f32 = 32.0;
 
 pub fn box_thing(gfx: &mut Graphics, pos: Vector, size: Vector) -> quicksilver::Result<()> {
-    gfx.fill_rect(&Rectangle::new(pos, size), Color::from_rgba(240, 240, 240, 1.0));
+    gfx.fill_rect(
+        &Rectangle::new(pos, size),
+        Color::from_rgba(240, 240, 240, 1.0),
+    );
     gfx.stroke_rect(&Rectangle::new(pos, size), Color::BLACK);
     Ok(())
 }

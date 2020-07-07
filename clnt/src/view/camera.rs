@@ -54,8 +54,16 @@ impl Camera {
         let offset = window_size / (2.0 * self.scale);
 
         self.target = follow_entity.map_or(self.target, |entity| entity.pos(game_time));
-        self.target.x = self.target.x.max(offset.x).min(self.map_size.x - offset.x);
-        self.target.y = self.target.y.max(offset.y).min(self.map_size.y - offset.y);
+        self.target.x = self
+            .target
+            .x
+            .max(offset.x - 200.0)
+            .min(self.map_size.x - offset.x + 200.0);
+        self.target.y = self
+            .target
+            .y
+            .max(offset.y - 200.0)
+            .min(self.map_size.y - offset.y + 200.0);
 
         self.pos = if (self.pos - self.target).norm() <= self.config.max_smooth_dist {
             geom::smooth_to_target_point(
