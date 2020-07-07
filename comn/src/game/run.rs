@@ -548,13 +548,12 @@ impl Game {
             dash.time_left -= dt;
 
             if dash.time_left <= 0.0 {
+                ent.dash_cooldown = PLAYER_DASH_COOLDOWN;
                 None
             } else {
                 Some(dash)
             }
         } else if input.use_item && ent.dash_cooldown == 0.0 {
-            ent.dash_cooldown = PLAYER_DASH_COOLDOWN;
-
             Some(Dash {
                 time_left: PLAYER_DASH_DURATION,
                 dir: Vector::new(ent.angle.cos(), ent.angle.sin()),
