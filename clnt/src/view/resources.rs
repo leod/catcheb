@@ -1,4 +1,7 @@
-use quicksilver::{golem::TextureFilter, graphics::{FontRenderer, Graphics, Image, VectorFont}};
+use quicksilver::{
+    golem::TextureFilter,
+    graphics::{FontRenderer, Graphics, Image, VectorFont},
+};
 
 pub struct Resources {
     pub ttf: VectorFont,
@@ -8,6 +11,7 @@ pub struct Resources {
     pub icon_dash: Image,
     pub icon_hook: Image,
     pub ground: Image,
+    pub player: Image,
 }
 
 impl Resources {
@@ -19,9 +23,12 @@ impl Resources {
         let icon_dash = Image::load(gfx, "sprint.png").await?;
         let icon_hook = Image::load(gfx, "robot-grab.png").await?;
         let mut ground = Image::load(gfx, "ground.png").await?;
+        let mut player = Image::load(gfx, "player.png").await?;
 
-        ground.set_magnification(TextureFilter::Nearest);
-        ground.set_minification(TextureFilter::Nearest);
+        for texture in [&mut ground, &mut player].iter() {
+            texture.set_magnification(TextureFilter::Nearest)?;
+            texture.set_minification(TextureFilter::Nearest)?;
+        }
 
         Ok(Self {
             ttf,
@@ -31,6 +38,7 @@ impl Resources {
             icon_dash,
             icon_hook,
             ground,
+            player,
         })
     }
 }

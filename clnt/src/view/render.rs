@@ -19,6 +19,18 @@ use comn::{
 
 use crate::view::Resources;
 
+pub fn color_enemy() -> Color {
+    Color::from_hex("E13700")
+}
+
+pub fn color_food() -> Color {
+    Color::from_hex("FFC100")
+}
+
+pub fn color_wall() -> Color {
+    Color::from_hex("0A0903")
+}
+
 pub fn interp_entities<'a>(
     state: &'a comn::Game,
     next_entities: &'a BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
@@ -68,7 +80,7 @@ pub fn render_game(
         gfx.set_transform(camera_transform);
         let map_size: mint::Vector2<f32> = state.settings.map.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
-        gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
+        //gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
         //gfx.fill_rect(&map_rect, Color::WHITE);
         gfx.draw_subimage(
             &resources.ground,
@@ -138,7 +150,7 @@ pub fn render_game(
                 if spawn.has_food {
                     let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                     gfx.set_transform(transform.then(camera_transform));
-                    gfx.fill_rect(&rect, Color::ORANGE);
+                    gfx.fill_rect(&rect, color_food());
                     gfx.stroke_rect(&rect, Color::BLACK);
                 }
             }
@@ -242,7 +254,7 @@ pub fn render_game(
                 gfx.draw_subimage(&resources.hirsch, sub_rect, rect);*/
 
                 let color = if danger_guy.is_hot {
-                    Color::RED
+                    color_enemy()
                 } else {
                     Color::CYAN
                 };
@@ -256,7 +268,7 @@ pub fn render_game(
                 let color = if bullet.owner == Some(my_player_id) {
                     Color::ORANGE
                 } else {
-                    Color::MAGENTA
+                    color_enemy()
                 };
                 gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, color);
@@ -265,7 +277,7 @@ pub fn render_game(
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
                 let color = if turret.target.is_some() {
-                    Color::RED
+                    color_enemy()
                 } else {
                     Color::from_rgba(150, 150, 150, 1.0)
                 };
@@ -291,6 +303,7 @@ pub fn render_game(
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, Color::from_rgba(170, 170, 170, 1.0));
+                //gfx.fill_rect(&rect, color_wall());
                 gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::FoodSpawn(_) => (),
@@ -303,6 +316,8 @@ pub fn render_game(
     Ok(())
 }
 
+// 0a0903,ffc100,e13700,072ac8,7ae582
+
 fn render_player(
     gfx: &mut Graphics,
     resources: &mut Resources,
@@ -314,23 +329,54 @@ fn render_player(
     player: &comn::PlayerView,
 ) -> quicksilver::Result<()> {
     let pos: mint::Vector2<f32> = player.pos.coords.into();
+    let transform = rect_to_transform(&player.rect());
+    let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
 
-    let color = if player.owner == my_player_id {
+    gfx.set_transform(Transform::rotate(90.0).then(transform.then(camera_transform)));
+
+    let row = if player.owner == my_player_id {
+        0.0
+    } else if state.catcher == Some(player.owner) {
+        1.0
+    } else {
+        2.0
+    };
+    let column = if player.is_dashing {
+        //1.0
+        //pareen::fun(|t| (t / 0.075) as usize as f32).repeat(0.3).eval(time)
+        if state.catcher == Some(player.owner) {
+            pareen::constant(1.0)
+                .switch(0.1, 3.0)
+                .repeat(0.2)
+                .eval(time)
+        } else {
+            1.0
+        }
+    } else {
+        pareen::constant(2.0)
+            .switch(0.3, 3.0)
+            .repeat(0.6)
+            .eval(time)
+    };
+
+    let sub_rect = Rectangle::new(
+        Vector::new(16.0 * column, 16.0 * row),
+        Vector::new(16.0, 16.0),
+    );
+    gfx.draw_subimage(&resources.player, sub_rect, rect);
+
+    /*let color = if player.owner == my_player_id {
         Color::BLUE
     } else {
         Color::from_rgba(148, 0, 211, 1.0)
     };
 
-    let transform = rect_to_transform(&player.rect());
-    let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
-
-    gfx.set_transform(transform.then(camera_transform));
     gfx.fill_rect(&rect, color);
     gfx.stroke_rect(&rect, Color::BLACK);
 
     let nose = Rectangle::new(Vector::new(0.5, -0.1), Vector::new(0.2, 0.2));
     gfx.set_transform(transform.then(camera_transform));
-    gfx.fill_rect(&nose, Color::CYAN);
+    gfx.fill_rect(&nose, Color::CYAN);*/
 
     gfx.set_transform(camera_transform);
 
@@ -338,9 +384,9 @@ fn render_player(
         render_hook(gfx, state, next_entities, time, player.pos, hook)?;
     }
 
-    resources
-        .font
-        .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;
+    /*resources
+    .font
+    .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;*/
 
     Ok(())
 }
