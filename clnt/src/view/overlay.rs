@@ -30,7 +30,7 @@ pub fn render(
     if let Some(entity) = entity {
         box_thing(
             gfx,
-            Vector::new(PADDING, window_size.y - HEIGHT - PADDING - MARGIN),
+            Vector::new(PADDING, window_size.y - HEIGHT - 2.0 * PADDING - MARGIN),
             Vector::new(2.0 * (ICON_SIZE + MARGIN), HEIGHT + 2.0 * PADDING + 10.0),
         )?;
         render_ability(
@@ -40,7 +40,7 @@ pub fn render(
             "shift",
             entity.hook.is_some(),
             entity.hook_cooldown / HOOK_COOLDOWN,
-            Vector::new(MARGIN, window_size.y - HEIGHT - MARGIN),
+            Vector::new(MARGIN, window_size.y - HEIGHT - PADDING - MARGIN),
         )?;
         render_ability(
             gfx,
@@ -51,7 +51,7 @@ pub fn render(
             entity.dash_cooldown / PLAYER_DASH_COOLDOWN,
             Vector::new(
                 MARGIN + 1.0 * (MARGIN + ICON_SIZE),
-                window_size.y - HEIGHT - MARGIN,
+                window_size.y - HEIGHT - PADDING - MARGIN,
             ),
         )?;
     }

@@ -50,8 +50,9 @@ impl Camera {
         follow_entity: Option<comn::Entity>,
         game_time: comn::GameTime,
         window_size: comn::Vector,
+        window_scale_factor: f32,
     ) {
-        let offset = window_size / (2.0 * self.scale);
+        let offset = window_size / (2.0 * self.scale / window_scale_factor);
 
         self.target = follow_entity.map_or(self.target, |entity| entity.pos(game_time));
         self.target.x = self

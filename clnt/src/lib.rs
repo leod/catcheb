@@ -25,10 +25,7 @@ use comn::util::stats;
 
 use crate::view::View;
 
-const SCREEN_SIZE: Vector = Vector {
-    x: 1280.0,
-    y: 768.0,
-};
+const SCREEN_SIZE: Vector = Vector { x: 800.0, y: 600.0 };
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -207,17 +204,20 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 &mut gfx,
                 "Lost connection to server",
                 Color::RED,
-                Vector::new(10.0, 25.0),
+                Vector::new(window.size().x / 2.0, 25.0),
             )?;
         }
 
-        let mut debug_y: f32 = 15.0;
+        let mut debug_y: f32 = window.size().y * window.scale_factor() - 200.0;
         let mut debug = |s: &str| -> quicksilver::Result<()> {
             view.resources_mut().font_small.draw(
                 &mut gfx,
                 s,
                 Color::BLACK,
-                Vector::new(10.0, debug_y),
+                Vector::new(
+                    window.size().x * window.scale_factor() / 2.0 - 100.0,
+                    debug_y,
+                ),
             )?;
             debug_y += 12.0;
             Ok(())
@@ -225,10 +225,6 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
 
         if show_stats {
             coarse_prof::profile!("stats");
-
-            for _ in 0..46 {
-                debug("")?;
-            }
 
             debug(&format!(
                 "ping:               {:>7.3}",
