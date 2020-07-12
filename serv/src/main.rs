@@ -8,7 +8,7 @@ mod fake_bad_net;
 mod game;
 mod http;
 mod runner;
-mod tmx;
+mod tiled;
 mod webrtc;
 
 use std::{path::PathBuf, time::Duration};
@@ -57,12 +57,12 @@ async fn main() {
             Arg::with_name("map")
                 .long("map")
                 .takes_value(true)
-                .default_value("maps/test.json")
-                .help("Path to JSON map file"),
+                .default_value("maps/test.tmx")
+                .help("Path to TMX map file"),
         )
         .get_matches();
 
-    let game_map = tmx::load_map(matches.value_of("map").unwrap()).unwrap();
+    let game_map = tiled::load_map(matches.value_of("map").unwrap()).unwrap();
     let runner_config = runner::Config {
         max_num_games: 32,
         game_settings: comn::Settings {
