@@ -89,15 +89,6 @@ pub struct Config {
     pub game_settings: comn::Settings,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            max_num_games: 1000,
-            game_settings: comn::Settings::default(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct Stats {
     pub num_players: stats::Var,
