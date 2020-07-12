@@ -10,8 +10,8 @@ use crate::{
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
-pub const PLAYER_SIT_W: f32 = 40.0;
-pub const PLAYER_SIT_L: f32 = 40.0;
+pub const PLAYER_SIT_W: f32 = 50.0;
+pub const PLAYER_SIT_L: f32 = 50.0;
 pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
@@ -25,7 +25,7 @@ pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
 pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
 pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
-pub const PLAYER_SIZE_SKEW: f32 = 0.5;
+pub const PLAYER_SIZE_SKEW: f32 = 0.2;
 pub const PLAYER_TURN_DURATION: GameTime = 0.5;
 pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
 pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
@@ -35,7 +35,7 @@ pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
 pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
 pub const PLAYER_MAX_SIZE_BUMP: f32 = 50.0;
 
-pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
+pub const HOOK_SHOOT_SPEED: f32 = 1800.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
 pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;

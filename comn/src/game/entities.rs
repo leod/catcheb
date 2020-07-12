@@ -180,6 +180,7 @@ impl PlayerEntity {
             angle: self.angle,
             size: self.size(),
             hook: self.hook.clone(),
+            is_dashing: self.dash.is_some(),
         }
     }
 
@@ -231,6 +232,7 @@ pub struct PlayerView {
     pub angle: f32,
     pub size: Vector,
     pub hook: Option<Hook>,
+    pub is_dashing: bool,
 }
 
 impl PlayerView {
