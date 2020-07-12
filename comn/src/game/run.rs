@@ -151,14 +151,32 @@ impl Game {
                         .iter()
                         .filter(|(other_id, _)| **other_id != *entity_id)
                         .filter_map(|(other_id, other_entity)| {
-                            other_entity
-                                .player()
-                                .ok()
-                                .map(|player| (other_id, (turret.pos - player.pos).norm()))
+                            other_entity.player().ok().map(|player| {
+                                (
+                                    other_id,
+                                    other_entity,
+                                    (turret.pos - player.pos).norm_squared(),
+                                )
+                            })
                         })
-                        .filter(|(_, dist)| *dist <= TURRET_RANGE)
-                        .min_by(|(_, dist1), (_, dist2)| dist1.partial_cmp(dist2).unwrap())
-                        .map(|(other_id, _)| *other_id);
+                        .filter(|(other_id, other_entity, dist)| {
+                            let ray = Ray {
+                                origin: turret.pos,
+                                dir: other_entity.pos(time) - turret.pos,
+                            };
+
+                            *dist <= TURRET_RANGE * TURRET_RANGE
+                                && Self::trace_ray(
+                                    &ray,
+                                    time,
+                                    entities.iter().filter(|(between_id, _)| {
+                                        **between_id != *entity_id && **between_id != **other_id
+                                    }),
+                                )
+                                .map_or(true, |(t, _, _)| t > 1.0)
+                        })
+                        .min_by(|(_, _, dist1), (_, _, dist2)| dist1.partial_cmp(dist2).unwrap())
+                        .map(|(other_id, _, _)| *other_id);
 
                     if let Some(target) = turret.target {
                         let target_pos = entities[&target].pos(time);
@@ -394,30 +412,25 @@ impl Game {
                             dir: pos + pos_delta - ent.pos,
                         };
 
-                        let hook = input_state
-                            .entities
-                            .iter()
-                            .filter(|(other_id, other_ent)| {
+                        let hook = Self::trace_ray(
+                            &ray,
+                            input_time,
+                            input_state.entities.iter().filter(|(other_id, other_ent)| {
                                 **other_id != entity_id && other_ent.can_hook_attach()
-                            })
-                            .filter_map(|(other_id, other_ent)| {
-                                ray.intersections(&other_ent.shape(input_time))
-                                    .first()
-                                    .filter(|t| *t <= 1.0)
-                                    .map(|t| (other_id, other_ent, t))
-                            })
-                            .min_by(|(_, _, t1), (_, _, t2)| t1.partial_cmp(t2).unwrap())
-                            .map_or(
-                                Hook::Shooting {
-                                    pos: pos + pos_delta,
-                                    vel,
-                                    time_left: next_time_left,
-                                },
-                                |(other_id, other_ent, t)| Hook::Attached {
-                                    target: *other_id,
-                                    offset: ray.origin + t * ray.dir - other_ent.pos(input_time),
-                                },
-                            );
+                            }),
+                        )
+                        .filter(|(t, _, _)| *t <= 1.0)
+                        .map_or(
+                            Hook::Shooting {
+                                pos: pos + pos_delta,
+                                vel,
+                                time_left: next_time_left,
+                            },
+                            |(t, other_id, other_ent)| Hook::Attached {
+                                target: *other_id,
+                                offset: ray.origin + t * ray.dir - other_ent.pos(input_time),
+                            },
+                        );
 
                         Some(hook)
                     }
@@ -756,5 +769,19 @@ impl Game {
                 }
             })
             .next()
+    }
+
+    fn trace_ray<'a>(
+        ray: &Ray,
+        time: f32,
+        entities: impl Iterator<Item = (&'a EntityId, &'a Entity)>,
+    ) -> Option<(f32, &'a EntityId, &'a Entity)> {
+        entities
+            .filter_map(|(entity_id, entity)| {
+                ray.intersections(&entity.shape(time))
+                    .first()
+                    .map(|t| (t, entity_id, entity))
+            })
+            .min_by(|(t1, _, _), (t2, _, _)| t1.partial_cmp(t2).unwrap())
     }
 }
