@@ -69,7 +69,16 @@ pub fn render_game(
         let map_size: mint::Vector2<f32> = state.settings.map.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
         gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
-        gfx.fill_rect(&map_rect, Color::WHITE);
+        //gfx.fill_rect(&map_rect, Color::WHITE);
+        gfx.draw_subimage(
+            &resources.ground,
+            map_rect,
+            Rectangle::new(
+                Vector::new(0.0, 0.0),
+                Vector::new(map_size.x * 8.0, map_size.y * 8.0),
+            ),
+        );
+
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
 

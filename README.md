@@ -44,4 +44,5 @@ cargo run -j8 --bin serv -- \
 ## Credits
 - `clnt/static/Munro-2LYe.ttf`: Munro font: http://www.tenbytwenty.com/
 - `clnt/static/kongtext.ttf`: https://www.1001fonts.com/kongtext-font.html
+- `clnt/static/ground.png`: By Tiziana, see https://opengameart.org/content/plain-concrete-256px
 - Icons: https://game-icons.net
