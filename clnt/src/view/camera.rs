@@ -39,7 +39,7 @@ impl Camera {
             centered_pos: comn::Point::origin(),
             target: comn::Point::origin(),
             map_size,
-            scale: 0.5,
+            scale: 0.7,
         }
     }
 

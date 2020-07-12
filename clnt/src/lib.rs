@@ -25,7 +25,10 @@ use comn::util::stats;
 
 use crate::view::View;
 
-const SCREEN_SIZE: Vector = Vector { x: 800.0, y: 600.0 };
+const SCREEN_SIZE: Vector = Vector {
+    x: 1280.0,
+    y: 1024.0,
+};
 
 #[wasm_bindgen(start)]
 pub fn main() {
@@ -204,7 +207,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
                 &mut gfx,
                 "Lost connection to server",
                 Color::RED,
-                Vector::new(window.size().x / 2.0, 25.0),
+                Vector::new(250.0, 25.0),
             )?;
         }
 
