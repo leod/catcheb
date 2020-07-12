@@ -84,7 +84,8 @@ impl View {
             &pressed_keys,
             follow_entity,
             game_time,
-            self.window_size * self.window_scale_factor,
+            self.window_size,
+            self.window_scale_factor,
         );
 
         for event in game_events {
@@ -116,7 +117,7 @@ impl View {
                 gfx,
                 &mut self.resources,
                 state.get_player_entity(self.my_player_id).map(|(_, e)| e),
-                Vector::new(self.window_size.x, self.window_size.y),
+                Vector::new(self.window_size.x, self.window_size.y) * self.window_scale_factor,
             )?;
         }
 
@@ -133,7 +134,7 @@ impl View {
                 gfx,
                 &mut self.resources.font_small,
                 state,
-                Vector::new(1010.0, 10.0),
+                Vector::new(self.window_size.x * self.window_scale_factor - 270.0, 10.0),
                 Vector::new(300.0, 300.0),
             )?;
         }

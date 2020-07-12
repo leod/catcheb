@@ -94,10 +94,7 @@ async fn service(
     match (req.method(), req.uri().path()) {
         // Serve static files
         (&Method::GET, file) => {
-            let item = STATIC_FILES
-                .iter()
-                .filter(|(key, _, _)| *key == file)
-                .next();
+            let item = STATIC_FILES.iter().find(|(key, _, _)| *key == file);
 
             if let Some((_, filename, content_type)) = item {
                 send_file(config, filename, content_type).await
