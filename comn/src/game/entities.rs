@@ -370,6 +370,15 @@ pub struct Turret {
 }
 
 impl Turret {
+    pub fn new(pos: Point) -> Self {
+        Self {
+            pos,
+            target: None,
+            angle: 0.0,
+            next_shot_time: 0.0,
+        }
+    }
+
     pub fn angle_to_pos(&self, pos: Point) -> f32 {
         let d = pos - self.pos;
         d.y.atan2(d.x)
@@ -413,6 +422,14 @@ pub struct FoodSpawn {
 }
 
 impl FoodSpawn {
+    pub fn new(pos: Point) -> Self {
+        Self {
+            pos,
+            has_food: true,
+            respawn_time: None,
+        }
+    }
+
     pub fn rect(&self, time: GameTime) -> Rect {
         AaRect::new_center(self.pos, Vector::new(run::FOOD_SIZE, run::FOOD_SIZE))
             .rotate(time * run::FOOD_ROTATION_SPEED)

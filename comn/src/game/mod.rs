@@ -2,12 +2,11 @@ pub mod entities;
 pub mod run;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use nalgebra as na;
-
-use entities::{DangerGuy, FoodSpawn, Turret, Wall};
 
 use crate::{
     geom,
@@ -32,22 +31,17 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Map {
+    pub spawn_points: Vec<Point>,
+    pub entities: Vec<Entity>,
+    pub size: Vector,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub max_num_players: usize,
     pub ticks_per_second: usize,
-    pub size: Vector,
-    pub spawn_points: Vec<Point>,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            max_num_players: 16,
-            ticks_per_second: 30,
-            size: Vector::new(2400.0, 2400.0),
-            spawn_points: vec![Point::new(50.0, 50.0), Point::new(50.0, 1300.0)],
-        }
-    }
+    pub map: Map,
 }
 
 impl Settings {
@@ -60,7 +54,7 @@ impl Settings {
     }
 
     pub fn aa_rect(&self) -> geom::AaRect {
-        geom::AaRect::new_top_left(Point::new(0.0, 0.0), self.size)
+        geom::AaRect::new_top_left(Point::new(0.0, 0.0), self.map.size)
     }
 }
 
@@ -156,9 +150,9 @@ impl_opaque_diff!(Player);
 pub type PlayerMap = BTreeMap<PlayerId, Player>;
 pub type EntityMap = BTreeMap<EntityId, Entity>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Game {
-    pub settings: Settings,
+    pub settings: Arc<Settings>,
     pub tick_num: TickNum,
     pub players: PlayerMap,
     pub entities: EntityMap,
@@ -166,153 +160,23 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(settings: Settings) -> Self {
-        let entities = Self::initial_entities(&settings);
+    pub fn new(settings: Arc<Settings>) -> Self {
+        let entities = settings
+            .map
+            .entities
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(id, entity)| (EntityId(id as u32), entity))
+            .collect();
 
         Self {
             settings,
             tick_num: TickNum(0),
             players: BTreeMap::new(),
-            entities: entities
-                .into_iter()
-                .enumerate()
-                .map(|(id, entity)| (EntityId(id as u32), entity))
-                .collect(),
+            entities,
             catcher: None,
         }
-    }
-
-    pub fn initial_entities(settings: &Settings) -> Vec<Entity> {
-        let mut ents = vec![
-            Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(100.0, 1200.0),
-                end_pos: Point::new(1500.0, 1200.0),
-                size: Vector::new(140.0, 40.0),
-                speed: (1000.0, 1000.0),
-                wait_time: (2.0, 2.0),
-                phase: 0.0,
-                is_hot: true,
-            }),
-            Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(1500.0, 1400.0),
-                end_pos: Point::new(100.0, 1400.0),
-                size: Vector::new(140.0, 40.0),
-                speed: (1000.0, 1000.0),
-                wait_time: (2.0, 2.0),
-                phase: 0.0,
-                is_hot: true,
-            }),
-            Entity::Turret(Turret {
-                pos: Point::new(600.0, 400.0),
-                target: None,
-                angle: 0.0,
-                next_shot_time: 0.0,
-            }),
-            Entity::Turret(Turret {
-                pos: Point::new(1200.0, 400.0),
-                target: None,
-                angle: 0.0,
-                next_shot_time: 0.0,
-            }),
-            Entity::Turret(Turret {
-                pos: Point::new(900.0, 1000.0),
-                target: None,
-                angle: 0.0,
-                next_shot_time: 0.0,
-            }),
-            Entity::FoodSpawn(FoodSpawn {
-                pos: Point::new(900.0, 700.0),
-                has_food: true,
-                respawn_time: None,
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, 0.0),
-                    Vector::new(settings.size.x, 40.0),
-                ),
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, 0.0),
-                    Vector::new(40.0, settings.size.y),
-                ),
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(0.0, settings.size.y - 40.0),
-                    Vector::new(settings.size.x, 40.0),
-                ),
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(settings.size.x - 40.0, 0.0),
-                    Vector::new(40.0, settings.size.y),
-                ),
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(1800.0, 600.0),
-                    Vector::new(20.0, 900.0),
-                ),
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(2200.0, 600.0),
-                    Vector::new(20.0, 900.0),
-                ),
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(1500.0, 200.0),
-                    Vector::new(150.0, 150.0),
-                ),
-            }),
-            Entity::Wall(Wall {
-                rect: geom::AaRect::new_top_left(
-                    Point::new(1500.0, 1500.0),
-                    Vector::new(150.0, 150.0),
-                ),
-            }),
-            Entity::FoodSpawn(FoodSpawn {
-                pos: Point::new(2010.0, 1050.0),
-                has_food: true,
-                respawn_time: None,
-            }),
-            /*Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(1750.0, 200.0),
-                end_pos: Point::new(1750.0, 1400.0),
-                size: Vector::new(180.0, 40.0),
-                speed: (800.0, 400.0),
-                wait_time: (2.0, 3.0),
-                phase: 0.0,
-                is_hot: false,
-            }),*/
-        ];
-
-        for i in 0..5 {
-            let y = 200.0 * i as f32 + 650.0;
-            let phase = (i as f32) / 1.7;
-            ents.push(Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(1835.0, y),
-                end_pos: Point::new(1995.0, y),
-                size: Vector::new(30.0, 100.0),
-                speed: (800.0, 300.0),
-                wait_time: (4.0, 0.5),
-                phase,
-                is_hot: true,
-            }));
-            ents.push(Entity::DangerGuy(DangerGuy {
-                start_pos: Point::new(2185.0, y),
-                end_pos: Point::new(2025.0, y),
-                size: Vector::new(30.0, 100.0),
-                speed: (800.0, 300.0),
-                wait_time: (4.0, 0.5),
-                phase,
-                is_hot: true,
-            }));
-        }
-
-        ents
     }
 
     pub fn tick_game_time(&self, tick_num: TickNum) -> GameTime {

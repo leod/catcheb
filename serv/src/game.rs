@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
 
 use log::{debug, info};
 use rand::seq::SliceRandom;
@@ -33,7 +36,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(settings: comn::Settings) -> Self {
+    pub fn new(settings: Arc<comn::Settings>) -> Self {
         let state = comn::Game::new(settings);
         let next_entity_id = state
             .entities
@@ -169,6 +172,7 @@ impl Game {
                     let spawn_pos = self
                         .state
                         .settings
+                        .map
                         .spawn_points
                         .choose(&mut rand::thread_rng())
                         .unwrap();

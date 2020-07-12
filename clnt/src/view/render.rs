@@ -66,9 +66,9 @@ pub fn render_game(
 ) -> quicksilver::Result<()> {
     {
         gfx.set_transform(camera_transform);
-        let map_size: mint::Vector2<f32> = state.settings.size.into();
+        let map_size: mint::Vector2<f32> = state.settings.map.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
-        //gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
+        gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
         gfx.fill_rect(&map_rect, Color::WHITE);
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
@@ -108,6 +108,66 @@ pub fn render_game(
         //gfx.set_blend_mode(Some(Default::default()));
     }
 
+    // Lower layer
+    for entity in interp_entities(state, next_entities, time) {
+        match entity {
+            comn::Entity::FoodSpawn(spawn) => {
+                let origin: mint::Vector2<f32> = spawn.pos.coords.into();
+                let circle = Circle::new(origin.into(), FOOD_SIZE * 0.5);
+                gfx.set_transform(camera_transform);
+                gfx.stroke_circle(&circle, Color::BLACK);
+            }
+            _ => (),
+        }
+    }
+
+    for entity in interp_entities(state, next_entities, time) {
+        match entity {
+            comn::Entity::FoodSpawn(spawn) => {
+                let transform = rect_to_transform(&spawn.rect(time));
+
+                if spawn.has_food {
+                    let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+                    gfx.set_transform(transform.then(camera_transform));
+                    gfx.fill_rect(&rect, Color::ORANGE);
+                    gfx.stroke_rect(&rect, Color::BLACK);
+                }
+            }
+            comn::Entity::Food(food) => {
+                let transform = rect_to_transform(&food.rect(time));
+
+                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+                gfx.set_transform(transform.then(camera_transform));
+
+                // TODO: Blending's-a not working -- user error or not?
+                let alpha = pareen::constant(1.0)
+                    .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, 0.0)
+                    .squeeze(food.start_time..=food.start_time + FOOD_MAX_LIFETIME)
+                    .eval(time);
+                gfx.fill_rect(
+                    &rect,
+                    Color {
+                        r: 1.0,
+                        g: 1.0 - 0.5 * alpha,
+                        b: 1.0 - alpha,
+                        a: 1.0,
+                    },
+                );
+                gfx.stroke_rect(
+                    &rect,
+                    Color {
+                        r: 1.0 - alpha,
+                        g: 1.0 - alpha,
+                        b: 1.0 - alpha,
+                        a: 1.0,
+                    },
+                );
+            }
+            _ => (),
+        }
+    }
+
+    // Main layer
     for entity in interp_entities(state, next_entities, time) {
         match entity {
             comn::Entity::Player(player) => {
@@ -224,51 +284,8 @@ pub fn render_game(
                 gfx.fill_rect(&rect, Color::from_rgba(170, 170, 170, 1.0));
                 gfx.stroke_rect(&rect, Color::BLACK);
             }
-            comn::Entity::FoodSpawn(spawn) => {
-                let origin: mint::Vector2<f32> = spawn.pos.coords.into();
-                let transform = rect_to_transform(&spawn.rect(time));
-
-                if spawn.has_food {
-                    let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
-                    gfx.set_transform(transform.then(camera_transform));
-                    gfx.fill_rect(&rect, Color::ORANGE);
-                    gfx.stroke_rect(&rect, Color::BLACK);
-                }
-
-                let circle = Circle::new(origin.into(), FOOD_SIZE * 1.3);
-                gfx.set_transform(camera_transform);
-                gfx.stroke_circle(&circle, Color::BLACK);
-            }
-            comn::Entity::Food(food) => {
-                let transform = rect_to_transform(&food.rect(time));
-
-                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
-                gfx.set_transform(transform.then(camera_transform));
-
-                // TODO: Blending's-a not working -- user error or not?
-                let alpha = pareen::constant(1.0)
-                    .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, 0.0)
-                    .squeeze(food.start_time..=food.start_time + FOOD_MAX_LIFETIME)
-                    .eval(time);
-                gfx.fill_rect(
-                    &rect,
-                    Color {
-                        r: 1.0,
-                        g: 1.0 - 0.5 * alpha,
-                        b: 1.0 - alpha,
-                        a: 1.0,
-                    },
-                );
-                gfx.stroke_rect(
-                    &rect,
-                    Color {
-                        r: 1.0 - alpha,
-                        g: 1.0 - alpha,
-                        b: 1.0 - alpha,
-                        a: 1.0,
-                    },
-                );
-            }
+            comn::Entity::FoodSpawn(_) => (),
+            comn::Entity::Food(_) => (),
         }
     }
 
