@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.4" tiledversion="1.4.1" orientation="orthogonal" renderorder="right-down" width="100" height="100" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="45">
+ <objectgroup color="#1e8b00" id="2" name="Spawns">
+  <object id="42" name="spawn" x="1568" y="2400" width="64" height="64"/>
+ </objectgroup>
+ <objectgroup color="#000000" id="3" name="Map">
+  <object id="13" type="wall" x="0" y="0" width="64" height="3200"/>
+  <object id="28" type="wall" x="1344" y="2592" width="96" height="608"/>
+  <object id="30" type="wall" x="1760" y="2592" width="96" height="608"/>
+  <object id="35" type="wall" x="3136" y="0" width="64" height="3200"/>
+  <object id="37" type="wall" x="64" y="0" width="3072" height="64"/>
+  <object id="38" type="wall" x="64" y="3136" width="1280" height="64"/>
+  <object id="40" type="wall" x="1856" y="3136" width="1280" height="64"/>
+ </objectgroup>
+ <objectgroup color="#ff0000" id="4" name="Enemies">
+  <object id="20" type="turret" x="928" y="2304" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="31" type="turret" x="1568" y="3104" width="64" height="64">
+   <ellipse/>
+  </object>
+ </objectgroup>
+ <objectgroup color="#f79019" id="5" name="Food">
+  <object id="21" type="food_spawn" x="832" y="2466" width="32" height="32"/>
+  <object id="32" type="food_spawn" x="1568" y="2976" width="32" height="32"/>
+  <object id="33" type="food_spawn" x="1600" y="2976" width="32" height="32"/>
+ </objectgroup>
+</map>

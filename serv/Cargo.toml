@@ -17,6 +17,8 @@ rand = "0.7"
 rand_distr = "0.2"
 ctrlc = { git = "https://github.com/leod/rust-ctrlc.git" }
 
+tiled = "0.9.2"
+
 futures = "0.3"
 tokio = { version = "0.2", features = ["full"] }
 hyper = "0.13"
