@@ -37,6 +37,7 @@ pub const STATIC_FILES: &[(&str, &str, &str)] = &[
     ("/kongtext.ttf", "kongtext.ttf", "font/ttf"),
     ("/sprint.png", "sprint.png", "image/png"),
     ("/robot-grab.png", "robot-grab.png", "image/png"),
+    ("/ground.png", "ground.png", "image/png"),
 ];
 
 impl Server {
