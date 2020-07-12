@@ -1,7 +1,7 @@
 use std::{convert::AsRef, path::Path};
 
 use comn::{
-    game::entities::{FoodSpawn, Turret, Wall},
+    game::entities::{DangerGuy, FoodSpawn, Turret, Wall},
     geom::AaRect,
 };
 
@@ -11,6 +11,8 @@ pub const PLAYER_SPAWN_NAME: &str = "spawn";
 pub enum LoadError {
     Tiled(tiled::TiledError),
     UnknownEntityType(String),
+    MissingProperty(String),
+    WrongTypeProperty(String),
 }
 
 pub fn load_map<P: AsRef<Path>>(path: P) -> Result<comn::Map, LoadError> {
@@ -61,12 +63,43 @@ fn object_to_entity(object: &tiled::Object) -> Result<comn::Entity, LoadError> {
             rect: object_aa_rect(object),
         }),
         "food_spawn" => comn::Entity::FoodSpawn(FoodSpawn::new(object_center(object))),
+        "danger_guy" => comn::Entity::DangerGuy(DangerGuy {
+            start_pos: object_center(object),
+            end_pos: object_center(object)
+                + comn::Vector::new(
+                    read_property_f32(object, "delta_x")?,
+                    read_property_f32(object, "delta_y")?,
+                ),
+            size: object_size(object),
+            speed: (
+                read_property_f32(object, "speed_go")?,
+                read_property_f32(object, "speed_back")?,
+            ),
+            wait_time: (
+                read_property_f32(object, "wait_go")?,
+                read_property_f32(object, "wait_back")?,
+            ),
+            phase: read_property_f32(object, "phase")?,
+            is_hot: true,
+        }),
         name => {
             return Err(LoadError::UnknownEntityType(name.to_string()));
         }
     };
 
     Ok(entity)
+}
+
+fn read_property_f32(object: &tiled::Object, prop_key: &str) -> Result<f32, LoadError> {
+    let prop_value = object
+        .properties
+        .get(prop_key)
+        .ok_or_else(|| LoadError::MissingProperty(prop_key.to_string()))?;
+    if let tiled::PropertyValue::FloatValue(result) = prop_value {
+        Ok(*result)
+    } else {
+        Err(LoadError::WrongTypeProperty(prop_key.to_string()))
+    }
 }
 
 fn object_name(object: &tiled::Object) -> &str {
