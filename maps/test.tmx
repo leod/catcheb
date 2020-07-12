@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.4" tiledversion="1.4.1" orientation="orthogonal" renderorder="right-down" width="100" height="100" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="236">
+ <objectgroup color="#1e8b00" id="2" name="Spawns">
+  <object id="42" name="spawn" x="1568" y="2400" width="64" height="64"/>
+ </objectgroup>
+ <objectgroup color="#000000" id="3" name="Map">
+  <object id="13" type="wall" x="0" y="0" width="64" height="3200"/>
+  <object id="28" type="wall" x="1344" y="2592" width="96" height="608"/>
+  <object id="30" type="wall" x="1760" y="2592" width="96" height="608"/>
+  <object id="35" type="wall" x="3136" y="0" width="64" height="3200"/>
+  <object id="37" type="wall" x="64" y="0" width="3072" height="64"/>
+  <object id="38" type="wall" x="64" y="3136" width="1280" height="64"/>
+  <object id="40" type="wall" x="1856" y="3136" width="1280" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="55" type="wall" x="2368" y="2848" width="256" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="56" type="wall" x="2560" y="2592" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="57" type="wall" x="2112" y="2592" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="58" type="wall" x="2112" y="2848" width="256" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="59" type="wall" x="2880" y="2848" width="256" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="60" type="wall" x="2880" y="2592" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="61" type="wall" x="2720" y="2880" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="126" type="wall" x="896" y="1504" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="127" type="wall" x="896" y="1504" width="256" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="128" type="wall" x="640" y="1504" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="129" type="wall" x="448" y="1504" width="256" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="130" type="wall" x="896" y="1056" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="131" type="wall" x="896" y="1248" width="256" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="132" type="wall" x="448" y="1248" width="256" height="64">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="133" type="wall" x="640" y="1056" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="224" type="wall" x="1984" y="448" width="64" height="1792">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="226" type="wall" x="2496" y="448" width="64" height="1792">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="228" type="wall" x="2240" y="1984" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="229" type="wall" x="2240" y="1600" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="230" type="wall" x="2240" y="1216" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="231" type="wall" x="2240" y="832" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="232" type="wall" x="2240" y="448" width="64" height="256">
+   <properties>
+    <property name="ASDF" type="float" value="0"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup color="#ff0000" id="4" name="Enemies">
+  <object id="20" type="turret" x="928" y="2304" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="31" type="turret" x="1568" y="3104" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="64" type="danger_guy" x="2624" y="2816" width="256" height="64">
+   <properties>
+    <property name="delta_x" type="float" value="0"/>
+    <property name="delta_y" type="float" value="-400"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="135" type="danger_guy" x="1408" y="1312" width="64" height="192">
+   <properties>
+    <property name="delta_x" type="float" value="-608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="136" type="danger_guy" x="128" y="1312" width="64" height="192">
+   <properties>
+    <property name="delta_x" type="float" value="608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="137" type="turret" x="640" y="1760" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="138" type="turret" x="896" y="1760" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="139" type="turret" x="1152" y="1504" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="140" type="turret" x="1152" y="1248" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="141" type="turret" x="384" y="1504" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="142" type="turret" x="384" y="1248" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="143" type="turret" x="640" y="992" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="144" type="turret" x="896" y="992" width="64" height="64">
+   <ellipse/>
+  </object>
+  <object id="146" type="danger_guy" x="704" y="1888" width="192" height="64">
+   <properties>
+    <property name="delta_x" type="float" value="0"/>
+    <property name="delta_y" type="float" value="-480"/>
+    <property name="phase" type="float" value="1"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="147" type="danger_guy" x="704" y="864" width="192" height="64">
+   <properties>
+    <property name="delta_x" type="float" value="0"/>
+    <property name="delta_y" type="float" value="480"/>
+    <property name="phase" type="float" value="1"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="233" type="danger_guy" x="2304" y="256" width="192" height="64">
+   <properties>
+    <property name="delta_x" type="float" value="0"/>
+    <property name="delta_y" type="float" value="2016"/>
+    <property name="phase" type="float" value="4"/>
+    <property name="speed_back" type="float" value="500"/>
+    <property name="speed_go" type="float" value="500"/>
+    <property name="wait_back" type="float" value="1"/>
+    <property name="wait_go" type="float" value="1"/>
+   </properties>
+  </object>
+  <object id="234" type="danger_guy" x="2048" y="256" width="192" height="64">
+   <properties>
+    <property name="delta_x" type="float" value="0"/>
+    <property name="delta_y" type="float" value="2016"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="500"/>
+    <property name="speed_go" type="float" value="500"/>
+    <property name="wait_back" type="float" value="1"/>
+    <property name="wait_go" type="float" value="1"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup color="#f79019" id="5" name="Food">
+  <object id="21" type="food_spawn" x="832" y="2466" width="32" height="32"/>
+  <object id="32" type="food_spawn" x="1568" y="2976" width="32" height="32"/>
+  <object id="33" type="food_spawn" x="1600" y="2976" width="32" height="32"/>
+  <object id="85" type="food_spawn" x="2976" y="3008" width="32" height="32"/>
+  <object id="90" type="food_spawn" x="800" y="1472" width="32" height="32"/>
+  <object id="91" type="food_spawn" x="800" y="1440" width="32" height="32"/>
+  <object id="92" type="food_spawn" x="832" y="1472" width="32" height="32"/>
+  <object id="93" type="food_spawn" x="832" y="1440" width="32" height="32"/>
+  <object id="94" type="food_spawn" x="736" y="1472" width="32" height="32"/>
+  <object id="95" type="food_spawn" x="736" y="1440" width="32" height="32"/>
+  <object id="96" type="food_spawn" x="768" y="1472" width="32" height="32"/>
+  <object id="97" type="food_spawn" x="768" y="1440" width="32" height="32"/>
+  <object id="98" type="food_spawn" x="800" y="1408" width="32" height="32"/>
+  <object id="99" type="food_spawn" x="800" y="1376" width="32" height="32"/>
+  <object id="100" type="food_spawn" x="832" y="1408" width="32" height="32"/>
+  <object id="101" type="food_spawn" x="832" y="1376" width="32" height="32"/>
+  <object id="102" type="food_spawn" x="736" y="1408" width="32" height="32"/>
+  <object id="103" type="food_spawn" x="736" y="1376" width="32" height="32"/>
+  <object id="104" type="food_spawn" x="768" y="1408" width="32" height="32"/>
+  <object id="105" type="food_spawn" x="768" y="1376" width="32" height="32"/>
+  <object id="106" type="food_spawn" x="800" y="1344" width="32" height="32"/>
+  <object id="107" type="food_spawn" x="832" y="1344" width="32" height="32"/>
+  <object id="108" type="food_spawn" x="736" y="1344" width="32" height="32"/>
+  <object id="109" type="food_spawn" x="768" y="1344" width="32" height="32"/>
+  <object id="110" type="food_spawn" x="864" y="1472" width="32" height="32"/>
+  <object id="111" type="food_spawn" x="864" y="1440" width="32" height="32"/>
+  <object id="112" type="food_spawn" x="864" y="1408" width="32" height="32"/>
+  <object id="113" type="food_spawn" x="864" y="1376" width="32" height="32"/>
+  <object id="114" type="food_spawn" x="864" y="1344" width="32" height="32"/>
+  <object id="115" type="food_spawn" x="704" y="1472" width="32" height="32"/>
+  <object id="116" type="food_spawn" x="704" y="1440" width="32" height="32"/>
+  <object id="117" type="food_spawn" x="704" y="1408" width="32" height="32"/>
+  <object id="118" type="food_spawn" x="704" y="1376" width="32" height="32"/>
+  <object id="119" type="food_spawn" x="704" y="1344" width="32" height="32"/>
+  <object id="120" type="food_spawn" x="704" y="1312" width="32" height="32"/>
+  <object id="121" type="food_spawn" x="736" y="1312" width="32" height="32"/>
+  <object id="122" type="food_spawn" x="768" y="1312" width="32" height="32"/>
+  <object id="123" type="food_spawn" x="800" y="1312" width="32" height="32"/>
+  <object id="124" type="food_spawn" x="832" y="1312" width="32" height="32"/>
+  <object id="125" type="food_spawn" x="864" y="1312" width="32" height="32"/>
+  <object id="148" type="food_spawn" x="960" y="1568" width="32" height="32"/>
+  <object id="149" type="food_spawn" x="960" y="1216" width="32" height="32"/>
+  <object id="150" type="food_spawn" x="608" y="1216" width="32" height="32"/>
+  <object id="151" type="food_spawn" x="608" y="1568" width="32" height="32"/>
+  <object id="235" type="food_spawn" x="2976" y="3040" width="32" height="32"/>
+ </objectgroup>
+</map>

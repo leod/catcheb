@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     net::SocketAddr,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -86,15 +87,6 @@ impl Player {
 pub struct Config {
     pub max_num_games: usize,
     pub game_settings: comn::Settings,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            max_num_games: 1000,
-            game_settings: comn::Settings::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -568,7 +560,7 @@ impl Runner {
 
     fn add_game(&mut self) -> comn::GameId {
         let game_id = comn::GameId(Uuid::new_v4());
-        let mut game = Game::new(self.config.game_settings.clone());
+        let mut game = Game::new(Arc::new(self.config.game_settings.clone()));
 
         game.join("bot1".into(), true);
         game.join("bot2".into(), true);
