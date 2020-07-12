@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, VecDeque},
+    sync::Arc,
     time::Duration,
 };
 
@@ -36,7 +37,7 @@ const MAX_TIME_LAG_DEVIATION: f32 = 0.075;
 const KEEP_STATES_BUFFER: u32 = 5;
 
 pub struct Runner {
-    settings: comn::Settings,
+    settings: Arc<comn::Settings>,
     my_token: comn::PlayerToken,
     my_player_id: comn::PlayerId,
 
@@ -68,7 +69,7 @@ impl Runner {
         let recv_tick_time = GameTimeEstimation::new(join.game_settings.tick_period());
 
         Self {
-            settings: join.game_settings,
+            settings: Arc::new(join.game_settings),
             my_token: join.your_token,
             my_player_id: join.your_player_id,
             webrtc_client,

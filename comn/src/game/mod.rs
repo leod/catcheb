@@ -2,6 +2,7 @@ pub mod entities;
 pub mod run;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -156,9 +157,9 @@ impl_opaque_diff!(Player);
 pub type PlayerMap = BTreeMap<PlayerId, Player>;
 pub type EntityMap = BTreeMap<EntityId, Entity>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Game {
-    pub settings: Settings,
+    pub settings: Arc<Settings>,
     pub tick_num: TickNum,
     pub players: PlayerMap,
     pub entities: EntityMap,
@@ -166,7 +167,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(settings: Settings) -> Self {
+    pub fn new(settings: Arc<Settings>) -> Self {
         let entities = Self::initial_entities(&settings);
 
         Self {
