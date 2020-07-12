@@ -172,6 +172,7 @@ impl Game {
                     let spawn_pos = self
                         .state
                         .settings
+                        .map
                         .spawn_points
                         .choose(&mut rand::thread_rng())
                         .unwrap();

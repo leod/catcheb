@@ -66,7 +66,7 @@ pub fn render_game(
 ) -> quicksilver::Result<()> {
     {
         gfx.set_transform(camera_transform);
-        let map_size: mint::Vector2<f32> = state.settings.size.into();
+        let map_size: mint::Vector2<f32> = state.settings.map.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
         //gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
         gfx.fill_rect(&map_rect, Color::WHITE);

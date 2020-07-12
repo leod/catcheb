@@ -8,6 +8,7 @@ mod fake_bad_net;
 mod game;
 mod http;
 mod runner;
+mod tmx;
 mod webrtc;
 
 use std::{path::PathBuf, time::Duration};
@@ -52,8 +53,24 @@ async fn main() {
                 .default_value("clnt/static")
                 .help("Directory containing static files to be served over HTTP"),
         )
+        .arg(
+            Arg::with_name("map")
+                .long("map")
+                .takes_value(true)
+                .default_value("maps/test.json")
+                .help("Path to JSON map file"),
+        )
         .get_matches();
 
+    let game_map = tmx::load_map(matches.value_of("map").unwrap()).unwrap();
+    let runner_config = runner::Config {
+        max_num_games: 32,
+        game_settings: comn::Settings {
+            max_num_players: 16,
+            ticks_per_second: 30,
+            map: game_map,
+        },
+    };
     let http_server_config = http::Config {
         listen_addr: matches
             .value_of("http_address")
@@ -72,7 +89,7 @@ async fn main() {
     let config = Config {
         http_server: http_server_config,
         webrtc_server: webrtc_server_config,
-        runner: runner::Config::default(),
+        runner: runner_config,
     };
 
     let (recv_message_tx, recv_message_rx) = webrtc::recv_message_channel();

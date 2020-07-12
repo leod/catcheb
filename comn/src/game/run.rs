@@ -502,7 +502,7 @@ impl Game {
                         // predict locally that we caught the other player, so
                         // we collide if the dash stops while we are still on
                         // top.)
-                        if PLAYER_DASH_COOLDOWN - ent.dash_cooldown < 1.5 * PLAYER_DASH_DURATION {
+                        if ent.dash.is_some() || PLAYER_DASH_COOLDOWN - ent.dash_cooldown < 0.5 {
                             collide = false;
                         }
                     }
@@ -534,12 +534,12 @@ impl Game {
         ent.pos.x = ent
             .pos
             .x
-            .min(self.settings.size.x - PLAYER_SIT_W / 2.0)
+            .min(self.settings.map.size.x - PLAYER_SIT_W / 2.0)
             .max(PLAYER_SIT_W / 2.0);
         ent.pos.y = ent
             .pos
             .y
-            .min(self.settings.size.y - PLAYER_SIT_W / 2.0)
+            .min(self.settings.map.size.y - PLAYER_SIT_W / 2.0)
             .max(PLAYER_SIT_W / 2.0);
 
         // Start or dashing

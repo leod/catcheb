@@ -43,7 +43,7 @@ impl View {
         window_scale_factor: f32,
     ) -> Self {
         let event_list = EventList::new(config.event_list);
-        let camera = Camera::new(config.camera, settings.size);
+        let camera = Camera::new(config.camera, settings.map.size);
 
         Self {
             my_player_id,
