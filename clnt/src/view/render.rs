@@ -341,42 +341,13 @@ fn render_player(
     } else {
         2.0
     };
-    let column = if player.is_dashing {
-        //1.0
-        //pareen::fun(|t| (t / 0.075) as usize as f32).repeat(0.3).eval(time)
-        if state.catcher == Some(player.owner) {
-            pareen::constant(1.0)
-                .switch(0.1, 3.0)
-                .repeat(0.2)
-                .eval(time)
-        } else {
-            1.0
-        }
-    } else {
-        pareen::constant(2.0)
-            .switch(0.3, 3.0)
-            .repeat(0.6)
-            .eval(time)
-    };
+    let column = player.anim_frame as f32;
 
     let sub_rect = Rectangle::new(
         Vector::new(16.0 * column, 16.0 * row),
         Vector::new(16.0, 16.0),
     );
     gfx.draw_subimage(&resources.player, sub_rect, rect);
-
-    /*let color = if player.owner == my_player_id {
-        Color::BLUE
-    } else {
-        Color::from_rgba(148, 0, 211, 1.0)
-    };
-
-    gfx.fill_rect(&rect, color);
-    gfx.stroke_rect(&rect, Color::BLACK);
-
-    let nose = Rectangle::new(Vector::new(0.5, -0.1), Vector::new(0.2, 0.2));
-    gfx.set_transform(transform.then(camera_transform));
-    gfx.fill_rect(&nose, Color::CYAN);*/
 
     gfx.set_transform(camera_transform);
 
