@@ -131,6 +131,9 @@ pub struct Dash {
     pub dir: Vector,
 }
 
+pub type Frame = u8;
+pub type AnimState = (Frame, GameTime);
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
     pub owner: PlayerId,
@@ -149,6 +152,7 @@ pub struct PlayerEntity {
     pub dash_cooldown: GameTime,
     pub hook: Option<Hook>,
     pub hook_cooldown: GameTime,
+    pub anim_frame: AnimState,
 }
 
 impl PlayerEntity {
@@ -170,6 +174,7 @@ impl PlayerEntity {
             dash_cooldown: 0.0,
             hook: None,
             hook_cooldown: 0.0,
+            anim_frame: (0, 0.0),
         }
     }
 
@@ -181,6 +186,7 @@ impl PlayerEntity {
             size: self.size(),
             hook: self.hook.clone(),
             is_dashing: self.dash.is_some(),
+            anim_frame: self.anim_frame.0,
         }
     }
 
@@ -233,6 +239,7 @@ pub struct PlayerView {
     pub size: Vector,
     pub hook: Option<Hook>,
     pub is_dashing: bool,
+    pub anim_frame: Frame,
 }
 
 impl PlayerView {
