@@ -162,7 +162,7 @@ pub fn render_game(
 
                 // TODO: Blending's-a not working -- user error or not?
                 let alpha = pareen::c(1.0)
-                    .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, 0.0)
+                    .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, pareen::c(0.0))
                     .squeeze(food.start_time..=food.start_time + FOOD_MAX_LIFETIME)
                     .eval(time);
                 gfx.fill_rect(
@@ -253,20 +253,31 @@ pub fn render_game(
 
                 ;*/
 
-                let frame = 0.0;
+                let fps_0 = danger_guy.speed.0 / 10.0;
+                let fps_1 = danger_guy.speed.1 / 10.0;
+                let frame = pareen::seq_with_dur!(
+                    pareen::c(0).dur(danger_guy.wait_time.0),
+                    pareen::frames(0..=6, fps_0).dur(danger_guy.walk_time().0),
+                    pareen::c(0).dur(danger_guy.wait_time.1),
+                    pareen::frames(0..=6, fps_1).dur(danger_guy.walk_time().1),
+                )
+                .repeat()
+                .eval(time);
 
-                let sub_rect =
-                    Rectangle::new(Vector::new(0.0, 16.0 * frame), Vector::new(16.0, 16.0));
+                let sub_rect = Rectangle::new(
+                    Vector::new(16.0 * frame as f32, 0.0),
+                    Vector::new(16.0, 16.0),
+                );
                 gfx.draw_subimage(&resources.danger_guy, sub_rect, rect);
 
-                let color = if danger_guy.is_hot {
+                /*let color = if danger_guy.is_hot {
                     color_enemy()
                 } else {
                     Color::CYAN
                 };
 
-                gfx.fill_rect(&rect, color);
-                gfx.stroke_rect(&rect, Color::BLACK);
+                gfx.fill_rect(&rect, color);*/
+                //gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();

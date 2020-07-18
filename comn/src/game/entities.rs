@@ -288,9 +288,11 @@ impl DangerGuy {
     pub fn pos(&self, t: GameTime) -> Point {
         pareen::seq_with_dur!(
             pareen::c(self.start_pos).dur(self.wait_time.0),
-            pareen::lerp(self.start_pos, self.end_pos).scale_to_dur(self.walk_time().0),
+            pareen::lerp(pareen::c(self.start_pos), pareen::c(self.end_pos))
+                .scale_to_dur(self.walk_time().0),
             pareen::c(self.end_pos).dur(self.wait_time.1),
-            pareen::lerp(self.end_pos, self.start_pos).scale_to_dur(self.walk_time().1),
+            pareen::lerp(pareen::c(self.end_pos), pareen::c(self.start_pos))
+                .scale_to_dur(self.walk_time().1),
         )
         .repeat()
         .eval(t)
