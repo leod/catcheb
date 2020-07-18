@@ -161,7 +161,7 @@ pub fn render_game(
                 gfx.set_transform(transform.then(camera_transform));
 
                 // TODO: Blending's-a not working -- user error or not?
-                let alpha = pareen::constant(1.0)
+                let alpha = pareen::c(1.0)
                     .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, 0.0)
                     .squeeze(food.start_time..=food.start_time + FOOD_MAX_LIFETIME)
                     .eval(time);
@@ -251,7 +251,13 @@ pub fn render_game(
                     )
                 };
 
-                gfx.draw_subimage(&resources.hirsch, sub_rect, rect);*/
+                ;*/
+
+                let frame = 0.0;
+
+                let sub_rect =
+                    Rectangle::new(Vector::new(0.0, 16.0 * frame), Vector::new(16.0, 16.0));
+                gfx.draw_subimage(&resources.danger_guy, sub_rect, rect);
 
                 let color = if danger_guy.is_hot {
                     color_enemy()

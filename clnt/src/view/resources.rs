@@ -12,6 +12,7 @@ pub struct Resources {
     pub icon_hook: Image,
     pub ground: Image,
     pub player: Image,
+    pub danger_guy: Image,
 }
 
 impl Resources {
@@ -24,8 +25,9 @@ impl Resources {
         let icon_hook = Image::load(gfx, "robot-grab.png").await?;
         let mut ground = Image::load(gfx, "ground.png").await?;
         let mut player = Image::load(gfx, "player.png").await?;
+        let mut danger_guy = Image::load(gfx, "danger_guy.png").await?;
 
-        for texture in [&mut ground, &mut player].iter() {
+        for texture in [&mut ground, &mut player, &mut danger_guy].iter() {
             texture.set_magnification(TextureFilter::Nearest)?;
             texture.set_minification(TextureFilter::Nearest)?;
         }
@@ -39,6 +41,7 @@ impl Resources {
             icon_hook,
             ground,
             player,
+            danger_guy,
         })
     }
 }
