@@ -319,6 +319,7 @@ dependencies = [
  "instant",
  "log",
  "nalgebra",
+ "pareen",
  "rand",
  "rmp-serde",
  "serde",
@@ -1442,8 +1443,8 @@ dependencies = [
 
 [[package]]
 name = "pareen"
-version = "0.2.3"
-source = "git+https://github.com/leod/pareen.git#009b4286674a42a1440f810988697175787ced20"
+version = "0.2.5"
+source = "git+https://github.com/leod/pareen.git?branch=brainstorm#8e3eb350a010f6de71a5675540a0e8dbc8df6be1"
 dependencies = [
  "easer",
  "num-traits",
