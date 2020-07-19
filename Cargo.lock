@@ -1427,7 +1427,7 @@ dependencies = [
 [[package]]
 name = "pareen"
 version = "0.2.5"
-source = "git+https://github.com/leod/pareen.git?branch=brainstorm#9edc9a8d7fc04aa8873e4650d7f622f2593cd7f3"
+source = "git+https://github.com/leod/pareen.git?branch=brainstorm#1a58c593ecbcd103f6316701d41a17fc24a11c2f"
 dependencies = [
  "easer",
  "num-traits",

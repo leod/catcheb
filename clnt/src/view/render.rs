@@ -219,45 +219,25 @@ pub fn render_game(
                 let origin: mint::Vector2<f32> =
                     (danger_guy.pos(time) - danger_guy.size / 2.0).coords.into();
                 let size: mint::Vector2<f32> = danger_guy.size.into();
-                let rect = Rectangle::new(origin.into(), size.into());
-                gfx.set_transform(camera_transform);
-
-                // Awesome Hirsch, add back in once we have more images!
-                /*let frame = pareen::constant(0)
-                    .switch(danger_guy.wait_time - 0.6, 1)
-                    .switch(danger_guy.wait_time - 0.4, 2)
-                    .switch(danger_guy.wait_time - 0.2, 3)
-                    .seq(
-                        danger_guy.wait_time,
-                        pareen::fun(|tau| 3 + (tau * danger_guy.speed / 40.0) as usize % 4),
-                    )
-                    .repeat(danger_guy.period() / 2.0)
-                    .eval(danger_guy.tau(time)) as f32;
-
-                let flip = danger_guy
-                    .dir(time)
-                    .normalize()
-                    .dot(&comn::Vector::new(1.0, 0.0))
-                    > 0.7;
-                let sub_rect = if flip {
-                    Rectangle::new(
-                        Vector::new(17.0, 16.0 * frame + 1.0),
-                        Vector::new(-16.0, 16.0),
-                    )
+                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+                let transform = if danger_guy.end_pos.y != danger_guy.start_pos.y {
+                    Transform::rotate(90.0)
                 } else {
-                    Rectangle::new(
-                        Vector::new(1.0, 16.0 * frame + 1.0),
-                        Vector::new(16.0, 16.0),
-                    )
-                };
+                    Transform::IDENTITY
+                }
+                .then(Transform::translate(Vector::new(0.5, 0.5)))
+                .then(Transform::scale(size.into()))
+                .then(Transform::translate(origin.into()))
+                .then(camera_transform);
+                gfx.set_transform(transform);
 
-                ;*/
-
-                let fps_0 = danger_guy.speed.0 / 10.0;
-                let fps_1 = danger_guy.speed.1 / 10.0;
+                let fps_0 = danger_guy.speed.0 / 12.0;
+                let fps_1 = danger_guy.speed.1 / 12.0;
                 let frame = pareen::seq_with_dur!(
                     pareen::c(0).dur(danger_guy.wait_time.0),
-                    pareen::frames(0..=6, fps_0).dur(danger_guy.walk_time().0),
+                    pareen::frames(0..=6, fps_0)
+                        .dur(danger_guy.walk_time().0)
+                        .backwards(),
                     pareen::c(0).dur(danger_guy.wait_time.1),
                     pareen::frames(0..=6, fps_1).dur(danger_guy.walk_time().1),
                 )
