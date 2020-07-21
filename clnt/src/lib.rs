@@ -27,7 +27,7 @@ use crate::view::View;
 
 const SCREEN_SIZE: Vector = Vector {
     x: 1280.0,
-    y: 1024.0,
+    y: 720.0,
 };
 
 #[wasm_bindgen(start)]
