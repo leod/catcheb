@@ -160,7 +160,6 @@ pub fn render_game(
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
 
-                // TODO: Blending's-a not working -- user error or not?
                 let alpha = pareen::constant(1.0)
                     .seq_ease_out(
                         0.9,
@@ -173,19 +172,17 @@ pub fn render_game(
                 gfx.fill_rect(
                     &rect,
                     Color {
-                        r: 1.0,
-                        g: 1.0 - 0.5 * alpha,
-                        b: 1.0 - alpha,
-                        a: 1.0,
+                        a: alpha,
+                        ..color_food()
                     },
                 );
                 gfx.stroke_rect(
                     &rect,
                     Color {
-                        r: 1.0 - alpha,
-                        g: 1.0 - alpha,
-                        b: 1.0 - alpha,
-                        a: 1.0,
+                        r: 1.0,
+                        g: 1.0,
+                        b: 1.0,
+                        a: alpha,
                     },
                 );
             }
