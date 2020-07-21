@@ -22,7 +22,8 @@ quicksilver = { version = "=0.4.0-alpha0.5", default-features = false, features 
 mint = "0.5"
 nalgebra = { version = "0.21", features = ["mint"] }
 instant = "0.1"
-pareen = { git = "https://github.com/leod/pareen.git", branch = "brainstorm", features = ["easer"] }
+#pareen = { path = "../../pareen", features = ["easer"] } 
+pareen = { git = "https://github.com/leod/pareen.git", branch = "anim_with_dur", features = ["easer"] }
 coarse-prof = { git = "https://github.com/leod/coarse-prof.git" }
 
 comn = { path = "../comn" }

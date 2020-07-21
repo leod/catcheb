@@ -161,8 +161,13 @@ pub fn render_game(
                 gfx.set_transform(transform.then(camera_transform));
 
                 // TODO: Blending's-a not working -- user error or not?
-                let alpha = pareen::c(1.0)
-                    .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, pareen::c(0.0))
+                let alpha = pareen::constant(1.0)
+                    .seq_ease_out(
+                        0.9,
+                        pareen::easer::functions::Sine,
+                        0.1,
+                        pareen::constant(0.0),
+                    )
                     .squeeze(food.start_time..=food.start_time + FOOD_MAX_LIFETIME)
                     .eval(time);
                 gfx.fill_rect(
@@ -231,15 +236,26 @@ pub fn render_game(
                 .then(camera_transform);
                 gfx.set_transform(transform);
 
+                // We need to play the frames backwards depending on the
+                // initial orientation of the danger guy.
+                let is_positive_first = (danger_guy.end_pos - danger_guy.start_pos)
+                    .dot(&comn::Vector::new(1.0, 1.0))
+                    > 0.0;
+                let walk_frames = |fps: f32| {
+                    let anim = || pareen::cycle(7, fps);
+
+                    pareen::cond(is_positive_first, anim(), anim().backwards(0.0))
+                };
+
                 let fps_0 = danger_guy.speed.0 / 12.0;
                 let fps_1 = danger_guy.speed.1 / 12.0;
                 let frame = pareen::seq_with_dur!(
-                    pareen::c(0).dur(danger_guy.wait_time.0),
-                    pareen::frames(0..=6, fps_0)
-                        .dur(danger_guy.walk_time().0)
-                        .backwards(),
-                    pareen::c(0).dur(danger_guy.wait_time.1),
-                    pareen::frames(0..=6, fps_1).dur(danger_guy.walk_time().1),
+                    pareen::constant(0).dur(danger_guy.wait_time.0),
+                    walk_frames(fps_0).dur(danger_guy.walk_time().0),
+                    pareen::constant(0).dur(danger_guy.wait_time.1),
+                    walk_frames(fps_1)
+                        .backwards(0.0)
+                        .dur(danger_guy.walk_time().1),
                 )
                 .repeat()
                 .eval(time);

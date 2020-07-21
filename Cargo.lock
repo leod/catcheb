@@ -256,7 +256,7 @@ dependencies = [
  "log",
  "mint",
  "nalgebra",
- "pareen",
+ "pareen 0.2.5 (git+https://github.com/leod/pareen.git?branch=anim_with_dur)",
  "quicksilver",
  "serde",
  "wasm-bindgen",
@@ -316,7 +316,7 @@ dependencies = [
  "instant",
  "log",
  "nalgebra",
- "pareen",
+ "pareen 0.2.5 (git+https://github.com/leod/pareen.git?branch=brainstorm)",
  "rand",
  "rmp-serde",
  "serde",
@@ -1422,6 +1422,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88cfece6e95d2e717e0872a7f53a8684712ad13822a7979bc760b9c77ec0013b"
 dependencies = [
  "shared_library",
+]
+
+[[package]]
+name = "pareen"
+version = "0.2.5"
+source = "git+https://github.com/leod/pareen.git?branch=anim_with_dur#0db38f999033580414c721f493aa9b318007b9d8"
+dependencies = [
+ "easer",
+ "num-traits",
 ]
 
 [[package]]
