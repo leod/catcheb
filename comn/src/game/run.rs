@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rand::{seq::IteratorRandom, Rng};
 
-use crate::entities::{Bullet, Dash, Food};
+use crate::entities::{AnimState, Bullet, Dash, Food, Frame};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, Input,
@@ -10,8 +10,8 @@ use crate::{
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
-pub const PLAYER_SIT_W: f32 = 40.0;
-pub const PLAYER_SIT_L: f32 = 40.0;
+pub const PLAYER_SIT_W: f32 = 50.0;
+pub const PLAYER_SIT_L: f32 = 50.0;
 pub const PLAYER_MOVE_W: f32 = 56.6;
 pub const PLAYER_MOVE_L: f32 = 28.2;
 pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
@@ -25,7 +25,7 @@ pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
 pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
 pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
-pub const PLAYER_SIZE_SKEW: f32 = 0.5;
+pub const PLAYER_SIZE_SKEW: f32 = 0.15;
 pub const PLAYER_TURN_DURATION: GameTime = 0.5;
 pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
 pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
@@ -35,7 +35,7 @@ pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
 pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
 pub const PLAYER_MAX_SIZE_BUMP: f32 = 50.0;
 
-pub const HOOK_SHOOT_SPEED: f32 = 1200.0;
+pub const HOOK_SHOOT_SPEED: f32 = 1800.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
 pub const HOOK_MIN_DISTANCE: f32 = 40.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
@@ -625,6 +625,21 @@ impl Game {
             }
         }
 
+        // Animation
+        ent.anim_frame = if ent.dash.is_some() {
+            if input_state.catcher == Some(ent.owner) {
+                Self::cycle_anim(&[1, 3], 10.0, dt, ent.anim_frame)
+            } else {
+                (1, 0.0)
+            }
+        } else {
+            if any_move_key {
+                Self::cycle_anim(&[2, 3], 4.0, dt, ent.anim_frame)
+            } else {
+                (0, 0.0)
+            }
+        };
+
         // Dying
         if let Some(reason) = killed {
             self.kill_player(entity_id, reason, context)?;
@@ -783,5 +798,28 @@ impl Game {
                     .map(|t| (t, entity_id, entity))
             })
             .min_by(|(t1, _, _), (t2, _, _)| t1.partial_cmp(t2).unwrap())
+    }
+
+    fn cycle_anim(
+        seq: &[Frame],
+        fps: f32,
+        dt: GameTime,
+        (frame, time_left): AnimState,
+    ) -> AnimState {
+        let new_time_left = time_left - dt;
+
+        if new_time_left <= 0.0 {
+            let current_index = seq.iter().position(|&f| f == frame).unwrap_or(0);
+
+            let new_frame = if current_index + 1 < seq.len() {
+                seq[current_index + 1]
+            } else {
+                seq[0]
+            };
+
+            (new_frame, 1.0 / fps + new_time_left)
+        } else {
+            (frame, new_time_left)
+        }
     }
 }
