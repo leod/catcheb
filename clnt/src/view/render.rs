@@ -19,6 +19,18 @@ use comn::{
 
 use crate::view::Resources;
 
+pub fn color_enemy() -> Color {
+    Color::from_hex("E13700")
+}
+
+pub fn color_food() -> Color {
+    Color::from_hex("FFC100")
+}
+
+pub fn color_wall() -> Color {
+    Color::from_hex("0A0903")
+}
+
 pub fn interp_entities<'a>(
     state: &'a comn::Game,
     next_entities: &'a BTreeMap<comn::EntityId, (comn::GameTime, comn::Entity)>,
@@ -68,8 +80,17 @@ pub fn render_game(
         gfx.set_transform(camera_transform);
         let map_size: mint::Vector2<f32> = state.settings.map.size.into();
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
-        gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
-        gfx.fill_rect(&map_rect, Color::WHITE);
+        //gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
+        //gfx.fill_rect(&map_rect, Color::WHITE);
+        gfx.draw_subimage(
+            &resources.ground,
+            map_rect,
+            Rectangle::new(
+                Vector::new(0.0, 0.0),
+                Vector::new(map_size.x * 8.0, map_size.y * 8.0),
+            ),
+        );
+
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
 
@@ -129,7 +150,7 @@ pub fn render_game(
                 if spawn.has_food {
                     let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                     gfx.set_transform(transform.then(camera_transform));
-                    gfx.fill_rect(&rect, Color::ORANGE);
+                    gfx.fill_rect(&rect, color_food());
                     gfx.stroke_rect(&rect, Color::BLACK);
                 }
             }
@@ -139,27 +160,29 @@ pub fn render_game(
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
 
-                // TODO: Blending's-a not working -- user error or not?
                 let alpha = pareen::constant(1.0)
-                    .seq_ease_out(0.9, pareen::easer::functions::Sine, 0.1, 0.0)
+                    .seq_ease_out(
+                        0.9,
+                        pareen::easer::functions::Sine,
+                        0.1,
+                        pareen::constant(0.0),
+                    )
                     .squeeze(food.start_time..=food.start_time + FOOD_MAX_LIFETIME)
                     .eval(time);
                 gfx.fill_rect(
                     &rect,
                     Color {
-                        r: 1.0,
-                        g: 1.0 - 0.5 * alpha,
-                        b: 1.0 - alpha,
-                        a: 1.0,
+                        a: alpha,
+                        ..color_food()
                     },
                 );
                 gfx.stroke_rect(
                     &rect,
                     Color {
-                        r: 1.0 - alpha,
-                        g: 1.0 - alpha,
-                        b: 1.0 - alpha,
-                        a: 1.0,
+                        r: 1.0,
+                        g: 1.0,
+                        b: 1.0,
+                        a: alpha,
                     },
                 );
             }
@@ -198,48 +221,56 @@ pub fn render_game(
                 let origin: mint::Vector2<f32> =
                     (danger_guy.pos(time) - danger_guy.size / 2.0).coords.into();
                 let size: mint::Vector2<f32> = danger_guy.size.into();
-                let rect = Rectangle::new(origin.into(), size.into());
-                gfx.set_transform(camera_transform);
-
-                // Awesome Hirsch, add back in once we have more images!
-                /*let frame = pareen::constant(0)
-                    .switch(danger_guy.wait_time - 0.6, 1)
-                    .switch(danger_guy.wait_time - 0.4, 2)
-                    .switch(danger_guy.wait_time - 0.2, 3)
-                    .seq(
-                        danger_guy.wait_time,
-                        pareen::fun(|tau| 3 + (tau * danger_guy.speed / 40.0) as usize % 4),
-                    )
-                    .repeat(danger_guy.period() / 2.0)
-                    .eval(danger_guy.tau(time)) as f32;
-
-                let flip = danger_guy
-                    .dir(time)
-                    .normalize()
-                    .dot(&comn::Vector::new(1.0, 0.0))
-                    > 0.7;
-                let sub_rect = if flip {
-                    Rectangle::new(
-                        Vector::new(17.0, 16.0 * frame + 1.0),
-                        Vector::new(-16.0, 16.0),
-                    )
+                let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
+                let transform = if danger_guy.end_pos.y != danger_guy.start_pos.y {
+                    Transform::rotate(90.0)
                 } else {
-                    Rectangle::new(
-                        Vector::new(1.0, 16.0 * frame + 1.0),
-                        Vector::new(16.0, 16.0),
-                    )
+                    Transform::IDENTITY
+                }
+                .then(Transform::translate(Vector::new(0.5, 0.5)))
+                .then(Transform::scale(size.into()))
+                .then(Transform::translate(origin.into()))
+                .then(camera_transform);
+                gfx.set_transform(transform);
+
+                // We need to play the frames backwards depending on the
+                // initial orientation of the danger guy.
+                let is_positive_first = (danger_guy.end_pos - danger_guy.start_pos)
+                    .dot(&comn::Vector::new(1.0, 1.0))
+                    > 0.0;
+                let walk_frames = |fps: f32| {
+                    let anim = || pareen::cycle(7, fps);
+
+                    pareen::cond(is_positive_first, anim(), anim().backwards(0.0))
                 };
 
-                gfx.draw_subimage(&resources.hirsch, sub_rect, rect);*/
+                let fps_0 = danger_guy.speed.0 / 12.0;
+                let fps_1 = danger_guy.speed.1 / 12.0;
+                let frame = pareen::seq_with_dur!(
+                    pareen::constant(0).dur(danger_guy.wait_time.0),
+                    walk_frames(fps_0).dur(danger_guy.walk_time().0),
+                    pareen::constant(0).dur(danger_guy.wait_time.1),
+                    walk_frames(fps_1)
+                        .backwards(0.0)
+                        .dur(danger_guy.walk_time().1),
+                )
+                .repeat()
+                .eval(time);
 
-                let color = if danger_guy.is_hot {
-                    Color::RED
+                let sub_rect = Rectangle::new(
+                    Vector::new(16.0 * frame as f32, 0.0),
+                    Vector::new(16.0, 16.0),
+                );
+                gfx.draw_subimage(&resources.danger_guy, sub_rect, rect);
+
+                /*let color = if danger_guy.is_hot {
+                    color_enemy()
                 } else {
                     Color::CYAN
                 };
 
-                gfx.fill_rect(&rect, color);
-                gfx.stroke_rect(&rect, Color::BLACK);
+                gfx.fill_rect(&rect, color);*/
+                //gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::Bullet(bullet) => {
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
@@ -247,7 +278,7 @@ pub fn render_game(
                 let color = if bullet.owner == Some(my_player_id) {
                     Color::ORANGE
                 } else {
-                    Color::MAGENTA
+                    color_enemy()
                 };
                 gfx.set_transform(camera_transform);
                 gfx.fill_circle(&circle, color);
@@ -256,7 +287,7 @@ pub fn render_game(
             comn::Entity::Turret(turret) => {
                 let origin: mint::Vector2<f32> = turret.pos.coords.into();
                 let color = if turret.target.is_some() {
-                    Color::RED
+                    color_enemy()
                 } else {
                     Color::from_rgba(150, 150, 150, 1.0)
                 };
@@ -282,6 +313,7 @@ pub fn render_game(
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
                 gfx.fill_rect(&rect, Color::from_rgba(170, 170, 170, 1.0));
+                //gfx.fill_rect(&rect, color_wall());
                 gfx.stroke_rect(&rect, Color::BLACK);
             }
             comn::Entity::FoodSpawn(_) => (),
@@ -294,6 +326,8 @@ pub fn render_game(
     Ok(())
 }
 
+// 0a0903,ffc100,e13700,072ac8,7ae582
+
 fn render_player(
     gfx: &mut Graphics,
     resources: &mut Resources,
@@ -305,23 +339,25 @@ fn render_player(
     player: &comn::PlayerView,
 ) -> quicksilver::Result<()> {
     let pos: mint::Vector2<f32> = player.pos.coords.into();
-
-    let color = if player.owner == my_player_id {
-        Color::BLUE
-    } else {
-        Color::from_rgba(148, 0, 211, 1.0)
-    };
-
     let transform = rect_to_transform(&player.rect());
     let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
 
-    gfx.set_transform(transform.then(camera_transform));
-    gfx.fill_rect(&rect, color);
-    gfx.stroke_rect(&rect, Color::BLACK);
+    gfx.set_transform(Transform::rotate(90.0).then(transform.then(camera_transform)));
 
-    let nose = Rectangle::new(Vector::new(0.5, -0.1), Vector::new(0.2, 0.2));
-    gfx.set_transform(transform.then(camera_transform));
-    gfx.fill_rect(&nose, Color::CYAN);
+    let row = if player.owner == my_player_id {
+        0.0
+    } else if state.catcher == Some(player.owner) {
+        1.0
+    } else {
+        2.0
+    };
+    let column = player.anim_frame as f32;
+
+    let sub_rect = Rectangle::new(
+        Vector::new(16.0 * column, 16.0 * row),
+        Vector::new(16.0, 16.0),
+    );
+    gfx.draw_subimage(&resources.player, sub_rect, rect);
 
     gfx.set_transform(camera_transform);
 
@@ -329,9 +365,9 @@ fn render_player(
         render_hook(gfx, state, next_entities, time, player.pos, hook)?;
     }
 
-    resources
-        .font
-        .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;
+    /*resources
+    .font
+    .draw(gfx, &player.owner.0.to_string(), Color::WHITE, pos.into())?;*/
 
     Ok(())
 }

@@ -131,6 +131,9 @@ pub struct Dash {
     pub dir: Vector,
 }
 
+pub type Frame = u8;
+pub type AnimState = (Frame, GameTime);
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerEntity {
     pub owner: PlayerId,
@@ -149,6 +152,7 @@ pub struct PlayerEntity {
     pub dash_cooldown: GameTime,
     pub hook: Option<Hook>,
     pub hook_cooldown: GameTime,
+    pub anim_frame: AnimState,
 }
 
 impl PlayerEntity {
@@ -170,6 +174,7 @@ impl PlayerEntity {
             dash_cooldown: 0.0,
             hook: None,
             hook_cooldown: 0.0,
+            anim_frame: (0, 0.0),
         }
     }
 
@@ -180,6 +185,8 @@ impl PlayerEntity {
             angle: self.angle,
             size: self.size(),
             hook: self.hook.clone(),
+            is_dashing: self.dash.is_some(),
+            anim_frame: self.anim_frame.0,
         }
     }
 
@@ -231,6 +238,8 @@ pub struct PlayerView {
     pub angle: f32,
     pub size: Vector,
     pub hook: Option<Hook>,
+    pub is_dashing: bool,
+    pub anim_frame: Frame,
 }
 
 impl PlayerView {
@@ -276,55 +285,17 @@ impl DangerGuy {
         )
     }
 
-    pub fn period(&self) -> GameTime {
-        self.wait_time.0 + self.walk_time().0 + self.wait_time.1 + self.walk_time().1
-    }
-
-    pub fn delta(&self) -> Vector {
-        self.end_pos - self.start_pos
-    }
-
-    pub fn tau(&self, t: GameTime) -> GameTime {
-        ((t - self.phase) / self.period()).fract() * self.period()
-    }
-
     pub fn pos(&self, t: GameTime) -> Point {
-        let delta = self.delta();
-        let tau = self.tau(t);
-
-        // TODO: Simplify, maybe pareen?
-        if tau < self.wait_time.0 {
-            self.start_pos
-        } else if tau <= self.wait_time.0 + self.walk_time().0 {
-            self.start_pos + (tau - self.wait_time.0) / self.walk_time().0 * delta
-        } else if tau < self.wait_time.0 + self.wait_time.1 + self.walk_time().0 {
-            self.end_pos
-        } else {
-            self.end_pos
-                - (tau - self.wait_time.0 - self.wait_time.1 - self.walk_time().0)
-                    / self.walk_time().1
-                    * delta
-        }
-
-        /*pareen::seq! {
-            self.wait_time => self.start_pos,
-            self.walk_time() => pareen::lerp(self.start_pos, self.end_pos).scale_time(1.0 / self.walk_time()),
-            self.wait_time => self.end_pos,
-            self.walk_time() => pareen::lerp(self.end_pos, self.start_pos).scale_time(1.0 / self.walk_time()),
-        }
-        .repeat(self.period())
-        .eval(t)*/
-    }
-
-    pub fn dir(&self, t: GameTime) -> Vector {
-        let delta = self.delta();
-        let tau = self.tau(t);
-
-        if tau <= self.wait_time.0 + self.walk_time().0 {
-            delta
-        } else {
-            -delta
-        }
+        pareen::seq_with_dur!(
+            pareen::c(self.start_pos).dur(self.wait_time.0),
+            pareen::lerp(pareen::c(self.start_pos), pareen::c(self.end_pos))
+                .scale_to_dur(self.walk_time().0),
+            pareen::c(self.end_pos).dur(self.wait_time.1),
+            pareen::lerp(pareen::c(self.end_pos), pareen::c(self.start_pos))
+                .scale_to_dur(self.walk_time().1),
+        )
+        .repeat()
+        .eval(t)
     }
 
     pub fn aa_rect(&self, t: GameTime) -> AaRect {

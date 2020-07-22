@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.4" tiledversion="1.4.1" orientation="orthogonal" renderorder="right-down" width="100" height="100" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="236">
+<map version="1.4" tiledversion="1.4.1" orientation="orthogonal" renderorder="right-down" width="100" height="100" tilewidth="32" tileheight="32" infinite="0" nextlayerid="6" nextobjectid="247">
  <objectgroup color="#1e8b00" id="2" name="Spawns">
   <object id="42" name="spawn" x="1568" y="2400" width="64" height="64"/>
  </objectgroup>
@@ -144,7 +144,7 @@
     <property name="wait_go" type="float" value="0"/>
    </properties>
   </object>
-  <object id="135" type="danger_guy" x="1408" y="1312" width="64" height="192">
+  <object id="135" type="danger_guy" x="1376" y="1408" width="96" height="96">
    <properties>
     <property name="delta_x" type="float" value="-608"/>
     <property name="delta_y" type="float" value="0"/>
@@ -155,7 +155,7 @@
     <property name="wait_go" type="float" value="0"/>
    </properties>
   </object>
-  <object id="136" type="danger_guy" x="128" y="1312" width="64" height="192">
+  <object id="136" type="danger_guy" x="128" y="1312" width="96" height="96">
    <properties>
     <property name="delta_x" type="float" value="608"/>
     <property name="delta_y" type="float" value="0"/>
@@ -190,7 +190,7 @@
   <object id="144" type="turret" x="896" y="992" width="64" height="64">
    <ellipse/>
   </object>
-  <object id="146" type="danger_guy" x="704" y="1888" width="192" height="64">
+  <object id="146" type="danger_guy" x="704" y="1856" width="96" height="96">
    <properties>
     <property name="delta_x" type="float" value="0"/>
     <property name="delta_y" type="float" value="-480"/>
@@ -201,7 +201,7 @@
     <property name="wait_go" type="float" value="0"/>
    </properties>
   </object>
-  <object id="147" type="danger_guy" x="704" y="864" width="192" height="64">
+  <object id="147" type="danger_guy" x="800" y="864" width="96" height="96">
    <properties>
     <property name="delta_x" type="float" value="0"/>
     <property name="delta_y" type="float" value="480"/>
@@ -232,6 +232,94 @@
     <property name="speed_go" type="float" value="500"/>
     <property name="wait_back" type="float" value="1"/>
     <property name="wait_go" type="float" value="1"/>
+   </properties>
+  </object>
+  <object id="236" type="danger_guy" x="1312" y="608" width="96" height="96">
+   <properties>
+    <property name="delta_x" type="float" value="-608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="238" type="danger_guy" x="746.195" y="535.669" width="64" height="64">
+   <properties>
+    <property name="delta_x" type="float" value="-608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="239" type="danger_guy" x="1312" y="416" width="96" height="96">
+   <properties>
+    <property name="delta_x" type="float" value="-608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="240" type="danger_guy" x="1312" y="512" width="96" height="96">
+   <properties>
+    <property name="delta_x" type="float" value="-608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="243" type="danger_guy" x="1376" y="1312" width="96" height="96">
+   <properties>
+    <property name="delta_x" type="float" value="-608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="244" type="danger_guy" x="128" y="1408" width="96" height="96">
+   <properties>
+    <property name="delta_x" type="float" value="608"/>
+    <property name="delta_y" type="float" value="0"/>
+    <property name="phase" type="float" value="0"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="245" type="danger_guy" x="800" y="1856" width="96" height="96">
+   <properties>
+    <property name="delta_x" type="float" value="0"/>
+    <property name="delta_y" type="float" value="-480"/>
+    <property name="phase" type="float" value="1"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
+   </properties>
+  </object>
+  <object id="246" type="danger_guy" x="704" y="864" width="96" height="96">
+   <properties>
+    <property name="delta_x" type="float" value="0"/>
+    <property name="delta_y" type="float" value="480"/>
+    <property name="phase" type="float" value="1"/>
+    <property name="speed_back" type="float" value="100"/>
+    <property name="speed_go" type="float" value="200"/>
+    <property name="wait_back" type="float" value="0"/>
+    <property name="wait_go" type="float" value="0"/>
    </properties>
   </object>
  </objectgroup>
