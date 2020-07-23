@@ -124,6 +124,7 @@ pub enum Event {
     },
     PlayerDied {
         player_id: PlayerId,
+        pos: Point,
         reason: DeathReason,
     },
     NewCatcher {

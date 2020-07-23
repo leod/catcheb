@@ -1,6 +1,7 @@
 mod camera;
 mod event_list;
 mod overlay;
+mod particles;
 mod render;
 mod resources;
 mod scoreboard;
@@ -15,6 +16,7 @@ use quicksilver::{geom::Vector, graphics::Graphics, input::Key};
 
 use camera::Camera;
 use event_list::EventList;
+use particles::Particles;
 
 pub use resources::Resources;
 
@@ -31,6 +33,7 @@ pub struct View {
     camera: Camera,
     window_size: comn::Vector,
     window_scale_factor: f32,
+    particles: Particles,
 }
 
 impl View {
@@ -44,6 +47,7 @@ impl View {
     ) -> Self {
         let event_list = EventList::new(config.event_list);
         let camera = Camera::new(config.camera, settings.map.size);
+        let particles = Particles::new();
 
         Self {
             my_player_id,
@@ -52,6 +56,7 @@ impl View {
             camera,
             window_size,
             window_scale_factor,
+            particles,
         }
     }
 
@@ -87,9 +92,22 @@ impl View {
             self.window_size,
             self.window_scale_factor,
         );
+        self.particles.update(game_time);
 
         for event in game_events {
             self.event_list.push(now, event.clone());
+
+            use comn::Event::*;
+            match event {
+                PlayerDied {
+                    player_id: _,
+                    pos,
+                    reason: _,
+                } => {
+                    self.particles.spawn_blood(*pos, 100.0);
+                }
+                _ => (),
+            }
         }
     }
 
@@ -102,6 +120,8 @@ impl View {
         game_time: comn::GameTime,
     ) -> quicksilver::Result<()> {
         if let Some(state) = state {
+            self.particles.render(gfx, self.camera.transform());
+
             render::render_game(
                 gfx,
                 &mut self.resources,
