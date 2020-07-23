@@ -33,7 +33,8 @@ pub struct View {
     camera: Camera,
     window_size: comn::Vector,
     window_scale_factor: f32,
-    particles: Particles,
+    ground_particles: Particles,
+    air_particles: Particles,
 }
 
 impl View {
@@ -47,7 +48,8 @@ impl View {
     ) -> Self {
         let event_list = EventList::new(config.event_list);
         let camera = Camera::new(config.camera, settings.map.size);
-        let particles = Particles::new();
+        let ground_particles = Particles::new();
+        let air_particles = Particles::new();
 
         Self {
             my_player_id,
@@ -56,7 +58,8 @@ impl View {
             camera,
             window_size,
             window_scale_factor,
-            particles,
+            ground_particles,
+            air_particles,
         }
     }
 
@@ -92,7 +95,8 @@ impl View {
             self.window_size,
             self.window_scale_factor,
         );
-        self.particles.update(game_time);
+        self.ground_particles.update(game_time);
+        self.air_particles.update(game_time);
 
         for event in game_events {
             self.event_list.push(now, event.clone());
@@ -104,11 +108,29 @@ impl View {
                     pos,
                     reason: _,
                 } => {
-                    self.particles.spawn_blood(*pos, 100.0);
+                    self.ground_particles.spawn_blood(*pos, 100.0);
                 }
                 _ => (),
             }
         }
+
+        if let Some(state) = state {
+            for entity in state.entities.values() {
+                match entity {
+                    comn::Entity::Player(player) => {
+                        self.update_player(&player.to_view());
+                    }
+                    comn::Entity::PlayerView(player) => {
+                        self.update_player(player);
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+
+    pub fn update_player(&mut self, player: &comn::PlayerView) {
+        if player.is_dashing {}
     }
 
     pub fn render(
@@ -120,7 +142,7 @@ impl View {
         game_time: comn::GameTime,
     ) -> quicksilver::Result<()> {
         if let Some(state) = state {
-            self.particles.render(gfx, self.camera.transform());
+            self.ground_particles.render(gfx, self.camera.transform());
 
             render::render_game(
                 gfx,
@@ -131,6 +153,8 @@ impl View {
                 self.my_player_id,
                 self.camera.transform(),
             )?;
+
+            self.air_particles.render(gfx, self.camera.transform());
 
             coarse_prof::profile!("overlay");
             overlay::render(
