@@ -711,7 +711,13 @@ impl Game {
         context: &mut RunContext,
     ) -> GameResult<()> {
         let ent = self.get_entity(entity_id)?.player()?.clone();
-        context.killed_players.insert(ent.owner, reason);
+        context.killed_players.insert(ent.owner, reason.clone());
+
+        context.events.push(Event::PlayerDied {
+            player_id: ent.owner,
+            pos: ent.pos,
+            reason,
+        });
 
         if !context.is_predicting {
             let player = self.players.get_mut(&ent.owner).unwrap();

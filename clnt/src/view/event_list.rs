@@ -86,7 +86,11 @@ impl EventList {
     pub fn event_to_string(event: &Event) -> Option<String> {
         // TODO: Use player names
         match event {
-            Event::PlayerDied { player_id, reason } => Some(match reason {
+            Event::PlayerDied {
+                player_id,
+                pos: _,
+                reason,
+            } => Some(match reason {
                 DeathReason::ShotBy(Some(other_player_id)) => {
                     format!("{} shot {}", player_id.0, other_player_id.0)
                 }
