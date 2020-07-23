@@ -34,23 +34,25 @@ impl Particles {
 
     pub fn spawn_blood(&mut self, pos: comn::Point, bamness: f32) {
         let mut rng = rand::thread_rng();
-        let num = (bamness / 3.0) as usize;
+        let num = (bamness / 2.0) as usize;
 
         for _ in 0..num {
             let dir = rng.gen::<f32>() * std::f32::consts::PI * 2.0;
             let speed_factor = rng.gen::<f32>();
-            let speed = 50.0 + speed_factor * 200.0;
+            let speed = 50.0 + speed_factor * 500.0;
             let particle = Particle {
                 pos,
                 vel: speed * comn::Vector::new(dir.cos(), dir.sin()),
                 angle: 0.0,
-                angle_vel: rng.gen_range(-1.0, 1.0) * 90.0,
-                life: 10.0 + rng.gen_range(-1.0, 1.0),
-                damping: 6.0 + speed_factor * rng.gen::<f32>() * 9.0,
+                angle_vel: rng.gen_range(-1.0, 1.0) * 120.0,
+                life: 5.0 + rng.gen_range(-1.0, 1.0),
+                damping: 7.0 + speed_factor * rng.gen::<f32>() * 9.0,
                 color: Color {
-                    r: 255.0,
-                    g: 0.0, //rng.gen::<f32>() * 50.0,
-                    b: 0.0, //rng.gen::<f32>() * 50.0,
+                    r: 1.0 - rng.gen::<f32>() * 0.2,
+                    g: 0.0,
+                    b: 0.0,
+                    //g: rng.gen::<f32>() * 0.5,
+                    //b: rng.gen::<f32>() * 0.5,
                     a: 1.0,
                 },
                 size: rng.gen_range(7.0, 20.0),
@@ -74,7 +76,7 @@ impl Particles {
             }
 
             particle.angle += particle.angle_vel * dt;
-            particle.angle_vel -= 3.0 * particle.damping * particle.angle_vel * dt;
+            particle.angle_vel -= 2.0 * particle.damping * particle.angle_vel * dt;
             if particle.angle_vel.abs() < 0.01 {
                 particle.angle_vel = 0.0;
             }
@@ -96,9 +98,9 @@ impl Particles {
 
             let alpha = pareen::constant(1.0)
                 .seq_ease_out(
-                    -1.0,
+                    -0.15,
                     pareen::easer::functions::Sine,
-                    0.1,
+                    0.15,
                     pareen::constant(0.0),
                 )
                 .eval(-particle.life);
@@ -107,7 +109,7 @@ impl Particles {
             gfx.fill_rect(
                 &rect,
                 Color {
-                    a: 1.0,
+                    a: alpha,
                     ..particle.color
                 },
             );
