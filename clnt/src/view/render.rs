@@ -82,14 +82,14 @@ pub fn render_game(
         let map_rect = Rectangle::new(Vector::new(0.0, 0.0), map_size.into());
         //gfx.fill_rect(&map_rect, Color::from_rgba(204, 255, 204, 1.0));
         //gfx.fill_rect(&map_rect, Color::WHITE);
-        gfx.draw_subimage(
+        /*gfx.draw_subimage(
             &resources.ground,
             map_rect,
             Rectangle::new(
                 Vector::new(0.0, 0.0),
                 Vector::new(map_size.x * 8.0, map_size.y * 8.0),
             ),
-        );
+        );*/
 
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
@@ -312,7 +312,7 @@ pub fn render_game(
                 let transform = rect_to_transform(&wall.rect.to_rect());
                 let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
                 gfx.set_transform(transform.then(camera_transform));
-                gfx.fill_rect(&rect, Color::from_rgba(170, 170, 170, 1.0));
+                gfx.fill_rect(&rect, Color::from_hex("373145"));
                 //gfx.fill_rect(&rect, color_wall());
                 gfx.stroke_rect(&rect, Color::BLACK);
             }
