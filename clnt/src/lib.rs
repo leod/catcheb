@@ -27,7 +27,7 @@ use crate::view::View;
 
 const SCREEN_SIZE: Vector = Vector {
     x: 1280.0,
-    y: 1024.0,
+    y: 720.0,
 };
 
 #[wasm_bindgen(start)]
@@ -188,7 +188,7 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         );
 
         coarse_prof::profile!("render");
-        gfx.clear(Color::WHITE);
+        gfx.clear(Color::from_hex("D4D6B9"));
 
         {
             coarse_prof::profile!("view");
