@@ -20,14 +20,12 @@ struct Particle {
 }
 
 pub struct Particles {
-    last_time: Option<GameTime>,
     particles: Slab<Particle>,
 }
 
 impl Particles {
     pub fn new() -> Self {
         Self {
-            last_time: None,
             particles: Slab::new(),
         }
     }
@@ -61,13 +59,41 @@ impl Particles {
         }
     }
 
-    pub fn update(&mut self, time: GameTime) {
-        let dt = self
-            .last_time
-            .map_or(0.0, |last_time| time - last_time)
-            .max(0.0);
-        self.last_time = Some(time);
+    pub fn spawn_trail(
+        &mut self,
+        pos: comn::Point,
+        angle: f32,
+        angle_spread: f32,
+        speed: f32,
+        color: Color,
+        size: f32,
+        num: usize,
+    ) {
+        let mut rng = rand::thread_rng();
 
+        for _ in 0..num {
+            let particle_dir = angle + rng.gen_range(-1.0, 1.0) * angle_spread;
+            let particle_speed = speed + rng.gen_range(0.0, 50.0);
+            let particle = Particle {
+                pos,
+                vel: particle_speed * comn::Vector::new(particle_dir.cos(), particle_dir.sin()),
+                angle: 0.0,
+                angle_vel: rng.gen_range(-1.0, 1.0) * 120.0,
+                life: 0.3,
+                damping: 15.0 + rng.gen_range(0.0, 5.0),
+                color: Color {
+                    r: 0.3,
+                    g: 0.5,
+                    b: rng.gen_range(0.8, 1.0),
+                    a: 1.0,
+                },
+                size,
+            };
+            self.particles.insert(particle);
+        }
+    }
+
+    pub fn update(&mut self, dt: GameTime) {
         for (_, particle) in self.particles.iter_mut() {
             particle.pos += particle.vel * dt;
             particle.vel -= particle.damping * particle.vel * dt;
