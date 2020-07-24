@@ -12,7 +12,7 @@ use std::{
 };
 
 use instant::Instant;
-use quicksilver::{geom::Vector, graphics::Graphics, input::Key};
+use quicksilver::{geom::Vector, graphics::{Color, Graphics}, input::Key};
 
 use camera::Camera;
 use event_list::EventList;
@@ -35,6 +35,7 @@ pub struct View {
     window_scale_factor: f32,
     ground_particles: Particles,
     air_particles: Particles,
+    last_game_time: Option<comn::GameTime>,
 }
 
 impl View {
@@ -60,6 +61,7 @@ impl View {
             window_scale_factor,
             ground_particles,
             air_particles,
+            last_game_time: None,
         }
     }
 
@@ -81,6 +83,12 @@ impl View {
         game_events: &[comn::Event],
         game_time: comn::GameTime,
     ) {
+        let game_dt = self
+            .last_game_time
+            .map_or(0.0, |last_game_time| game_time - last_game_time)
+            .max(0.0);
+        self.last_game_time = Some(game_time);
+
         let follow_entity = state.and_then(|state| {
             state
                 .get_player_entity(self.my_player_id)
@@ -95,8 +103,8 @@ impl View {
             self.window_size,
             self.window_scale_factor,
         );
-        self.ground_particles.update(game_time);
-        self.air_particles.update(game_time);
+        self.ground_particles.update(game_dt);
+        self.air_particles.update(game_dt);
 
         for event in game_events {
             self.event_list.push(now, event.clone());
@@ -118,10 +126,10 @@ impl View {
             for entity in state.entities.values() {
                 match entity {
                     comn::Entity::Player(player) => {
-                        self.update_player(&player.to_view());
+                        self.update_player(game_dt, state, &player.to_view());
                     }
                     comn::Entity::PlayerView(player) => {
-                        self.update_player(player);
+                        self.update_player(game_dt, state, player);
                     }
                     _ => (),
                 }
@@ -129,8 +137,30 @@ impl View {
         }
     }
 
-    pub fn update_player(&mut self, player: &comn::PlayerView) {
-        if player.is_dashing {}
+    pub fn update_player(
+        &mut self,
+        game_dt: comn::GameTime,
+        state: &comn::Game,
+        player: &comn::PlayerView,
+    ) {
+        if player.is_dashing {
+            let num = (game_dt * 150.0) as usize;
+            let start = player.pos - comn::Vector::new(player.angle.cos(), player.angle.sin()) * 40.0;
+            let size = if Some(player.owner) == state.catcher {
+                16.0
+            } else {
+                12.5
+            };
+            self.air_particles.spawn_trail(
+                start,
+                player.angle,
+                std::f32::consts::PI / 8.0,
+                1000.0,
+                Color::BLUE,
+                size,
+                num,
+            );
+        }
     }
 
     pub fn render(

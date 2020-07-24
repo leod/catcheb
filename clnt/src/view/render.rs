@@ -338,7 +338,6 @@ fn render_player(
     camera_transform: Transform,
     player: &comn::PlayerView,
 ) -> quicksilver::Result<()> {
-    let pos: mint::Vector2<f32> = player.pos.coords.into();
     let transform = rect_to_transform(&player.rect());
     let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
 
