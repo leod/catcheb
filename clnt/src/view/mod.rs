@@ -192,7 +192,10 @@ impl View {
         game_time: comn::GameTime,
     ) -> quicksilver::Result<()> {
         if let Some(state) = state {
-            self.ground_particles.render(gfx, self.camera.transform());
+            {
+                coarse_prof::profile!("ground_particles");
+                self.ground_particles.render(gfx, self.camera.transform());
+            }
 
             render::render_game(
                 gfx,
@@ -204,10 +207,16 @@ impl View {
                 self.camera.transform(),
             )?;
 
-            self.air_particles.render(gfx, self.camera.transform());
+            {
+                coarse_prof::profile!("air_particles");
+                self.air_particles.render(gfx, self.camera.transform());
+            }
 
-            for active_event in &self.active_events {
-                active_event.render(gfx, state, game_time, self.camera.transform());
+            {
+                coarse_prof::profile!("active_events");
+                for active_event in &self.active_events {
+                    active_event.render(gfx, state, game_time, self.camera.transform());
+                }
             }
 
             coarse_prof::profile!("overlay");

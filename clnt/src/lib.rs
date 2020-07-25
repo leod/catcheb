@@ -174,18 +174,23 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         };
 
         let state = runner.state();
-        view.set_window_size(
-            comn::Vector::new(window.size().x, window.size().y),
-            window.scale_factor(),
-        );
-        view.update(
-            start_time,
-            last_dt,
-            &pressed_keys,
-            state.as_ref(),
-            &game_events,
-            runner.interp_game_time(),
-        );
+
+        {
+            coarse_prof::profile!("update_view");
+
+            view.set_window_size(
+                comn::Vector::new(window.size().x, window.size().y),
+                window.scale_factor(),
+            );
+            view.update(
+                start_time,
+                last_dt,
+                &pressed_keys,
+                state.as_ref(),
+                &game_events,
+                runner.interp_game_time(),
+            );
+        }
 
         coarse_prof::profile!("render");
         gfx.clear(Color::from_hex("D4D6B9"));
