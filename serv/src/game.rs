@@ -262,6 +262,8 @@ impl Game {
             assert!(self.state.get_player_entity(entity.owner).is_none());
         }
 
+        debug!("Creating entity {:?}", entity_id);
+
         self.state.entities.insert(entity_id, entity);
     }
 

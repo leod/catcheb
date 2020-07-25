@@ -211,7 +211,7 @@ impl Game {
                 Entity::Food(food) => {
                     if time - food.start_time > FOOD_MAX_LIFETIME {
                         context.removed_entities.insert(*entity_id);
-                    } else {
+                    } else if food.start_vel.norm_squared() > 0.001 {
                         for entity_b in entities.values() {
                             if entity_b.is_wall_like()
                                 && entity_b.shape(time).contains_point(food.pos(time))

@@ -66,7 +66,7 @@ async fn main() {
     let runner_config = runner::Config {
         max_num_games: 32,
         game_settings: comn::Settings {
-            max_num_players: 16,
+            max_num_players: 32,
             ticks_per_second: 30,
             map: game_map,
         },
