@@ -710,6 +710,7 @@ impl Game {
 
         context.events.push(Event::PlayerAteFood {
             player_id: ent.owner,
+            amount,
         });
     }
 

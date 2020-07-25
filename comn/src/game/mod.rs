@@ -129,6 +129,7 @@ pub enum Event {
     },
     PlayerAteFood {
         player_id: PlayerId,
+        amount: u32,
     },
     NewCatcher {
         player_id: PlayerId,
