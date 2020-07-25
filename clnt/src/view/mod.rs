@@ -1,3 +1,4 @@
+mod active_event;
 mod camera;
 mod event_list;
 mod overlay;
@@ -12,8 +13,13 @@ use std::{
 };
 
 use instant::Instant;
-use quicksilver::{geom::Vector, graphics::{Color, Graphics}, input::Key};
+use quicksilver::{
+    geom::Vector,
+    graphics::{Color, Graphics},
+    input::Key,
+};
 
+use active_event::ActiveEvent;
 use camera::Camera;
 use event_list::EventList;
 use particles::Particles;
@@ -36,6 +42,7 @@ pub struct View {
     ground_particles: Particles,
     air_particles: Particles,
     last_game_time: Option<comn::GameTime>,
+    active_events: Vec<ActiveEvent>,
 }
 
 impl View {
@@ -62,6 +69,7 @@ impl View {
             ground_particles,
             air_particles,
             last_game_time: None,
+            active_events: Vec::new(),
         }
     }
 
@@ -120,6 +128,14 @@ impl View {
                 }
                 _ => (),
             }
+
+            let duration = active_event::event_duration(event);
+            if duration > 0.0 {
+                self.active_events.push(ActiveEvent {
+                    start_time: game_time,
+                    event: event.clone(),
+                });
+            }
         }
 
         if let Some(state) = state {
@@ -135,6 +151,9 @@ impl View {
                 }
             }
         }
+
+        self.active_events
+            .retain(|active_event| active_event.is_active(game_time));
     }
 
     pub fn update_player(
@@ -145,7 +164,8 @@ impl View {
     ) {
         if player.is_dashing {
             let num = (game_dt * 150.0) as usize;
-            let start = player.pos - comn::Vector::new(player.angle.cos(), player.angle.sin()) * 40.0;
+            let start =
+                player.pos - comn::Vector::new(player.angle.cos(), player.angle.sin()) * 40.0;
             let size = if Some(player.owner) == state.catcher {
                 16.0
             } else {
@@ -185,6 +205,10 @@ impl View {
             )?;
 
             self.air_particles.render(gfx, self.camera.transform());
+
+            for active_event in &self.active_events {
+                active_event.render(gfx, state, game_time, self.camera.transform());
+            }
 
             coarse_prof::profile!("overlay");
             overlay::render(
