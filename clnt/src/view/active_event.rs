@@ -30,7 +30,7 @@ impl ActiveEvent {
         gfx.set_transform(camera_transform);
 
         match self.event {
-            PlayerAteFood { player_id } => {
+            PlayerAteFood { player_id, amount } => {
                 if let Some((_, player)) = state.get_player_view_entity(player_id) {
                     let dt = game_time - self.start_time;
 
@@ -42,8 +42,9 @@ impl ActiveEvent {
                         let tau = (dt * std::f32::consts::PI / CIRCLE_DURATION).sin().powi(2);
                         let pos = player.pos + dir * (tau * 40.0 + 50.0);
                         let pos: mint::Vector2<f32> = pos.coords.into();
+                        let size = 10.0 * (amount as f32).sqrt().min(1.5);
                         gfx.fill_circle(
-                            &Circle::new(pos.into(), 10.0),
+                            &Circle::new(pos.into(), size),
                             Color {
                                 a: tau,
                                 ..crate::view::render::color_food()
