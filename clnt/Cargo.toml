@@ -13,6 +13,9 @@ default = ["console_error_panic_hook"]
 [dependencies]
 log = "0.4"
 serde = { version = "1.0" }
+slab = "0.4"
+rand = "0.7"
+getrandom = { version = "0.1", features = ["wasm-bindgen"] }
 
 js-sys = "0.3.37"
 wasm-bindgen = { version = "0.2.60", features = ["serde-serialize"] }

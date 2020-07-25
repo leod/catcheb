@@ -124,7 +124,12 @@ pub enum Event {
     },
     PlayerDied {
         player_id: PlayerId,
+        pos: Point,
         reason: DeathReason,
+    },
+    PlayerAteFood {
+        player_id: PlayerId,
+        amount: u32,
     },
     NewCatcher {
         player_id: PlayerId,

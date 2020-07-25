@@ -258,8 +258,8 @@ pub fn render_game(
                 .eval(time);
 
                 let sub_rect = Rectangle::new(
-                    Vector::new(16.0 * frame as f32, 0.0),
-                    Vector::new(16.0, 16.0),
+                    Vector::new(16.0 * frame as f32 + 1.0, 0.0),
+                    Vector::new(15.0, 16.0),
                 );
                 gfx.draw_subimage(&resources.danger_guy, sub_rect, rect);
 
@@ -338,7 +338,6 @@ fn render_player(
     camera_transform: Transform,
     player: &comn::PlayerView,
 ) -> quicksilver::Result<()> {
-    let pos: mint::Vector2<f32> = player.pos.coords.into();
     let transform = rect_to_transform(&player.rect());
     let rect = Rectangle::new(Vector::new(-0.5, -0.5), Vector::new(1.0, 1.0));
 

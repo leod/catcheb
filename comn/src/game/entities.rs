@@ -192,8 +192,8 @@ impl PlayerEntity {
 
     pub fn size(&self) -> Vector {
         Vector::new(
-            (self.size_bump + self.size_scale * run::PLAYER_SIT_W) * (1.0 + self.size_skew),
-            (self.size_bump + self.size_scale * run::PLAYER_SIT_L) / (1.0 + self.size_skew),
+            (/*self.size_bump +*/self.size_scale * run::PLAYER_SIT_W) * (1.0 + self.size_skew),
+            (/*self.size_bump +*/self.size_scale * run::PLAYER_SIT_L) / (1.0 + self.size_skew),
         )
     }
 
