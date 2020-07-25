@@ -251,6 +251,7 @@ dependencies = [
  "coarse-prof",
  "comn",
  "console_error_panic_hook",
+ "getrandom",
  "instant",
  "js-sys",
  "log",
@@ -258,7 +259,9 @@ dependencies = [
  "nalgebra",
  "pareen 0.2.5 (git+https://github.com/leod/pareen.git?branch=anim_with_dur)",
  "quicksilver",
+ "rand",
  "serde",
+ "slab",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -671,6 +674,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]

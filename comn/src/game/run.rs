@@ -6,7 +6,7 @@ use crate::entities::{AnimState, Bullet, Dash, Food, Frame};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, Input,
-    PlayerEntity, PlayerId, PlayerMap, PlayerState, Vector,
+    PlayerEntity, PlayerId, PlayerMap, PlayerState, PlayerView, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -650,7 +650,7 @@ impl Game {
                 // If we are doing reconciliation, the entity might no longer exist in auth state.
                 if self.entities.contains_key(&caught_entity_id) {
                     self.kill_player(caught_entity_id, DeathReason::CaughtBy(ent.owner), context)?;
-                    Self::take_food(&mut self.players, ent, PLAYER_CATCH_FOOD);
+                    Self::take_food(&mut self.players, ent, PLAYER_CATCH_FOOD, context);
                 }
             }
         }
@@ -670,7 +670,7 @@ impl Game {
                         {
                             spawn.has_food = false;
                             spawn.respawn_time = Some(time + FOOD_RESPAWN_DURATION);
-                            Self::take_food(&mut self.players, ent, 1);
+                            Self::take_food(&mut self.players, ent, 1, context);
                         }
                     }
                     Entity::Food(food) => {
@@ -686,7 +686,7 @@ impl Game {
                         )
                         .is_some()
                         {
-                            Self::take_food(&mut self.players, ent, food.amount);
+                            Self::take_food(&mut self.players, ent, food.amount, context);
                             context.removed_entities.insert(*entity_id);
                         }
                     }
@@ -698,10 +698,20 @@ impl Game {
         Ok(())
     }
 
-    fn take_food(players: &mut PlayerMap, ent: &mut PlayerEntity, amount: u32) {
+    fn take_food(
+        players: &mut PlayerMap,
+        ent: &mut PlayerEntity,
+        amount: u32,
+        context: &mut RunContext,
+    ) {
         players.get_mut(&ent.owner).unwrap().food += amount;
         ent.target_size_bump += PLAYER_TAKE_FOOD_SIZE_BUMP * amount as f32;
         ent.target_size_bump = ent.target_size_bump.min(PLAYER_MAX_SIZE_BUMP);
+
+        context.events.push(Event::PlayerAteFood {
+            player_id: ent.owner,
+            amount,
+        });
     }
 
     fn kill_player(
@@ -711,7 +721,13 @@ impl Game {
         context: &mut RunContext,
     ) -> GameResult<()> {
         let ent = self.get_entity(entity_id)?.player()?.clone();
-        context.killed_players.insert(ent.owner, reason);
+        context.killed_players.insert(ent.owner, reason.clone());
+
+        context.events.push(Event::PlayerDied {
+            player_id: ent.owner,
+            pos: ent.pos,
+            reason,
+        });
 
         if !context.is_predicting {
             let player = self.players.get_mut(&ent.owner).unwrap();
@@ -786,11 +802,23 @@ impl Game {
             .next()
     }
 
+    pub fn get_player_view_entity(&self, player_id: PlayerId) -> Option<(EntityId, PlayerView)> {
+        self.entities
+            .iter()
+            .filter_map(|(&id, e)| match e {
+                Entity::Player(ref e) if e.owner == player_id => Some((id, e.to_view())),
+                Entity::PlayerView(ref e) if e.owner == player_id => Some((id, e.clone())),
+                _ => None,
+            })
+            .next()
+    }
+
     fn trace_ray<'a>(
         ray: &Ray,
         time: f32,
         entities: impl Iterator<Item = (&'a EntityId, &'a Entity)>,
     ) -> Option<(f32, &'a EntityId, &'a Entity)> {
+        // FIXME: The unwrap here can actually fail!
         entities
             .filter_map(|(entity_id, entity)| {
                 ray.intersections(&entity.shape(time))

@@ -197,11 +197,8 @@ impl Game {
             self.remove_entity(entity_id);
         }
 
-        for (player_id, reason) in context.killed_players {
+        for (player_id, _reason) in context.killed_players {
             self.kill_player(player_id);
-            context
-                .events
-                .push(comn::Event::PlayerDied { player_id, reason });
         }
 
         self.state.tick_num = self.state.tick_num.next();
