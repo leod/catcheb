@@ -164,13 +164,13 @@ impl View {
     ) {
         if player.is_dashing {
             let num = (game_dt * 150.0) as usize;
-            let start =
-                player.pos - comn::Vector::new(player.angle.cos(), player.angle.sin()) * 40.0;
-            let size = if Some(player.owner) == state.catcher {
-                16.0
+            let (offset, size) = if Some(player.owner) == state.catcher {
+                (50.0, 16.0)
             } else {
-                12.5
+                (35.0, 12.5)
             };
+            let start =
+                player.pos - comn::Vector::new(player.angle.cos(), player.angle.sin()) * offset;
             self.air_particles.spawn_trail(
                 start,
                 player.angle,

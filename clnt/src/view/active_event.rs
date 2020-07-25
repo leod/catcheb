@@ -3,7 +3,7 @@ use quicksilver::{
     graphics::{Color, Graphics},
 };
 
-use comn::{Entity, Event, Game, GameTime};
+use comn::{Event, Game, GameTime};
 
 const NUM_CIRCLE_PARTICLES: usize = 16;
 const CIRCLE_DURATION: GameTime = 0.3;
