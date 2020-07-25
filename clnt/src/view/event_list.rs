@@ -64,20 +64,23 @@ impl EventList {
         }
 
         // Display events.
-        if !self.events.is_empty() {
+        let event_strings: Vec<_> = self
+            .events
+            .iter()
+            .filter_map(|(_, event)| Self::event_to_string(event))
+            .collect();
+
+        if !event_strings.is_empty() {
             overlay::box_thing(
                 gfx,
                 pos - Vector::new(0.0, 6.0),
-                Vector::new(260.0, 12.0 * self.events.len() as f32 + 14.0),
+                Vector::new(260.0, 12.0 * event_strings.len() as f32 + 14.0),
             )?;
             pos += Vector::new(10.0, 10.0);
-        }
-
-        for (_, event) in self.events.iter() {
-            if let Some(string) = Self::event_to_string(event) {
+            for string in event_strings {
                 font.draw(gfx, &string, Color::BLACK, pos)?;
+                pos.y += 12.0;
             }
-            pos.y += 12.0;
         }
 
         Ok(())
