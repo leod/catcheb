@@ -818,6 +818,7 @@ impl Game {
         time: f32,
         entities: impl Iterator<Item = (&'a EntityId, &'a Entity)>,
     ) -> Option<(f32, &'a EntityId, &'a Entity)> {
+        // FIXME: The unwrap here can actually fail!
         entities
             .filter_map(|(entity_id, entity)| {
                 ray.intersections(&entity.shape(time))

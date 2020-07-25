@@ -258,8 +258,8 @@ pub fn render_game(
                 .eval(time);
 
                 let sub_rect = Rectangle::new(
-                    Vector::new(16.0 * frame as f32, 0.0),
-                    Vector::new(16.0, 16.0),
+                    Vector::new(16.0 * frame as f32 + 1.0, 0.0),
+                    Vector::new(15.0, 16.0),
                 );
                 gfx.draw_subimage(&resources.danger_guy, sub_rect, rect);
 
