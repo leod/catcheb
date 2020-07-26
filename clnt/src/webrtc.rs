@@ -155,7 +155,7 @@ impl Client {
                 .map_err(ConnectError::ResponseJson)?,
         );
 
-        info!("A");
+        info!("A nswer: {:?}", answer);
 
         JsFuture::from(peer.set_remote_description(&answer.into()))
             .await
