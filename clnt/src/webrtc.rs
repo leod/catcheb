@@ -140,6 +140,8 @@ impl Client {
             .map_err(ConnectError::CreateOffer)?
             .into();
 
+        info!("Offer: {:?}", offer);
+
         JsFuture::from(peer.set_local_description(&offer))
             .await
             .map_err(ConnectError::SetLocalDescription)?;
@@ -155,7 +157,7 @@ impl Client {
                 .map_err(ConnectError::ResponseJson)?,
         );
 
-        info!("A");
+        info!("A nswer: {:?}", answer);
 
         JsFuture::from(peer.set_remote_description(&answer.into()))
             .await

@@ -38,6 +38,7 @@ pub const PLAYER_MAX_SIZE_BUMP: f32 = 50.0;
 pub const HOOK_SHOOT_SPEED: f32 = 1800.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
 pub const HOOK_MIN_DISTANCE: f32 = 40.0;
+pub const HOOK_MAX_DISTANCE: f32 = 2000.0;
 pub const HOOK_PULL_SPEED: f32 = 700.0;
 pub const HOOK_MAX_CONTRACT_DURATION: f32 = 0.2;
 pub const HOOK_CONTRACT_SPEED: f32 = 2000.0;
@@ -263,6 +264,46 @@ impl Game {
         entity_id: EntityId,
         ent: &mut PlayerEntity,
     ) -> GameResult<()> {
+        assert!(ent.pos.x.is_finite());
+        assert!(ent.pos.y.is_finite());
+        assert!(ent.vel.x.is_finite());
+        assert!(ent.vel.y.is_finite());
+        assert!(ent.angle.is_finite());
+        assert!(ent.turn_time_left.is_finite());
+        assert!(ent.target_angle.is_finite());
+        assert!(ent.size_scale.is_finite());
+        assert!(ent.size_skew.is_finite());
+        assert!(ent.size_bump.is_finite());
+        assert!(ent.target_size_bump.is_finite());
+        assert!(ent.next_shot_time.is_finite());
+        if let Some(dash) = ent.dash.as_ref() {
+            assert!(dash.time_left.is_finite());
+            assert!(dash.dir.x.is_finite());
+            assert!(dash.dir.y.is_finite());
+        }
+        assert!(ent.dash_cooldown.is_finite());
+        if let Some(hook) = ent.hook.as_ref() {
+            match hook {
+                Hook::Shooting { pos, vel, time_left } => {
+                    assert!(pos.x.is_finite());
+                    assert!(pos.y.is_finite());
+                    assert!(vel.x.is_finite());
+                    assert!(vel.y.is_finite());
+                    assert!(time_left.is_finite());
+                }
+                Hook::Attached { target: _, offset } => {
+                    assert!(offset.x.is_finite());
+                    assert!(offset.y.is_finite());
+                }
+                Hook::Contracting { pos } => {
+                    assert!(pos.x.is_finite());
+                    assert!(pos.y.is_finite());
+                }
+            }
+        }
+        assert!(ent.hook_cooldown.is_finite());
+        assert!(ent.anim_frame.1.is_finite());
+
         let dt = self.settings.tick_period();
         let input_state = input_state.unwrap_or(self);
         let input_time = input_state.game_time();
@@ -274,6 +315,7 @@ impl Game {
         if let Some(dash) = ent.dash.as_ref() {
             // Movement is constricted while dashing.
             ent.target_angle = dash.dir.y.atan2(dash.dir.x);
+            assert!(ent.target_angle.is_finite());
         } else {
             // Normal movement when not dashing.
             let mut delta = Vector::new(0.0, 0.0);
@@ -317,6 +359,7 @@ impl Game {
                 PLAYER_TURN_FACTOR
             };
             ent.angle += angle_dist * factor;
+            assert!(ent.angle.is_finite());
 
             let turn_scale = if let Some(dash) = ent.dash.as_ref() {
                 let dash_delta = PLAYER_DASH_DURATION - dash.time_left;
@@ -438,8 +481,12 @@ impl Game {
                 Hook::Attached { target, offset } => {
                     input_state.entities.get(&target).and_then(|target_ent| {
                         let hook_pos = target_ent.pos(input_time) + offset;
+                        let distance = (hook_pos - ent.pos).norm();
 
-                        if !input.use_action || (hook_pos - ent.pos).norm() < HOOK_MIN_DISTANCE {
+                        if !input.use_action
+                            || distance < HOOK_MIN_DISTANCE
+                            || distance > HOOK_MAX_DISTANCE
+                        {
                             Some(Hook::Contracting { pos: hook_pos })
                         } else {
                             ent.vel += (hook_pos - ent.pos).normalize() * HOOK_PULL_SPEED;
@@ -524,6 +571,7 @@ impl Game {
                 if collide {
                     offset += collision.resolution_vector;
                     if flip {
+                        assert!(collision.resolution_vector.norm() > 0.0);
                         flip_axis = Some(collision.resolution_vector.normalize());
                     }
                 }
@@ -532,6 +580,9 @@ impl Game {
 
         // Allow reflecting off walls when dashing
         if let (Some(dash), Some(flip_axis)) = (ent.dash.as_mut(), flip_axis) {
+            assert!(flip_axis.x.is_finite());
+            assert!(flip_axis.y.is_finite());
+
             let reflected_dash_dir = dash.dir - 2.0 * dash.dir.dot(&flip_axis) * flip_axis;
             dash.dir = reflected_dash_dir;
             ent.vel = ent.vel - 2.0 * ent.vel.dot(&flip_axis) * flip_axis;
@@ -567,6 +618,9 @@ impl Game {
                 Some(dash)
             }
         } else if input.use_item && ent.dash_cooldown == 0.0 {
+            assert!(ent.angle.is_finite());
+            assert!(ent.angle.cos().is_finite());
+            assert!(ent.angle.sin().is_finite());
             Some(Dash {
                 time_left: PLAYER_DASH_DURATION,
                 dir: Vector::new(ent.angle.cos(), ent.angle.sin()),
