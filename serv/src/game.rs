@@ -215,7 +215,7 @@ impl Game {
     }
 
     pub fn remove_player(&mut self, player_id: comn::PlayerId) {
-        debug!("Removing player {:?}", player_id);
+        //debug!("Removing player {:?}", player_id);
         self.state.players.remove(&player_id).unwrap();
         self.players_meta.remove(&player_id).unwrap();
 

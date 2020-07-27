@@ -284,7 +284,11 @@ impl Game {
         assert!(ent.dash_cooldown.is_finite());
         if let Some(hook) = ent.hook.as_ref() {
             match hook {
-                Hook::Shooting { pos, vel, time_left } => {
+                Hook::Shooting {
+                    pos,
+                    vel,
+                    time_left,
+                } => {
                     assert!(pos.x.is_finite());
                     assert!(pos.y.is_finite());
                     assert!(vel.x.is_finite());
