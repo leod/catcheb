@@ -241,6 +241,7 @@ impl View {
                 gfx,
                 &mut self.resources.font_small,
                 state,
+                self.my_player_id,
                 Vector::new(self.window_size.x * self.window_scale_factor - 270.0, 10.0),
                 Vector::new(300.0, 300.0),
             )?;
