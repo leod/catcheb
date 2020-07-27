@@ -98,6 +98,7 @@ impl Game {
             self.catcher = self
                 .players
                 .iter()
+                .filter(|(_, player)| !player.name.contains("bot")) // TODO: remove bot discrimination
                 .filter(|(_, player)| player.state == PlayerState::Alive)
                 .map(|(player_id, _)| *player_id)
                 .choose(&mut rng);

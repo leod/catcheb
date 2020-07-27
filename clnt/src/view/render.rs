@@ -94,6 +94,22 @@ pub fn render_game(
         gfx.stroke_rect(&map_rect, Color::BLACK);
     }
 
+    for spawn_point in state.settings.map.spawn_points.iter() {
+        let rect = Rectangle::new(
+            Vector::new(spawn_point.x, spawn_point.y) + Vector::new(-50.0, -50.0),
+            Vector::new(100.0, 100.0),
+        );
+        gfx.fill_rect(
+            &rect,
+            Color {
+                r: 0.4,
+                g: 0.8,
+                b: 0.4,
+                a: 0.4,
+            },
+        );
+    }
+
     {
         /*gfx.set_blend_mode(Some(BlendMode {
             equation: BlendEquation::Same(BlendOperation::Add),
