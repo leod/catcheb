@@ -161,6 +161,9 @@ impl Rect {
             Shape::Rect(other) => rect_collision(self, other, delta),
             Shape::AaRect(other) => rect_collision(self, &other.to_rect(), delta),
             Shape::Circle(other) => {
+                assert!(self.x_edge.x.is_finite());
+                assert!(self.x_edge.y.is_finite());
+
                 let theta = self.x_edge.y.atan2(self.x_edge.x);
                 let rotation = na::Rotation2::new(theta);
                 let inv_rotation = na::Rotation2::new(-theta);
@@ -197,6 +200,8 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
 
     for &edge in &edges {
         let axis = Vector::new(-edge.y, edge.x).normalize();
+        assert!(axis.x.is_finite());
+        assert!(axis.y.is_finite());
         //let axis = edge;
 
         // Are the polygons currently intersecting?
@@ -231,7 +236,7 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
 
         // Keep the axis with the minimum interval distance.
         let interval_distance = interval_distance.abs();
-        if interval_distance < min_interval_distance {
+        if interval_distance < min_interval_distance && interval_distance > 0.0 {
             min_interval_distance = interval_distance;
 
             translation_axis = if (a.center - b.center).dot(&axis) < 0.0 {
@@ -242,7 +247,8 @@ pub fn rect_collision(a: &Rect, b: &Rect, delta: Vector) -> Option<Collision> {
         }
     }
 
-    if will_intersect {
+    if will_intersect && min_interval_distance.is_finite() {
+        assert!(min_interval_distance.is_finite());
         Some(Collision {
             resolution_vector: translation_axis * min_interval_distance,
         })
@@ -283,6 +289,11 @@ pub fn aa_rect_circle_collision(
         } else {
             delta / dist
         };
+
+        assert!(normal.x.is_finite());
+        assert!(normal.y.is_finite());
+        assert!(dist.is_finite());
+        assert!(circle.radius.is_finite());
 
         Some(Collision {
             resolution_vector: normal * (circle.radius - dist + 1.0),
