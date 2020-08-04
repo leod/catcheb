@@ -8,7 +8,7 @@ use rand::seq::SliceRandom;
 
 use comn::{game::RunContext, Entity, PlayerState};
 
-use crate::bot::Bot;
+use crate::{bot::Bot, run};
 
 pub const FIRST_SPAWN_DURATION: comn::GameTime = 0.5;
 pub const RESPAWN_DURATION: comn::GameTime = 2.0;
@@ -105,7 +105,7 @@ impl Game {
         let current_time = self.state.game_time();
         let mut context = RunContext::default();
 
-        self.state.run_tick(&mut context).unwrap();
+        run::run_tick(&mut self.state, &mut context).unwrap();
 
         // TODO: Sort player input by tick num
         for (player_id, input_tick_num, input) in inputs {
@@ -189,16 +189,16 @@ impl Game {
             }
         }
 
+        for (player_id, reason) in context.killed_players.clone() {
+            self.kill_player(player_id, reason, &mut context);
+        }
+
         for entity in context.new_entities {
             self.add_entity(entity);
         }
 
         for entity_id in context.removed_entities {
             self.remove_entity(entity_id);
-        }
-
-        for (player_id, _reason) in context.killed_players {
-            self.kill_player(player_id);
         }
 
         self.state.tick_num = self.state.tick_num.next();
@@ -270,7 +270,12 @@ impl Game {
         self.state.entities.remove(&entity_id);
     }
 
-    fn kill_player(&mut self, player_id: comn::PlayerId) {
+    fn kill_player(
+        &mut self,
+        player_id: comn::PlayerId,
+        reason: comn::DeathReason,
+        context: &mut RunContext,
+    ) {
         let player = self.state.players.get_mut(&player_id).unwrap();
         debug!(
             "Killing player {:?} (in state {:?})",
@@ -279,7 +284,9 @@ impl Game {
 
         player.state = PlayerState::Dead;
 
-        if let Some((player_entity_id, _)) = self.state.get_player_entity(player_id) {
+        if let Some((player_entity_id, player_entity)) = self.state.get_player_entity(player_id) {
+            let player_entity = player_entity.clone();
+            run::on_kill_player(&mut self.state, &player_entity, reason, context).unwrap();
             self.remove_entity(player_entity_id);
         }
     }
