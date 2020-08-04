@@ -562,7 +562,7 @@ impl Runner {
         let game_id = comn::GameId(Uuid::new_v4());
         let mut game = Game::new(Arc::new(self.config.game_settings.clone()));
 
-        for i in 0..60 {
+        for i in 0..2 {
             game.join(format!("bot{}", i), true);
         }
 

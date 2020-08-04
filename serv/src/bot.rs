@@ -14,8 +14,9 @@ impl Bot {
             (0.02, &mut self.last_input.move_right),
             (0.02, &mut self.last_input.move_up),
             (0.02, &mut self.last_input.move_down),
-            (0.002, &mut self.last_input.use_item),
+            (0.002, &mut self.last_input.dash),
             (0.002, &mut self.last_input.use_action),
+            (0.002, &mut self.last_input.shoot),
         ]
         .iter_mut()
         {

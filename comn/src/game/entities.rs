@@ -346,8 +346,11 @@ pub struct Rocket {
 impl Rocket {
     pub fn pos(&self, t: GameTime) -> Point {
         let dt = t.max(self.start_time) - self.start_time;
+        let dir = Vector::new(self.angle.cos(), self.angle.sin());
         self.start_pos
-            + 0.5 * run::ROCKET_ACCEL * dt * dt * Vector::new(self.angle.cos(), self.angle.sin())
+            //+ 0.5 * run::ROCKET_ACCEL * dt * dt * dir
+            + (dt * dt * run::ROCKET_ACCEL).cosh().ln() * dir
+            + run::ROCKET_START_SPEED * dt * dir
     }
 
     pub fn shape(&self, t: GameTime) -> Shape {
