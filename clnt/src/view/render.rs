@@ -12,7 +12,7 @@ use quicksilver::{
 };
 
 use comn::{
-    game::run::{BULLET_RADIUS, FOOD_MAX_LIFETIME, FOOD_SIZE, TURRET_RADIUS},
+    game::run::{BULLET_RADIUS, FOOD_MAX_LIFETIME, FOOD_SIZE, ROCKET_RADIUS, TURRET_RADIUS},
     geom,
     util::join,
 };
@@ -292,6 +292,18 @@ pub fn render_game(
                 let origin: mint::Vector2<f32> = bullet.pos(time).coords.into();
                 let circle = Circle::new(origin.into(), BULLET_RADIUS);
                 let color = if bullet.owner == Some(my_player_id) {
+                    Color::ORANGE
+                } else {
+                    color_enemy()
+                };
+                gfx.set_transform(camera_transform);
+                gfx.fill_circle(&circle, color);
+                gfx.stroke_circle(&circle, Color::BLACK);
+            }
+            comn::Entity::Rocket(rocket) => {
+                let origin: mint::Vector2<f32> = rocket.pos(time).coords.into();
+                let circle = Circle::new(origin.into(), ROCKET_RADIUS);
+                let color = if rocket.owner == Some(my_player_id) {
                     Color::ORANGE
                 } else {
                     color_enemy()

@@ -6,7 +6,7 @@ use crate::entities::{AnimState, Bullet, Dash, Food, Frame};
 use crate::{
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, Input,
-    PlayerEntity, PlayerId, PlayerMap, PlayerState, PlayerView, Vector,
+    PlayerEntity, PlayerId, PlayerMap, PlayerState, PlayerView, Point, Turret, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -49,6 +49,9 @@ pub const BULLET_RADIUS: f32 = 8.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 
+pub const ROCKET_ACCEL: f32 = 10.0;
+pub const ROCKET_RADIUS: f32 = 16.0;
+
 pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 400.0;
 pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
@@ -79,7 +82,6 @@ impl Game {
     pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
         assert!(!context.is_predicting);
 
-        let time = self.game_time();
         let dt = self.settings.tick_period();
 
         if let Some(catcher) = self.catcher {
@@ -109,119 +111,50 @@ impl Game {
             }
         }
 
-        // TODO: clone
-        let entities = self.entities.clone();
+        let mut updates = Vec::new();
 
-        for (entity_id, entity) in self.entities.iter_mut() {
-            match entity {
+        for (entity_id, entity) in self.entities.iter() {
+            let mut entity = entity.clone();
+            let mut update = false;
+
+            match &mut entity {
                 Entity::Bullet(bullet) => {
-                    if !self.settings.aa_rect().contains_point(bullet.pos(time)) {
+                    if self.any_solid_neutral_contains_circle(
+                        *entity_id,
+                        bullet.owner,
+                        bullet.pos(self.game_time()),
+                        BULLET_RADIUS,
+                    ) {
                         context.removed_entities.insert(*entity_id);
-                        continue;
-                    }
-
-                    for (entity_id_b, entity_b) in entities.iter() {
-                        if *entity_id == *entity_id_b {
-                            continue;
-                        }
-
-                        match entity_b {
-                            Entity::DangerGuy(danger_guy) => {
-                                if danger_guy.aa_rect(time).contains_point(bullet.pos(time)) {
-                                    context.removed_entities.insert(*entity_id);
-                                }
-                            }
-                            Entity::Turret(turret) if bullet.owner.is_some() => {
-                                if (bullet.pos(time) - turret.pos).norm()
-                                    < TURRET_RADIUS + BULLET_RADIUS
-                                {
-                                    context.removed_entities.insert(*entity_id);
-                                }
-                            }
-                            Entity::Wall(wall) => {
-                                if wall.rect.contains_point(bullet.pos(time)) {
-                                    context.removed_entities.insert(*entity_id);
-                                    continue;
-                                }
-                            }
-                            _ => (),
-                        }
                     }
                 }
                 Entity::Turret(turret) => {
-                    turret.target = entities
-                        .iter()
-                        .filter(|(other_id, _)| **other_id != *entity_id)
-                        .filter_map(|(other_id, other_entity)| {
-                            other_entity.player().ok().map(|player| {
-                                (
-                                    other_id,
-                                    other_entity,
-                                    (turret.pos - player.pos).norm_squared(),
-                                )
-                            })
-                        })
-                        .filter(|(other_id, other_entity, dist)| {
-                            let ray = Ray {
-                                origin: turret.pos,
-                                dir: other_entity.pos(time) - turret.pos,
-                            };
-
-                            *dist <= TURRET_RANGE * TURRET_RANGE
-                                && Self::trace_ray(
-                                    &ray,
-                                    time,
-                                    entities.iter().filter(|(between_id, _)| {
-                                        **between_id != *entity_id && **between_id != **other_id
-                                    }),
-                                )
-                                .map_or(true, |(t, _, _)| t > 1.0)
-                        })
-                        .min_by(|(_, _, dist1), (_, _, dist2)| dist1.partial_cmp(dist2).unwrap())
-                        .map(|(other_id, _, _)| *other_id);
-
-                    if let Some(target) = turret.target {
-                        let target_pos = entities[&target].pos(time);
-                        let target_angle = turret.angle_to_pos(target_pos);
-                        let angle_dist = geom::angle_dist(target_angle, turret.angle);
-                        turret.angle += angle_dist * TURRET_TURN_FACTOR;
-                        //.min(TURRET_MAX_TURN_SPEED * tick_period)
-                        //.max(TURRET_MAX_TURN_SPEED * tick_period);
-
-                        if time >= turret.next_shot_time && angle_dist.abs() < TURRET_SHOOT_ANGLE {
-                            turret.next_shot_time = time + TURRET_SHOOT_PERIOD;
-
-                            let delta = Vector::new(turret.angle.cos(), turret.angle.sin());
-
-                            context.new_entities.push(Entity::Bullet(Bullet {
-                                owner: None,
-                                start_time: time,
-                                start_pos: turret.pos + TURRET_SPAWN_OFFSET * delta,
-                                vel: delta * BULLET_MOVE_SPEED,
-                            }));
-                        }
-                    }
+                    self.update_turret(*entity_id, turret, context);
+                    update = true;
                 }
                 Entity::FoodSpawn(spawn) if !spawn.has_food => {
                     if let Some(respawn_time) = spawn.respawn_time {
-                        if time >= respawn_time {
+                        if self.game_time() >= respawn_time {
                             spawn.has_food = true;
                             spawn.respawn_time = None;
+                            update = true;
                         }
                     }
                 }
                 Entity::Food(food) => {
-                    if time - food.start_time > FOOD_MAX_LIFETIME {
+                    if self.game_time() - food.start_time > FOOD_MAX_LIFETIME {
                         context.removed_entities.insert(*entity_id);
                     } else {
-                        for entity_b in entities.values() {
+                        for entity_b in self.entities.values() {
                             if entity_b.is_wall_like()
-                                && entity_b.shape(time).contains_point(food.pos(time))
+                                && entity_b
+                                    .shape(self.game_time())
+                                    .contains_point(food.pos(self.game_time()))
                             {
                                 // Replace the Food by a non-moving one
                                 context.removed_entities.insert(*entity_id);
                                 context.new_entities.push(Entity::Food(Food {
-                                    start_pos: food.pos(time - dt / 2.0),
+                                    start_pos: food.pos(self.game_time() - dt / 2.0),
                                     start_vel: Vector::zeros(),
                                     ..food.clone()
                                 }));
@@ -232,9 +165,69 @@ impl Game {
                 }
                 _ => (),
             }
+
+            if update {
+                updates.push((*entity_id, entity));
+            }
         }
 
+        self.entities.extend(updates);
+
         Ok(())
+    }
+
+    fn update_turret(&self, entity_id: EntityId, turret: &mut Turret, context: &mut RunContext) {
+        turret.target = self
+            .entities
+            .iter()
+            .filter(|(other_id, _)| **other_id != entity_id)
+            .filter_map(|(other_id, other_entity)| {
+                other_entity.player().ok().map(|player| {
+                    (
+                        other_id,
+                        other_entity,
+                        (turret.pos - player.pos).norm_squared(),
+                    )
+                })
+            })
+            .filter(|(other_id, other_entity, dist)| {
+                let ray = Ray {
+                    origin: turret.pos,
+                    dir: other_entity.pos(self.game_time()) - turret.pos,
+                };
+
+                *dist <= TURRET_RANGE * TURRET_RANGE
+                    && Self::trace_ray(
+                        &ray,
+                        self.game_time(),
+                        self.entities.iter().filter(|(between_id, _)| {
+                            **between_id != entity_id && **between_id != **other_id
+                        }),
+                    )
+                    .map_or(true, |(t, _, _)| t > 1.0)
+            })
+            .min_by(|(_, _, dist1), (_, _, dist2)| dist1.partial_cmp(dist2).unwrap())
+            .map(|(other_id, _, _)| *other_id);
+
+        if let Some(target) = turret.target {
+            let target_pos = self.entities[&target].pos(self.game_time());
+            let target_angle = turret.angle_to_pos(target_pos);
+            let angle_dist = geom::angle_dist(target_angle, turret.angle);
+            turret.angle += angle_dist * TURRET_TURN_FACTOR;
+
+            if self.game_time() >= turret.next_shot_time && angle_dist.abs() < TURRET_SHOOT_ANGLE {
+                turret.next_shot_time = self.game_time() + TURRET_SHOOT_PERIOD;
+
+                let delta = Vector::new(turret.angle.cos(), turret.angle.sin());
+
+                context.new_entities.push(Entity::Bullet(Bullet {
+                    owner: None,
+                    start_time: self.game_time(),
+                    start_pos: turret.pos + TURRET_SPAWN_OFFSET * delta,
+                    vel: delta * BULLET_MOVE_SPEED,
+                }));
+            }
+        }
     }
 
     pub fn run_player_input(
@@ -870,6 +863,45 @@ impl Game {
                 _ => None,
             })
             .next()
+    }
+
+    fn any_solid_neutral_contains_circle(
+        &self,
+        entity_id: EntityId,
+        owner: Option<PlayerId>,
+        pos: Point,
+        radius: f32,
+    ) -> bool {
+        if !self.settings.aa_rect().contains_point(pos) {
+            return true;
+        }
+
+        for (entity_id_b, entity_b) in self.entities.iter() {
+            if entity_id == *entity_id_b {
+                continue;
+            }
+
+            match entity_b {
+                Entity::DangerGuy(danger_guy) => {
+                    if danger_guy.aa_rect(self.game_time()).contains_point(pos) {
+                        return true;
+                    }
+                }
+                Entity::Turret(turret) if owner.is_some() => {
+                    if (pos - turret.pos).norm() < TURRET_RADIUS + radius {
+                        return true;
+                    }
+                }
+                Entity::Wall(wall) => {
+                    if wall.rect.contains_point(pos) {
+                        return true;
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        false
     }
 
     fn trace_ray<'a>(

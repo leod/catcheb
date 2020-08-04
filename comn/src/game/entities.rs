@@ -11,6 +11,7 @@ pub enum Entity {
     Player(PlayerEntity),
     PlayerView(PlayerView),
     Bullet(Bullet),
+    Rocket(Rocket),
     DangerGuy(DangerGuy),
     Turret(Turret),
     Wall(Wall),
@@ -32,6 +33,7 @@ impl Entity {
             Entity::Player(entity) => entity.pos,
             Entity::PlayerView(entity) => entity.pos,
             Entity::Bullet(entity) => entity.pos(time),
+            Entity::Rocket(entity) => entity.pos(time),
             Entity::DangerGuy(entity) => entity.pos(time),
             Entity::Turret(entity) => entity.pos,
             Entity::Wall(entity) => entity.pos(),
@@ -58,6 +60,7 @@ impl Entity {
     pub fn can_hook_attach(&self) -> bool {
         match self {
             Entity::Bullet(_) => false,
+            Entity::Rocket(_) => false,
             _ => true,
         }
     }
@@ -75,6 +78,7 @@ impl Entity {
             Entity::Player(entity) => entity.shape(),
             Entity::PlayerView(entity) => entity.shape(),
             Entity::Bullet(entity) => entity.shape(time),
+            Entity::Rocket(entity) => entity.shape(time),
             Entity::DangerGuy(entity) => entity.shape(time),
             Entity::Turret(entity) => entity.shape(),
             Entity::Wall(entity) => entity.shape(),
@@ -322,6 +326,28 @@ impl Bullet {
         } else {
             self.start_pos
         }
+    }
+
+    pub fn shape(&self, t: GameTime) -> Shape {
+        Shape::Circle(Circle {
+            center: self.pos(t),
+            radius: 1.0,
+        })
+    }
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Rocket {
+    pub owner: Option<PlayerId>,
+    pub start_time: GameTime,
+    pub start_pos: Point,
+    pub angle: f32,
+}
+
+impl Rocket {
+    pub fn pos(&self, t: GameTime) -> Point {
+        let dt = t.max(self.start_time) - self.start_time;
+        self.start_pos
+            + 0.5 * run::ROCKET_ACCEL * dt * dt * Vector::new(self.angle.cos(), self.angle.sin())
     }
 
     pub fn shape(&self, t: GameTime) -> Shape {
