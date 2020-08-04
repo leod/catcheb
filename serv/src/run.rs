@@ -24,8 +24,6 @@ const TURRET_SHOOT_PERIOD: GameTime = 1.3;
 pub fn run_tick(state: &mut Game, context: &mut RunContext) -> GameResult<()> {
     assert!(!context.is_predicting);
 
-    let dt = state.settings.tick_period();
-
     if let Some(catcher) = state.catcher {
         let catcher_alive = state
             .players
@@ -57,56 +55,7 @@ pub fn run_tick(state: &mut Game, context: &mut RunContext) -> GameResult<()> {
 
     for (entity_id, entity) in state.entities.iter() {
         let mut entity = entity.clone();
-        let mut update = false;
-
-        match &mut entity {
-            Entity::Bullet(bullet) => {
-                if state.any_solid_neutral_contains_circle(
-                    *entity_id,
-                    bullet.owner,
-                    bullet.pos(state.game_time()),
-                    BULLET_RADIUS,
-                ) {
-                    context.removed_entities.insert(*entity_id);
-                }
-            }
-            Entity::Turret(turret) => {
-                update_turret(state, *entity_id, turret, context);
-                update = true;
-            }
-            Entity::FoodSpawn(spawn) if !spawn.has_food => {
-                if let Some(respawn_time) = spawn.respawn_time {
-                    if state.game_time() >= respawn_time {
-                        spawn.has_food = true;
-                        spawn.respawn_time = None;
-                        update = true;
-                    }
-                }
-            }
-            Entity::Food(food) => {
-                if state.game_time() - food.start_time > FOOD_MAX_LIFETIME {
-                    context.removed_entities.insert(*entity_id);
-                } else {
-                    for entity_b in state.entities.values() {
-                        if entity_b.is_wall_like()
-                            && entity_b
-                                .shape(state.game_time())
-                                .contains_point(food.pos(state.game_time()))
-                        {
-                            // Replace the Food by a non-moving one
-                            context.removed_entities.insert(*entity_id);
-                            context.new_entities.push(Entity::Food(Food {
-                                start_pos: food.pos(state.game_time() - dt / 2.0),
-                                start_vel: Vector::zeros(),
-                                ..food.clone()
-                            }));
-                            break;
-                        }
-                    }
-                }
-            }
-            _ => (),
-        }
+        let update = update_entity(state, *entity_id, &mut entity, context);
 
         if update {
             updates.push((*entity_id, entity));
@@ -116,6 +65,67 @@ pub fn run_tick(state: &mut Game, context: &mut RunContext) -> GameResult<()> {
     state.entities.extend(updates);
 
     Ok(())
+}
+
+fn update_entity(
+    state: &Game,
+    entity_id: EntityId,
+    entity: &mut Entity,
+    context: &mut RunContext,
+) -> bool {
+    let dt = state.settings.tick_period();
+
+    match entity {
+        Entity::Bullet(bullet) => {
+            if state.any_solid_neutral_contains_circle(
+                entity_id,
+                bullet.owner,
+                bullet.pos(state.game_time()),
+                BULLET_RADIUS,
+            ) {
+                context.removed_entities.insert(entity_id);
+            }
+            false
+        }
+        Entity::Turret(turret) => {
+            update_turret(state, entity_id, turret, context);
+            true
+        }
+        Entity::FoodSpawn(spawn) if !spawn.has_food => {
+            if let Some(respawn_time) = spawn.respawn_time {
+                if state.game_time() >= respawn_time {
+                    spawn.has_food = true;
+                    spawn.respawn_time = None;
+                    return true;
+                }
+            }
+            false
+        }
+        Entity::Food(food) => {
+            if state.game_time() - food.start_time > FOOD_MAX_LIFETIME {
+                context.removed_entities.insert(entity_id);
+            } else {
+                for entity_b in state.entities.values() {
+                    if entity_b.is_wall_like()
+                        && entity_b
+                            .shape(state.game_time())
+                            .contains_point(food.pos(state.game_time()))
+                    {
+                        // Replace the Food by a non-moving one
+                        context.removed_entities.insert(entity_id);
+                        context.new_entities.push(Entity::Food(Food {
+                            start_pos: food.pos(state.game_time() - dt / 2.0),
+                            start_vel: Vector::zeros(),
+                            ..food.clone()
+                        }));
+                        break;
+                    }
+                }
+            }
+            false
+        }
+        _ => false,
+    }
 }
 
 fn update_turret(state: &Game, entity_id: EntityId, turret: &mut Turret, context: &mut RunContext) {
