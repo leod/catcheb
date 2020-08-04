@@ -4,7 +4,7 @@ use crate::{
     entities::{AnimState, Dash, Frame},
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, Input,
-    PlayerEntity, PlayerId, PlayerMap, PlayerView, Point, Vector,
+    PlayerEntity, PlayerId, PlayerMap, PlayerView, Point, Rocket, Vector,
 };
 
 pub const PLAYER_MOVE_SPEED: f32 = 300.0;
@@ -45,8 +45,9 @@ pub const BULLET_RADIUS: f32 = 8.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 
-pub const ROCKET_ACCEL: f32 = 10.0;
+pub const ROCKET_ACCEL: f32 = 50.0;
 pub const ROCKET_RADIUS: f32 = 16.0;
+pub const ROCKET_START_SPEED: f32 = 100.0;
 
 pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 400.0;
@@ -451,7 +452,7 @@ impl Game {
             } else {
                 Some(dash)
             }
-        } else if input.use_item && ent.dash_cooldown == 0.0 {
+        } else if input.dash && ent.dash_cooldown == 0.0 {
             assert!(ent.angle.is_finite());
             assert!(ent.angle.cos().is_finite());
             assert!(ent.angle.sin().is_finite());
@@ -464,17 +465,17 @@ impl Game {
         };
 
         // Shooting
-        /*if input_time >= ent.next_shot_time {
+        if input_time >= ent.next_shot_time {
             if ent.shots_left == 0 {
                 ent.shots_left = MAGAZINE_SIZE;
             }
 
-            if delta.norm() > 0.0 && input.use_item {
-                context.new_entities.push(Entity::Bullet(Bullet {
+            if input.shoot {
+                context.new_entities.push(Entity::Rocket(Rocket {
                     owner: Some(ent.owner),
                     start_time: input_time,
                     start_pos: ent.pos,
-                    vel: delta.normalize() * BULLET_MOVE_SPEED,
+                    angle: ent.angle,
                 }));
 
                 ent.shots_left -= 1;
@@ -485,7 +486,7 @@ impl Game {
                     ent.next_shot_time = input_time + PLAYER_SHOOT_PERIOD;
                 }
             }
-        }*/
+        }
 
         // Check for death
         let mut killed = None;

@@ -2,7 +2,10 @@ use rand::{seq::IteratorRandom, Rng};
 
 use comn::{
     entities::{Bullet, Food},
-    game::run::{RunContext, BULLET_MOVE_SPEED, BULLET_RADIUS, FOOD_MAX_LIFETIME, TURRET_RANGE},
+    game::run::{
+        RunContext, BULLET_MOVE_SPEED, BULLET_RADIUS, FOOD_MAX_LIFETIME, ROCKET_RADIUS,
+        TURRET_RANGE,
+    },
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameResult, GameTime, PlayerEntity, PlayerState,
     Turret, Vector,
@@ -84,6 +87,17 @@ fn update_entity(
                 BULLET_RADIUS,
             ) {
                 context.removed_entities.insert(entity_id);
+            }
+            false
+        }
+        Entity::Rocket(rocket) => {
+            if state.any_solid_neutral_contains_circle(
+                entity_id,
+                rocket.owner,
+                rocket.pos(state.game_time()),
+                ROCKET_RADIUS,
+            ) {
+                //context.removed_entities.insert(entity_id);
             }
             false
         }
