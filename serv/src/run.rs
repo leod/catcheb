@@ -22,7 +22,7 @@ const FOOD_MAX_SPEED: f32 = 700.0;
 const TURRET_TURN_FACTOR: f32 = 0.1;
 const TURRET_SHOOT_ANGLE: f32 = 0.3;
 const TURRET_SPAWN_OFFSET: f32 = 12.0;
-const TURRET_SHOOT_PERIOD: GameTime = 1.3;
+const TURRET_SHOOT_PERIOD: GameTime = 2.5;
 
 pub fn run_tick(state: &mut Game, context: &mut RunContext) -> GameResult<()> {
     assert!(!context.is_predicting);
