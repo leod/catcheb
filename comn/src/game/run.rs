@@ -45,9 +45,10 @@ pub const BULLET_RADIUS: f32 = 8.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 
-pub const ROCKET_ACCEL: f32 = 50.0;
 pub const ROCKET_RADIUS: f32 = 16.0;
 pub const ROCKET_START_SPEED: f32 = 100.0;
+pub const ROCKET_WARMUP_DURATION: f32 = 1.0;
+pub const ROCKET_SPEED: f32 = 500.0;
 
 pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 400.0;

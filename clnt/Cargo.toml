@@ -18,7 +18,7 @@ rand = "0.7"
 getrandom = { version = "0.1", features = ["wasm-bindgen"] }
 
 js-sys = "0.3.37"
-wasm-bindgen = { version = "0.2.60", features = ["serde-serialize"] }
+wasm-bindgen = { version = "=0.2.67", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.10"
 
 quicksilver = { version = "=0.4.0-alpha0.5", default-features = false, features = ["web-sys", "font", "ttf", "easy-log"] }

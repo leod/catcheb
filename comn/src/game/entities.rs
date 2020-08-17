@@ -291,12 +291,18 @@ impl DangerGuy {
 
     pub fn pos(&self, t: GameTime) -> Point {
         pareen::seq_with_dur!(
-            pareen::c(self.start_pos).dur(self.wait_time.0),
-            pareen::lerp(pareen::c(self.start_pos), pareen::c(self.end_pos))
-                .scale_to_dur(self.walk_time().0),
-            pareen::c(self.end_pos).dur(self.wait_time.1),
-            pareen::lerp(pareen::c(self.end_pos), pareen::c(self.start_pos))
-                .scale_to_dur(self.walk_time().1),
+            pareen::constant(self.start_pos).dur(self.wait_time.0),
+            pareen::lerp(
+                pareen::constant(self.start_pos),
+                pareen::constant(self.end_pos)
+            )
+            .scale_to_dur(self.walk_time().0),
+            pareen::constant(self.end_pos).dur(self.wait_time.1),
+            pareen::lerp(
+                pareen::constant(self.end_pos),
+                pareen::constant(self.start_pos)
+            )
+            .scale_to_dur(self.walk_time().1),
         )
         .repeat()
         .eval(t)
@@ -345,12 +351,18 @@ pub struct Rocket {
 
 impl Rocket {
     pub fn pos(&self, t: GameTime) -> Point {
-        let dt = t.max(self.start_time) - self.start_time;
         let dir = Vector::new(self.angle.cos(), self.angle.sin());
-        self.start_pos
-            //+ 0.5 * run::ROCKET_ACCEL * dt * dt * dir
-            + (dt * dt * run::ROCKET_ACCEL).cosh().ln() * dir
-            + run::ROCKET_START_SPEED * dt * dir
+
+        let anim = pareen::quadratic(&[
+            0.5 * (run::ROCKET_SPEED - run::ROCKET_START_SPEED) / run::ROCKET_WARMUP_DURATION,
+            run::ROCKET_START_SPEED,
+            0.0,
+        ])
+        .seq_continue(run::ROCKET_WARMUP_DURATION, |last_tau| {
+            pareen::prop(run::ROCKET_SPEED) + last_tau
+        }) * dir;
+
+        self.start_pos + anim.eval(t.max(self.start_time) - self.start_time)
     }
 
     pub fn shape(&self, t: GameTime) -> Shape {
