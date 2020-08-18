@@ -19,6 +19,7 @@ use comn::{
 };
 
 use crate::{
+    bot::Bot,
     game::Game,
     webrtc::{self, RecvMessageRx, SendMessageTx},
 };
@@ -501,7 +502,7 @@ impl Runner {
         let player_token = comn::PlayerToken(Uuid::new_v4());
         assert!(!self.players.contains_key(&player_token));
 
-        let player_id = game.join(request.player_name, false);
+        let player_id = game.join(request.player_name, None);
         let player = Player::new(game.settings().tick_period(), game_id, player_id);
         self.players.insert(player_token, player);
 
@@ -562,8 +563,12 @@ impl Runner {
         let game_id = comn::GameId(Uuid::new_v4());
         let mut game = Game::new(Arc::new(self.config.game_settings.clone()));
 
+        /*for i in 0..2 {
+            game.join(format!("random_bot{}", i), Some(Bot::random()));
+        }*/
+
         for i in 0..2 {
-            game.join(format!("bot{}", i), true);
+            game.join(format!("left_right_bot{}", i), Some(Bot::left_right(2.0)));
         }
 
         assert!(!self.games.contains_key(&game_id));

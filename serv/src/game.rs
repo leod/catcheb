@@ -64,7 +64,7 @@ impl Game {
         &self.state.settings
     }
 
-    pub fn join(&mut self, player_name: String, bot: bool) -> comn::PlayerId {
+    pub fn join(&mut self, player_name: String, bot: Option<Bot>) -> comn::PlayerId {
         // Runner takes care of not trying to join a full game.
         assert!(!self.is_full());
 
@@ -87,7 +87,7 @@ impl Game {
         };
         let player_meta = PlayerMeta {
             last_input_num: None,
-            bot: if bot { Some(Bot::default()) } else { None },
+            bot,
         };
         info!(
             "New player {:?} with id {:?} joined game",
