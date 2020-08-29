@@ -7,29 +7,29 @@ use crate::{
     PlayerEntity, PlayerId, PlayerMap, PlayerView, Point, Rocket, Vector,
 };
 
-pub const PLAYER_MOVE_SPEED: f32 = 300.0;
-pub const PLAYER_SIT_W: f32 = 50.0;
-pub const PLAYER_SIT_L: f32 = 50.0;
-pub const PLAYER_MOVE_W: f32 = 56.6;
-pub const PLAYER_MOVE_L: f32 = 28.2;
-pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_ACCEL_FACTOR: f32 = 30.0;
+pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
+pub const PLAYER_CATCH_FOOD: u32 = 10;
+pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
 pub const PLAYER_DASH_DURATION: GameTime = 0.6;
-pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
-pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
-pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
-pub const PLAYER_SIZE_SKEW: f32 = 0.15;
-pub const PLAYER_TURN_DURATION: GameTime = 0.5;
-pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
-pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
-pub const PLAYER_CATCH_FOOD: u32 = 10;
-pub const PLAYER_TAKE_FOOD_SIZE_BUMP: f32 = 25.0;
-pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
-pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
 pub const PLAYER_MAX_SIZE_BUMP: f32 = 50.0;
+pub const PLAYER_MOVE_L: f32 = 28.2;
+pub const PLAYER_MOVE_SPEED: f32 = 300.0;
+pub const PLAYER_MOVE_W: f32 = 56.6;
+pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
+pub const PLAYER_SIT_L: f32 = 50.0;
+pub const PLAYER_SIT_W: f32 = 50.0;
+pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
+pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
+pub const PLAYER_SIZE_SKEW: f32 = 0.15;
+pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
+pub const PLAYER_TAKE_FOOD_SIZE_BUMP: f32 = 25.0;
+pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
+pub const PLAYER_TURN_DURATION: GameTime = 0.5;
+pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1800.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -472,10 +472,12 @@ impl Game {
             }
 
             if input.shoot {
+                let start_pos = ent.rect().transform_point(Point::new(0.5, 0.0));
+
                 context.new_entities.push(Entity::Rocket(Rocket {
                     owner: Some(ent.owner),
                     start_time: input_time,
-                    start_pos: ent.pos,
+                    start_pos,
                     angle: ent.angle,
                 }));
 
