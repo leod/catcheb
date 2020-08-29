@@ -122,6 +122,10 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub fn transform_point(&self, p: Point) -> Point {
+        self.center + p.x * self.x_edge + p.y * self.y_edge
+    }
+
     pub fn iter_points(&self) -> impl Iterator<Item = Point> {
         once(self.center - self.x_edge / 2.0 - self.y_edge / 2.0)
             .chain(once(self.center + self.x_edge / 2.0 - self.y_edge / 2.0))
