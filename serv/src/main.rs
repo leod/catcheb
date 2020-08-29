@@ -7,6 +7,7 @@ mod bot;
 mod fake_bad_net;
 mod game;
 mod http;
+mod run;
 mod runner;
 mod tiled;
 mod webrtc;

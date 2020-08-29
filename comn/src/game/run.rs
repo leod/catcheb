@@ -1,39 +1,35 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use rand::{seq::IteratorRandom, Rng};
-
-use crate::entities::{AnimState, Bullet, Dash, Food, Frame};
 use crate::{
+    entities::{AnimState, Dash, Frame},
     geom::{self, Ray},
     DeathReason, Entity, EntityId, Event, Game, GameError, GameResult, GameTime, Hook, Input,
-    PlayerEntity, PlayerId, PlayerMap, PlayerState, PlayerView, Vector,
+    PlayerEntity, PlayerId, PlayerMap, PlayerView, Point, Rocket, Vector,
 };
 
-pub const PLAYER_MOVE_SPEED: f32 = 300.0;
-pub const PLAYER_SIT_W: f32 = 50.0;
-pub const PLAYER_SIT_L: f32 = 50.0;
-pub const PLAYER_MOVE_W: f32 = 56.6;
-pub const PLAYER_MOVE_L: f32 = 28.2;
-pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
 pub const PLAYER_ACCEL_FACTOR: f32 = 30.0;
+pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
+pub const PLAYER_CATCH_FOOD: u32 = 10;
+pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_COOLDOWN: f32 = 2.5;
 pub const PLAYER_DASH_DURATION: GameTime = 0.6;
-pub const PLAYER_DASH_ACCEL_FACTOR: f32 = 40.0;
 pub const PLAYER_DASH_SPEED: f32 = 850.0;
-pub const PLAYER_MAX_LOSE_FOOD: u32 = 5;
-pub const PLAYER_MIN_LOSE_FOOD: u32 = 1;
-pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 pub const PLAYER_DASH_TURN_FACTOR: f32 = 0.8;
-pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
-pub const PLAYER_SIZE_SKEW: f32 = 0.15;
-pub const PLAYER_TURN_DURATION: GameTime = 0.5;
-pub const PLAYER_CATCHER_SIZE_SCALE: f32 = 1.5;
-pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
-pub const PLAYER_CATCH_FOOD: u32 = 10;
-pub const PLAYER_TAKE_FOOD_SIZE_BUMP: f32 = 25.0;
-pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
-pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
 pub const PLAYER_MAX_SIZE_BUMP: f32 = 50.0;
+pub const PLAYER_MOVE_L: f32 = 28.2;
+pub const PLAYER_MOVE_SPEED: f32 = 300.0;
+pub const PLAYER_MOVE_W: f32 = 56.6;
+pub const PLAYER_SHOOT_PERIOD: GameTime = 0.3;
+pub const PLAYER_SIT_L: f32 = 50.0;
+pub const PLAYER_SIT_W: f32 = 50.0;
+pub const PLAYER_SIZE_BUMP_FACTOR: f32 = 20.0;
+pub const PLAYER_SIZE_SCALE_FACTOR: f32 = 10.0;
+pub const PLAYER_SIZE_SKEW: f32 = 0.15;
+pub const PLAYER_SIZE_SKEW_FACTOR: f32 = 20.0;
+pub const PLAYER_TAKE_FOOD_SIZE_BUMP: f32 = 25.0;
+pub const PLAYER_TARGET_SIZE_BUMP_FACTOR: f32 = 30.0;
+pub const PLAYER_TURN_DURATION: GameTime = 0.5;
+pub const PLAYER_TURN_FACTOR: f32 = 0.35;
 
 pub const HOOK_SHOOT_SPEED: f32 = 1800.0;
 pub const HOOK_MAX_SHOOT_DURATION: f32 = 0.6;
@@ -49,22 +45,18 @@ pub const BULLET_RADIUS: f32 = 8.0;
 pub const MAGAZINE_SIZE: u32 = 15;
 pub const RELOAD_DURATION: GameTime = 2.0;
 
+pub const ROCKET_RADIUS: f32 = 16.0;
+pub const ROCKET_START_SPEED: f32 = 100.0;
+pub const ROCKET_WARMUP_DURATION: f32 = 1.0;
+pub const ROCKET_SPEED: f32 = 500.0;
+
 pub const TURRET_RADIUS: f32 = 30.0;
 pub const TURRET_RANGE: f32 = 400.0;
-pub const TURRET_SHOOT_PERIOD: GameTime = 1.3;
-pub const TURRET_SHOOT_ANGLE: f32 = 0.3;
-pub const TURRET_MAX_TURN_SPEED: f32 = 2.0;
-pub const TURRET_TURN_FACTOR: f32 = 0.1;
-pub const TURRET_SPAWN_OFFSET: f32 = 12.0;
 
 pub const FOOD_SIZE: f32 = 20.0;
 pub const FOOD_ROTATION_SPEED: f32 = 3.0;
 pub const FOOD_RESPAWN_DURATION: f32 = 5.0;
 pub const FOOD_MAX_LIFETIME: f32 = 10.0;
-pub const FOOD_MIN_SPEED: f32 = 300.0;
-pub const FOOD_MAX_SPEED: f32 = 700.0;
-pub const FOOD_SPEED_MIN_FACTOR: f32 = 5.0;
-pub const FOOD_SPEED_MAX_FACTOR: f32 = 10.0;
 
 #[derive(Clone, Debug, Default)]
 pub struct RunContext {
@@ -76,167 +68,6 @@ pub struct RunContext {
 }
 
 impl Game {
-    pub fn run_tick(&mut self, context: &mut RunContext) -> GameResult<()> {
-        assert!(!context.is_predicting);
-
-        let time = self.game_time();
-        let dt = self.settings.tick_period();
-
-        if let Some(catcher) = self.catcher {
-            let catcher_alive = self
-                .players
-                .get(&catcher)
-                .map_or(false, |player| player.state == PlayerState::Alive);
-            if !catcher_alive {
-                self.catcher = None;
-            }
-        }
-
-        if self.catcher.is_none() {
-            // TODO: Random
-            let mut rng = rand::thread_rng();
-            self.catcher = self
-                .players
-                .iter()
-                .filter(|(_, player)| !player.name.contains("bot")) // TODO: remove bot discrimination
-                .filter(|(_, player)| player.state == PlayerState::Alive)
-                .map(|(player_id, _)| *player_id)
-                .choose(&mut rng);
-            if let Some(catcher) = self.catcher {
-                context
-                    .events
-                    .push(Event::NewCatcher { player_id: catcher });
-            }
-        }
-
-        // TODO: clone
-        let entities = self.entities.clone();
-
-        for (entity_id, entity) in self.entities.iter_mut() {
-            match entity {
-                Entity::Bullet(bullet) => {
-                    if !self.settings.aa_rect().contains_point(bullet.pos(time)) {
-                        context.removed_entities.insert(*entity_id);
-                        continue;
-                    }
-
-                    for (entity_id_b, entity_b) in entities.iter() {
-                        if *entity_id == *entity_id_b {
-                            continue;
-                        }
-
-                        match entity_b {
-                            Entity::DangerGuy(danger_guy) => {
-                                if danger_guy.aa_rect(time).contains_point(bullet.pos(time)) {
-                                    context.removed_entities.insert(*entity_id);
-                                }
-                            }
-                            Entity::Turret(turret) if bullet.owner.is_some() => {
-                                if (bullet.pos(time) - turret.pos).norm()
-                                    < TURRET_RADIUS + BULLET_RADIUS
-                                {
-                                    context.removed_entities.insert(*entity_id);
-                                }
-                            }
-                            Entity::Wall(wall) => {
-                                if wall.rect.contains_point(bullet.pos(time)) {
-                                    context.removed_entities.insert(*entity_id);
-                                    continue;
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                }
-                Entity::Turret(turret) => {
-                    turret.target = entities
-                        .iter()
-                        .filter(|(other_id, _)| **other_id != *entity_id)
-                        .filter_map(|(other_id, other_entity)| {
-                            other_entity.player().ok().map(|player| {
-                                (
-                                    other_id,
-                                    other_entity,
-                                    (turret.pos - player.pos).norm_squared(),
-                                )
-                            })
-                        })
-                        .filter(|(other_id, other_entity, dist)| {
-                            let ray = Ray {
-                                origin: turret.pos,
-                                dir: other_entity.pos(time) - turret.pos,
-                            };
-
-                            *dist <= TURRET_RANGE * TURRET_RANGE
-                                && Self::trace_ray(
-                                    &ray,
-                                    time,
-                                    entities.iter().filter(|(between_id, _)| {
-                                        **between_id != *entity_id && **between_id != **other_id
-                                    }),
-                                )
-                                .map_or(true, |(t, _, _)| t > 1.0)
-                        })
-                        .min_by(|(_, _, dist1), (_, _, dist2)| dist1.partial_cmp(dist2).unwrap())
-                        .map(|(other_id, _, _)| *other_id);
-
-                    if let Some(target) = turret.target {
-                        let target_pos = entities[&target].pos(time);
-                        let target_angle = turret.angle_to_pos(target_pos);
-                        let angle_dist = geom::angle_dist(target_angle, turret.angle);
-                        turret.angle += angle_dist * TURRET_TURN_FACTOR;
-                        //.min(TURRET_MAX_TURN_SPEED * tick_period)
-                        //.max(TURRET_MAX_TURN_SPEED * tick_period);
-
-                        if time >= turret.next_shot_time && angle_dist.abs() < TURRET_SHOOT_ANGLE {
-                            turret.next_shot_time = time + TURRET_SHOOT_PERIOD;
-
-                            let delta = Vector::new(turret.angle.cos(), turret.angle.sin());
-
-                            context.new_entities.push(Entity::Bullet(Bullet {
-                                owner: None,
-                                start_time: time,
-                                start_pos: turret.pos + TURRET_SPAWN_OFFSET * delta,
-                                vel: delta * BULLET_MOVE_SPEED,
-                            }));
-                        }
-                    }
-                }
-                Entity::FoodSpawn(spawn) if !spawn.has_food => {
-                    if let Some(respawn_time) = spawn.respawn_time {
-                        if time >= respawn_time {
-                            spawn.has_food = true;
-                            spawn.respawn_time = None;
-                        }
-                    }
-                }
-                Entity::Food(food) => {
-                    if time - food.start_time > FOOD_MAX_LIFETIME {
-                        context.removed_entities.insert(*entity_id);
-                    } else {
-                        for entity_b in entities.values() {
-                            if entity_b.is_wall_like()
-                                && entity_b.shape(time).contains_point(food.pos(time))
-                            {
-                                // Replace the Food by a non-moving one
-                                context.removed_entities.insert(*entity_id);
-                                context.new_entities.push(Entity::Food(Food {
-                                    start_pos: food.pos(time - dt / 2.0),
-                                    start_vel: Vector::zeros(),
-                                    ..food.clone()
-                                }));
-                                break;
-                            }
-                        }
-                    }
-                }
-                _ => (),
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn run_player_input(
         &mut self,
         player_id: PlayerId,
@@ -622,7 +453,7 @@ impl Game {
             } else {
                 Some(dash)
             }
-        } else if input.use_item && ent.dash_cooldown == 0.0 {
+        } else if input.dash && ent.dash_cooldown == 0.0 {
             assert!(ent.angle.is_finite());
             assert!(ent.angle.cos().is_finite());
             assert!(ent.angle.sin().is_finite());
@@ -635,17 +466,19 @@ impl Game {
         };
 
         // Shooting
-        /*if input_time >= ent.next_shot_time {
+        if input_time >= ent.next_shot_time {
             if ent.shots_left == 0 {
                 ent.shots_left = MAGAZINE_SIZE;
             }
 
-            if delta.norm() > 0.0 && input.use_item {
-                context.new_entities.push(Entity::Bullet(Bullet {
+            if input.shoot {
+                let start_pos = ent.rect().transform_point(Point::new(0.5, 0.0));
+
+                context.new_entities.push(Entity::Rocket(Rocket {
                     owner: Some(ent.owner),
                     start_time: input_time,
-                    start_pos: ent.pos,
-                    vel: delta.normalize() * BULLET_MOVE_SPEED,
+                    start_pos,
+                    angle: ent.angle,
                 }));
 
                 ent.shots_left -= 1;
@@ -656,7 +489,7 @@ impl Game {
                     ent.next_shot_time = input_time + PLAYER_SHOOT_PERIOD;
                 }
             }
-        }*/
+        }
 
         // Check for death
         let mut killed = None;
@@ -788,53 +621,6 @@ impl Game {
             reason,
         });
 
-        if !context.is_predicting {
-            let player = self.players.get_mut(&ent.owner).unwrap();
-            let spawn_food = player
-                .food
-                .min(PLAYER_MAX_LOSE_FOOD)
-                .max(PLAYER_MIN_LOSE_FOOD);
-            player.food -= spawn_food.min(player.food);
-
-            for _ in 0..spawn_food {
-                // TODO: Random
-                let angle = rand::thread_rng().gen::<f32>() * std::f32::consts::PI * 2.0;
-                let speed = rand::thread_rng().gen_range(FOOD_MIN_SPEED, FOOD_MAX_SPEED);
-                let start_vel = Vector::new(speed * angle.cos(), speed * angle.sin());
-                let factor =
-                    rand::thread_rng().gen_range(FOOD_SPEED_MIN_FACTOR, FOOD_SPEED_MAX_FACTOR);
-
-                let food = Food {
-                    start_time: self.game_time(),
-                    start_pos: ent.pos,
-                    start_vel,
-                    factor,
-                    amount: 1,
-                };
-                context.new_entities.push(Entity::Food(food));
-            }
-
-            if self.catcher == Some(ent.owner) {
-                // Choose a new catcher
-                self.catcher = self
-                    .entities
-                    .iter()
-                    .filter(|(other_id, _)| **other_id != entity_id)
-                    .filter_map(|(_, other_entity)| {
-                        other_entity.player().ok().map(|other_player| {
-                            (other_player.owner, (ent.pos - other_player.pos).norm())
-                        })
-                    })
-                    .min_by(|(_, dist1), (_, dist2)| dist1.partial_cmp(dist2).unwrap())
-                    .map(|(other_owner, _)| other_owner);
-                if let Some(catcher) = self.catcher {
-                    context
-                        .events
-                        .push(Event::NewCatcher { player_id: catcher });
-                }
-            }
-        }
-
         Ok(())
     }
 
@@ -872,7 +658,46 @@ impl Game {
             .next()
     }
 
-    fn trace_ray<'a>(
+    pub fn any_solid_neutral_contains_circle(
+        &self,
+        entity_id: EntityId,
+        owner: Option<PlayerId>,
+        pos: Point,
+        radius: f32,
+    ) -> bool {
+        if !self.settings.aa_rect().contains_point(pos) {
+            return true;
+        }
+
+        for (entity_id_b, entity_b) in self.entities.iter() {
+            if entity_id == *entity_id_b {
+                continue;
+            }
+
+            match entity_b {
+                Entity::DangerGuy(danger_guy) => {
+                    if danger_guy.aa_rect(self.game_time()).contains_point(pos) {
+                        return true;
+                    }
+                }
+                Entity::Turret(turret) if owner.is_some() => {
+                    if (pos - turret.pos).norm() < TURRET_RADIUS + radius {
+                        return true;
+                    }
+                }
+                Entity::Wall(wall) => {
+                    if wall.rect.contains_point(pos) {
+                        return true;
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        false
+    }
+
+    pub fn trace_ray<'a>(
         ray: &Ray,
         time: f32,
         entities: impl Iterator<Item = (&'a EntityId, &'a Entity)>,

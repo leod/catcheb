@@ -17,4 +17,4 @@ log = "0.4"
 rand = "0.7"
 
 coarse-prof = { git = "https://github.com/leod/coarse-prof.git" }
-pareen = { git = "https://github.com/leod/pareen.git", branch = "brainstorm", features = ["easer"] }
+pareen = { git = "https://github.com/leod/pareen.git", branch = "anim_with_dur", features = ["easer"] }
