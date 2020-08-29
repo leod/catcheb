@@ -53,8 +53,9 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
         move_right: pressed_keys.contains(&Key::D),
         move_up: pressed_keys.contains(&Key::W),
         move_down: pressed_keys.contains(&Key::S),
-        use_item: pressed_keys.contains(&Key::Space),
+        dash: pressed_keys.contains(&Key::Space),
         use_action: pressed_keys.contains(&Key::LShift),
+        shoot: pressed_keys.contains(&Key::Q),
     }
 }
 

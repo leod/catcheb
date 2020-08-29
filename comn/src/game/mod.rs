@@ -91,8 +91,9 @@ pub struct Input {
     pub move_right: bool,
     pub move_up: bool,
     pub move_down: bool,
-    pub use_item: bool,
+    pub dash: bool,
     pub use_action: bool,
+    pub shoot: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
