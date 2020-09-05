@@ -15,7 +15,7 @@ use instant::Instant;
 use log::info;
 
 use quicksilver::{
-    geom::Vector,
+    geom::{Rectangle, Transform, Vector},
     graphics::{Color, Graphics},
     input::{Event, Input, Key},
     Settings, Window,
@@ -47,7 +47,7 @@ pub fn main() {
     );
 }
 
-pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
+fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
     comn::Input {
         move_left: pressed_keys.contains(&Key::A),
         move_right: pressed_keys.contains(&Key::D),
@@ -57,6 +57,18 @@ pub fn current_input(pressed_keys: &HashSet<Key>) -> comn::Input {
         use_action: pressed_keys.contains(&Key::LShift),
         shoot: pressed_keys.contains(&Key::Q),
     }
+}
+
+// https://github.com/ryanisaacg/quicksilver/issues/628#issuecomment-670566767
+fn resize(gfx: &mut Graphics, window: &Window, prev_size: Vector) -> Vector {
+    let size = window.size();
+
+    if size != prev_size {
+        let screen_region = Rectangle::new_sized(size);
+        gfx.set_projection(Transform::orthographic(screen_region));
+    }
+
+    size
 }
 
 /// Statistics for debugging.
@@ -113,6 +125,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         .expect("Failed to get Window")
         .set_onbeforeunload(Some(on_before_unload.as_ref().unchecked_ref()));
 
+    let mut window_size = resize(&mut gfx, &window, Vector::ZERO);
+
     loop {
         coarse_prof::profile!("loop");
 
@@ -154,6 +168,8 @@ async fn app(window: Window, mut gfx: Graphics, mut input: Input) -> quicksilver
         }
 
         coarse_prof::profile!("frame");
+
+        window_size = resize(&mut gfx, &window, window_size);
 
         let mut runner = runner.borrow_mut();
 
