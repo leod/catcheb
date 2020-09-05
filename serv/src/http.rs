@@ -34,6 +34,8 @@ pub const STATIC_FILES: &[(&str, &str, &str)] = &[
     ("/index.html", "index.html", "text/html"),
     ("/clnt.js", "clnt.js.gz", "text/javascript"),
     ("/clnt_bg.wasm", "clnt_bg.wasm.gz", "application/wasm"),
+    ("/resize.js", "resize.js", "text/javascript"),
+    ("/style.css", "style.css", "text/css"),
     ("/kongtext.ttf", "kongtext.ttf", "font/ttf"),
     ("/sprint.png", "sprint.png", "image/png"),
     ("/robot-grab.png", "robot-grab.png", "image/png"),
