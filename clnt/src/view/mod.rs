@@ -197,15 +197,18 @@ impl View {
                 self.ground_particles.render(gfx, self.camera.transform());
             }
 
-            render::render_game(
-                gfx,
-                &mut self.resources,
-                state,
-                next_entities,
-                game_time,
-                self.my_player_id,
-                self.camera.transform(),
-            )?;
+            {
+                coarse_prof::profile!("game");
+                render::render_game(
+                    gfx,
+                    &mut self.resources,
+                    state,
+                    next_entities,
+                    game_time,
+                    self.my_player_id,
+                    self.camera.transform(),
+                )?;
+            }
 
             {
                 coarse_prof::profile!("air_particles");
