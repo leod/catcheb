@@ -8,11 +8,11 @@
     curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
     sudo apt-get install -y nodejs
     ```
-- `wasm-bindgen` for generating JavaScript/Wasm bindings:
+- `wasm-pack` for generating JavaScript/Wasm bindings:
 
     ```
     rustup target add wasm32-unknown-unknown
-    cargo install wasm-bindgen-cli
+    cargo install wasm-pack
     ```
 - `rollup` for combining JavaScript files into a single file:
 

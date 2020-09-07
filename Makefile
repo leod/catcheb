@@ -3,20 +3,10 @@ clnt: build-clnt package-clnt
 clnt-debug: build-clnt-debug package-clnt
 
 build-clnt:
-	cd clnt && cargo build -j4 --release --target wasm32-unknown-unknown
-	wasm-bindgen \
-		--target web \
-		--no-typescript \
-		--out-dir clnt/pkg \
-		target/wasm32-unknown-unknown/release/clnt.wasm
+	cd clnt && wasm-pack build --mode no-install --target web --no-typescript --release
 
 build-clnt-debug:
-	cd clnt && cargo build -j4 --target wasm32-unknown-unknown
-	wasm-bindgen \
-		--target web \
-		--no-typescript \
-		--out-dir clnt/pkg \
-		target/wasm32-unknown-unknown/debug/clnt.wasm
+	cd clnt && wasm-pack build --mode no-install --target web --no-typescript 
 
 package-clnt:
 	rollup clnt/pkg/clnt.js \
