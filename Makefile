@@ -3,10 +3,10 @@ clnt: build-clnt package-clnt
 clnt-debug: build-clnt-debug package-clnt
 
 build-clnt:
-	cd clnt && wasm-pack build --mode no-install --target web --no-typescript --release
+	cd clnt && wasm-pack build --target web --no-typescript --release
 
 build-clnt-debug:
-	cd clnt && wasm-pack build --mode no-install --target web --no-typescript 
+	cd clnt && wasm-pack build --target web --no-typescript --dev
 
 package-clnt:
 	rollup clnt/pkg/clnt.js \
