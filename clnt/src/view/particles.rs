@@ -1,11 +1,6 @@
 use rand::Rng;
 use slab::Slab;
 
-use quicksilver::{
-    geom::{Rectangle, Transform, Vector},
-    graphics::{Color, Graphics},
-};
-
 use comn::GameTime;
 
 struct Particle {

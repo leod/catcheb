@@ -3,8 +3,6 @@ use log::{info, warn};
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
-use quicksilver::input::Input;
-
 use crate::{runner::Runner, webrtc};
 
 #[derive(Debug, Clone)]
@@ -14,10 +12,7 @@ pub enum JoinAndConnectError {
     WebRTC(webrtc::ConnectError),
 }
 
-pub async fn join_and_connect(
-    request: comn::JoinRequest,
-    input: &mut Input,
-) -> Result<Runner, JoinAndConnectError> {
+pub async fn join_and_connect(request: comn::JoinRequest) -> Result<Runner, JoinAndConnectError> {
     let join_success = join_request(request)
         .await
         .map_err(JoinAndConnectError::Request)?
@@ -36,10 +31,6 @@ pub async fn join_and_connect(
     while webrtc_client.status() == webrtc::Status::Connecting {
         info!("Waiting...");
         webrtc_client.debug_ready_state();
-
-        // Note: this is here as a way to yield control back to JavaScript.
-        // There probably is a better way to do this.
-        input.next_event().await;
 
         // TODO: Timeout
     }

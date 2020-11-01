@@ -9,10 +9,7 @@ build-clnt-debug:
 	cd clnt && wasm-pack build --target web --no-typescript --dev
 
 package-clnt:
-	rollup clnt/pkg/clnt.js \
-		--file clnt/static/clnt.js \
-		--format iife \
-		--name clnt
+	cp clnt/pkg/clnt.js clnt/static/clnt.js 
 	cp clnt/pkg/clnt_bg.wasm clnt/static/
 	gzip -f clnt/static/clnt_bg.wasm
 	gzip -f clnt/static/clnt.js
