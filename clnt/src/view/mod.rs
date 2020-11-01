@@ -13,11 +13,6 @@ use std::{
 };
 
 use instant::Instant;
-use quicksilver::{
-    geom::Vector,
-    graphics::{Color, Graphics},
-    input::Key,
-};
 
 use active_event::ActiveEvent;
 use camera::Camera;

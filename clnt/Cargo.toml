@@ -5,7 +5,7 @@ authors = ["leod <subtle.frustration@proton.me>"]
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["console_error_panic_hook"]
@@ -17,17 +17,17 @@ slab = "0.4"
 rand = "0.7"
 getrandom = { version = "0.1", features = ["wasm-bindgen"] }
 
-js-sys = "0.3.37"
-wasm-bindgen = { version = "=0.2.67", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4.10"
+js-sys = "0.3.45"
+wasm-bindgen = { version = "=0.2.68", features = ["serde-serialize"] }
+wasm-bindgen-futures = "0.4.18"
+console_log = "0.2"
 
-quicksilver = { version = "=0.4.0-alpha0.5", default-features = false, features = ["web-sys", "font", "ttf", "easy-log"] }
-mint = "0.5"
-nalgebra = { version = "0.21", features = ["mint"] }
-instant = "0.1"
-#pareen = { path = "../../pareen", features = ["easer"] } 
+nalgebra = { version = "0.22" }
+instant = { version = "0.1", features = ["wasm-bindgen"] }
+
 pareen = { git = "https://github.com/leod/pareen.git", branch = "anim_with_dur", features = ["easer"] }
 coarse-prof = { git = "https://github.com/leod/coarse-prof.git" }
+webglee = { git = "https://github.com/leod/webglee.git" }
 
 comn = { path = "../comn" }
 

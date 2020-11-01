@@ -1,23 +1,11 @@
 # Secret Project
 
 ## Dependencies
-- `npm` (only needed for the `rollup` packer):
-    Installation on Ubuntu (otherwise, follow https://github.com/nodesource/distributions/blob/master/README.md)
-
-    ```
-    curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-    ```
 - `wasm-pack` for generating JavaScript/Wasm bindings:
 
     ```
     rustup target add wasm32-unknown-unknown
     cargo install wasm-pack
-    ```
-- `rollup` for combining JavaScript files into a single file:
-
-    ```
-    sudo npm install --global rollup
     ```
 
 ## Running
@@ -37,9 +25,6 @@ cargo run -j8 --bin serv -- \
     --http_address <your-ip>:8080 \
     --webrtc_address <your-ip>:9000
 ```
-
-## Useful resources
-- https://dev.to/dandyvica/wasm-in-rust-without-nodejs-2e0c
 
 ## Credits
 - `clnt/static/Munro-2LYe.ttf`: Munro font: http://www.tenbytwenty.com/

@@ -2,16 +2,18 @@
   <head>
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
     <link rel="stylesheet" type="text/css" href="style.css">
+    <title>Play Catcheb</title>
   </head>
   <body>
-    <script type="text/javascript" src="/clnt.js"></script>
-    <script type="text/javascript">
+    <script type="module">
+      import init from './clnt.js';
+
       async function run() {
-        await clnt.default();
+        await init();
       }
 
       run();
     </script>
-    <script type="text/javascript" src="resize.js"></script>
+    <canvas id="canvas">
   </body>
 </html>

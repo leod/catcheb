@@ -1,8 +1,3 @@
-use quicksilver::{
-    geom::{Rectangle, Vector},
-    graphics::{Color, FontRenderer, Graphics, Image},
-};
-
 use comn::game::run::{HOOK_COOLDOWN, PLAYER_DASH_COOLDOWN};
 
 use crate::view::Resources;
