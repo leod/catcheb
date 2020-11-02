@@ -28,13 +28,6 @@ pub async fn join_and_connect(request: comn::JoinRequest) -> Result<Runner, Join
         .await
         .map_err(JoinAndConnectError::WebRTC)?;
 
-    while webrtc_client.status() == webrtc::Status::Connecting {
-        info!("Waiting...");
-        webrtc_client.debug_ready_state();
-
-        // TODO: Timeout
-    }
-
     Ok(Runner::new(join_success, webrtc_client))
 }
 
