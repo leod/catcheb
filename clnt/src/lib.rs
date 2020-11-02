@@ -1,7 +1,7 @@
 mod join;
 mod prediction;
 mod runner;
-//mod view;
+mod view;
 mod webrtc;
 
 use std::{cell::RefCell, collections::HashSet, rc::Rc};

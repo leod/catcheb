@@ -22,7 +22,7 @@ wasm-bindgen = { version = "=0.2.68", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4.18"
 console_log = "0.2"
 
-nalgebra = { version = "0.22" }
+nalgebra = { version = "0.23" }
 instant = { version = "0.1", features = ["wasm-bindgen"] }
 
 pareen = { git = "https://github.com/leod/pareen.git", branch = "anim_with_dur", features = ["easer"] }
