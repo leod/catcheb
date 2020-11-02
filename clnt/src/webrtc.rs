@@ -3,7 +3,15 @@
 //! This is based on the `echo_server.html` example from `webrtc-unreliable`,
 //! but translated from JavaScript into Rust.
 
-use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    future::Future,
+    pin::Pin,
+    rc::Rc,
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use instant::Instant;
 use log::{info, warn};
@@ -29,6 +37,7 @@ pub enum ConnectError {
     ResponseJson(JsValue),
     SetRemoteDescription(JsValue),
     AddIceCandidate(JsValue),
+    FailedToConnect(Status),
 }
 
 // TODO: webrtc::Status is redundant, can be replaced by ready_state()
@@ -170,6 +179,13 @@ impl Client {
             .map_err(ConnectError::AddIceCandidate)?;
 
         info!("C");
+
+        // TODO: Use a timeout for connecting.
+        ConnectFuture(data.clone()).await;
+
+        if data.borrow().status != Status::Open {
+            return Err(ConnectError::FailedToConnect(data.borrow().status));
+        }
 
         Ok(Client {
             data,
@@ -328,4 +344,18 @@ async fn request_session(
     JsFuture::from(response.json().map_err(ConnectError::ResponseJson)?)
         .await
         .map_err(ConnectError::ResponseJson)
+}
+
+struct ConnectFuture(Rc<RefCell<Data>>);
+
+impl Future for ConnectFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        if self.0.borrow().status == Status::Connecting {
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    }
 }
