@@ -9,7 +9,7 @@ use std::{
     future::Future,
     pin::Pin,
     rc::Rc,
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
     time::Duration,
 };
 
@@ -75,7 +75,8 @@ pub struct Data {
     channel: RtcDataChannel,
     status: Status,
     received: VecDeque<(Instant, comn::ServerMessage)>,
-    now: (Instant, Instant),
+
+    connect_waker: Option<Waker>,
 
     recv_rate: stats::Var,
     send_rate: RefCell<stats::Var>,
@@ -108,7 +109,7 @@ impl Client {
             channel,
             status: Status::Connecting,
             received: VecDeque::new(),
-            now: (Instant::now(), Instant::now()),
+            connect_waker: None,
             recv_rate: stats::Var::new(Duration::from_secs(10)),
             send_rate: RefCell::new(stats::Var::new(Duration::from_secs(10))),
             _peer: peer.clone(),
@@ -227,10 +228,6 @@ impl Client {
             .sum_per_sec()
             .unwrap_or(0.0)
     }
-
-    pub fn set_now(&self, now: (Instant, Instant)) {
-        self.data.borrow_mut().now = now;
-    }
 }
 
 impl Data {
@@ -238,6 +235,10 @@ impl Data {
         info!("Connection has been established");
 
         self.status = Status::Open;
+
+        if let Some(waker) = self.connect_waker.take() {
+            waker.wake();
+        }
     }
 
     pub fn on_close(&mut self) {
@@ -255,7 +256,6 @@ impl Data {
     pub fn on_message(&mut self, event: &MessageEvent) {
         coarse_prof::profile!("on_message");
 
-        //let recv_time = self.now.1 + Instant::now().duration_since(self.now.0);
         let recv_time = Instant::now();
         let message = if event.data().is_instance_of::<js_sys::ArrayBuffer>() {
             let abuf = event.data().dyn_into::<js_sys::ArrayBuffer>().unwrap();
@@ -353,6 +353,7 @@ impl Future for ConnectFuture {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         if self.0.borrow().status == Status::Connecting {
+            self.0.borrow_mut().connect_waker = Some(cx.waker().clone());
             Poll::Pending
         } else {
             Poll::Ready(())
