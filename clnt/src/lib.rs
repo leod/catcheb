@@ -40,13 +40,7 @@ struct Stats {
 }
 
 #[wasm_bindgen(start)]
-pub fn main() {
-    wasm_bindgen_futures::spawn_local(async {
-        start().await.unwrap_throw();
-    });
-}
-
-pub async fn start() -> Result<(), JsValue> {
+pub async fn start() {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
     console_log::init_with_level(log::Level::Debug).unwrap();
@@ -65,8 +59,6 @@ pub async fn start() -> Result<(), JsValue> {
     })
     .await
     .expect("Failed to connect");
-
-    Ok(())
 
     /*let mut view = View::new(
         config,
