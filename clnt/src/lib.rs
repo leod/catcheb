@@ -69,7 +69,7 @@ pub async fn start() {
         window.scale_factor(),
     );*/
 
-    /*let mut stats = Stats::default();
+    let mut stats = Stats::default();
     let mut show_stats = false;
     let mut lag_frames: usize = 0;
 
@@ -103,16 +103,13 @@ pub async fn start() {
                         let mut writer = std::io::Cursor::new(Vec::new());
                         coarse_prof::write(&mut writer).unwrap();
                         coarse_prof::reset();
-                        log::info!(
-                            "{}",
-                            std::str::from_utf8(&writer.into_inner()).unwrap()
-                        );
+                        log::info!("{}", std::str::from_utf8(&writer.into_inner()).unwrap());
                     }
                     Key::L => {
                         lag_frames = 30;
                     }
                     _ => (),
-                }
+                },
                 _ => (),
             }
         }
@@ -264,5 +261,5 @@ pub async fn start() {
             .frame_ms
             .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);
     })
-    .unwrap();*/
+    .unwrap();
 }

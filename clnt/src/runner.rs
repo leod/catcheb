@@ -128,7 +128,6 @@ impl Runner {
         {
             coarse_prof::profile!("webrtc");
 
-            self.webrtc_client.set_now((Instant::now(), now));
             while let Some((recv_time, message)) = self.webrtc_client.take_message() {
                 self.handle_message(recv_time, message);
             }
