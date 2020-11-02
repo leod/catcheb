@@ -11,7 +11,7 @@ serde = "1.0"
 serde_json = "1.0"
 rmp-serde = "0.14"
 uuid = { version = "0.8", features = ["serde"] }
-nalgebra = { version = "0.21", features = ["serde-serialize", "mint"] }
+nalgebra = { version = "0.23", features = ["serde-serialize"] }
 instant = "0.1"
 log = "0.4"
 rand = "0.7"

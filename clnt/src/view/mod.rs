@@ -1,11 +1,11 @@
-mod active_event;
+//mod active_event;
 mod camera;
-mod event_list;
-mod overlay;
-mod particles;
-mod render;
-mod resources;
-mod scoreboard;
+//mod event_list;
+//mod overlay;
+//mod particles;
+//mod render;
+//mod resources;
+//mod scoreboard;
 
 use std::{
     collections::{BTreeMap, HashSet},
@@ -14,20 +14,20 @@ use std::{
 
 use instant::Instant;
 
-use active_event::ActiveEvent;
+/*use active_event::ActiveEvent;
 use camera::Camera;
 use event_list::EventList;
 use particles::Particles;
 
-pub use resources::Resources;
+pub use resources::Resources;*/
 
-#[derive(Debug, Clone, Default)]
+/*#[derive(Debug, Clone, Default)]
 pub struct Config {
     pub event_list: event_list::Config,
     pub camera: camera::Config,
-}
+}*/
 
-pub struct View {
+/*pub struct View {
     my_player_id: comn::PlayerId,
     resources: Resources,
     event_list: EventList,
@@ -247,4 +247,4 @@ impl View {
 
         Ok(())
     }
-}
+}*/
