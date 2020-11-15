@@ -13,9 +13,10 @@ default = ["console_error_panic_hook"]
 [dependencies]
 log = "0.4"
 serde = { version = "1.0" }
-slab = "0.4"
 rand = "0.7"
 getrandom = { version = "0.1", features = ["wasm-bindgen"] }
+anyhow = "1.0"
+thiserror = "1.0"
 
 js-sys = "0.3.45"
 wasm-bindgen = { version = "=0.2.68", features = ["serde-serialize"] }
@@ -27,7 +28,8 @@ instant = { version = "0.1", features = ["wasm-bindgen"] }
 
 pareen = { git = "https://github.com/leod/pareen.git", branch = "anim_with_dur", features = ["easer"] }
 coarse-prof = { git = "https://github.com/leod/coarse-prof.git" }
-webglee = { git = "https://github.com/leod/webglee.git" }
+#webglee = { git = "https://github.com/leod/webglee.git" }
+webglee = { path = "../../webglee" }
 
 comn = { path = "../comn" }
 

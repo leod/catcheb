@@ -1,21 +1,27 @@
 use log::{info, warn};
+use thiserror::Error;
 
 use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::JsFuture;
 
 use crate::{runner::Runner, webrtc};
 
-#[derive(Debug, Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum JoinAndConnectError {
-    Request(JsValue),
+    #[error("failed to send request")]
+    Request(String),
+
+    #[error("failed to join game: {0:?}")]
     Join(comn::JoinError),
+
+    #[error("failed to connect")]
     WebRTC(webrtc::ConnectError),
 }
 
 pub async fn join_and_connect(request: comn::JoinRequest) -> Result<Runner, JoinAndConnectError> {
     let join_success = join_request(request)
         .await
-        .map_err(JoinAndConnectError::Request)?
+        .map_err(|e| JoinAndConnectError::Request(e.as_string().unwrap_or("error".into())))?
         .map_err(JoinAndConnectError::Join)?;
 
     let my_token = join_success.your_token;
