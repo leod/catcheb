@@ -1,23 +1,19 @@
-use quicksilver::{
-    golem::TextureFilter,
-    graphics::{FontRenderer, Graphics, Image, VectorFont},
-};
+use webglee::{Context, Error};
 
 pub struct Resources {
-    pub ttf: VectorFont,
-    pub font_small: FontRenderer,
-    pub font: FontRenderer,
-    pub font_large: FontRenderer,
-    pub icon_dash: Image,
-    pub icon_hook: Image,
-    pub ground: Image,
-    pub player: Image,
-    pub danger_guy: Image,
-}
+    /*pub ttf: VectorFont,
+pub font_small: FontRenderer,
+pub font: FontRenderer,
+pub font_large: FontRenderer,
+pub icon_dash: Image,
+pub icon_hook: Image,
+pub ground: Image,
+pub player: Image,
+pub danger_guy: Image,*/}
 
 impl Resources {
-    pub async fn load(gfx: &mut Graphics) -> quicksilver::Result<Self> {
-        let ttf = VectorFont::load("kongtext.ttf").await?;
+    pub async fn load(ctx: &Context) -> Result<Self, Error> {
+        /*let ttf = VectorFont::load("kongtext.ttf").await?;
         let font_small = ttf.to_renderer(gfx, 9.0)?;
         let font = ttf.to_renderer(gfx, 18.0)?;
         let font_large = ttf.to_renderer(gfx, 40.0)?;
@@ -42,6 +38,8 @@ impl Resources {
             ground,
             player,
             danger_guy,
-        })
+        })*/
+
+        Ok(Self {})
     }
 }

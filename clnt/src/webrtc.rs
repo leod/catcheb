@@ -15,6 +15,7 @@ use std::{
 
 use instant::Instant;
 use log::{info, warn};
+use serde::Deserialize;
 
 use js_sys::{Reflect, JSON};
 use wasm_bindgen::{prelude::*, JsCast};
@@ -28,16 +29,26 @@ use comn::util::stats;
 
 #[derive(Debug, Clone)]
 pub enum ConnectError {
-    NewRtcPeerConnection(JsValue),
-    CreateOffer(JsValue),
-    SetLocalDescription(JsValue),
-    NewRequest(JsValue),
-    Fetch(JsValue),
+    NewRtcPeerConnection(String),
+    CreateOffer(String),
+    SetLocalDescription(String),
+    NewRequest(String),
+    Fetch(String),
     ResponseStatus(u16),
-    ResponseJson(JsValue),
-    SetRemoteDescription(JsValue),
-    AddIceCandidate(JsValue),
+    ResponseJson(String),
+    SetRemoteDescription(String),
+    AddIceCandidate(String),
     FailedToConnect(Status),
+}
+
+fn js_connect_error(value: JsValue, ctor: fn(String) -> ConnectError) -> ConnectError {
+    ctor(String::from(js_sys::Error::from(value).to_string()))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct SdpResponse {
+    answer: String,
+    candidate: String,
 }
 
 // TODO: webrtc::Status is redundant, can be replaced by ready_state()
@@ -147,37 +158,35 @@ impl Client {
 
         let offer: RtcSessionDescriptionInit = JsFuture::from(peer.create_offer())
             .await
-            .map_err(ConnectError::CreateOffer)?
+            .map_err(|e| js_connect_error(e, ConnectError::CreateOffer))?
             .into();
 
         info!("Offer: {:?}", offer);
 
         JsFuture::from(peer.set_local_description(&offer))
             .await
-            .map_err(ConnectError::SetLocalDescription)?;
+            .map_err(|e| js_connect_error(e, ConnectError::SetLocalDescription))?;
 
         info!("Requesting WebRTC session...");
-        let reply: JsValue = request_session(&config.address, &offer).await?;
+        let reply = request_session(&config.address, &offer).await?;
         info!("Reply: {:?}", reply);
 
         let (answer, candidate) = (
             Reflect::get(&reply, &JsValue::from_str("answer"))
-                .map_err(ConnectError::ResponseJson)?,
+                .map_err(|e| js_connect_error(e, ConnectError::ResponseJson))?,
             Reflect::get(&reply, &JsValue::from_str("candidate"))
-                .map_err(ConnectError::ResponseJson)?,
+                .map_err(|e| js_connect_error(e, ConnectError::ResponseJson))?,
         );
-
-        info!("A nswer: {:?}", answer);
 
         JsFuture::from(peer.set_remote_description(&answer.into()))
             .await
-            .map_err(ConnectError::SetRemoteDescription)?;
+            .map_err(|e| js_connect_error(e, ConnectError::SetRemoteDescription))?;
 
         info!("B");
 
         JsFuture::from(peer.add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate.into())))
             .await
-            .map_err(ConnectError::AddIceCandidate)?;
+            .map_err(|e| js_connect_error(e, ConnectError::AddIceCandidate))?;
 
         info!("C");
 
@@ -306,7 +315,7 @@ fn new_rtc_peer_connection(config: &Config) -> Result<RtcPeerConnection, Connect
     rtc_configuration.ice_servers(&ice_servers);
 
     RtcPeerConnection::new_with_configuration(&rtc_configuration)
-        .map_err(ConnectError::NewRtcPeerConnection)
+        .map_err(|e| js_connect_error(e, ConnectError::NewRtcPeerConnection))
 }
 
 fn create_data_channel(peer: &RtcPeerConnection) -> RtcDataChannel {
@@ -328,12 +337,12 @@ async fn request_session(
     ));
 
     let request = web_sys::Request::new_with_str_and_init(&address, &opts)
-        .map_err(ConnectError::NewRequest)?;
+        .map_err(|e| js_connect_error(e, ConnectError::NewRequest))?;
 
     let window = web_sys::window().expect("Failed to get Window");
     let response_value: JsValue = JsFuture::from(window.fetch_with_request(&request))
         .await
-        .map_err(ConnectError::Fetch)?;
+        .map_err(|e| js_connect_error(e, ConnectError::Fetch))?;
     assert!(response_value.is_instance_of::<web_sys::Response>());
     let response: web_sys::Response = response_value.dyn_into().unwrap();
 
@@ -341,9 +350,12 @@ async fn request_session(
         return Err(ConnectError::ResponseStatus(response.status()));
     }
 
-    JsFuture::from(response.json().map_err(ConnectError::ResponseJson)?)
+    let response_json = response.json()
+        .map_err(|e| js_connect_error(e, ConnectError::ResponseJson))?;
+
+     JsFuture::from(response_json)
         .await
-        .map_err(ConnectError::ResponseJson)
+        .map_err(|e| js_connect_error(e, ConnectError::ResponseJson))
 }
 
 struct ConnectFuture(Rc<RefCell<Data>>);

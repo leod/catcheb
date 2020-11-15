@@ -13,15 +13,14 @@ use wasm_bindgen::{
 
 use instant::Instant;
 use log::info;
-
 use webglee::{Context, Event, InputState, Key};
 
-use comn::util::stats;
+use comn::{Input, JoinRequest, util::stats};
 
-//use crate::view::View;
+use view::View;
 
-fn current_input(input_state: &InputState) -> comn::Input {
-    comn::Input {
+fn current_input(input_state: &InputState) -> Input {
+    Input {
         move_left: input_state.key(Key::A),
         move_right: input_state.key(Key::D),
         move_up: input_state.key(Key::W),
@@ -41,6 +40,10 @@ struct Stats {
 
 #[wasm_bindgen(start)]
 pub async fn start() {
+    run().await.unwrap();
+}
+
+pub async fn run() -> anyhow::Result<()> {
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
     console_log::init_with_level(log::Level::Debug).unwrap();
@@ -48,26 +51,21 @@ pub async fn start() {
     info!("Starting up");
 
     let ctx = Context::from_canvas_id("canvas").unwrap();
-
-    /*let config = view::Config::default();
-    let resources = view::Resources::load(&mut gfx).await?;*/
-
-    // TODO: Graceful error handling in client
+    let config = view::Config::default();
+    let resources = view::Resources::load(&ctx).await?;
     let runner = join::join_and_connect(comn::JoinRequest {
         game_id: None,
         player_name: "Pioneer".to_string(),
     })
-    .await
-    .expect("Failed to connect");
+    .await?;
 
-    /*let mut view = View::new(
+    let mut view = View::new(
+        &ctx,
         config,
         runner.settings().clone(),
         runner.my_player_id(),
         resources,
-        comn::Vector::new(window.size().x, window.size().y),
-        window.scale_factor(),
-    );*/
+    )?;
 
     let mut stats = Stats::default();
     let mut show_stats = false;
@@ -137,39 +135,33 @@ pub async fn start() {
 
         let state = runner.state();
 
-        /*{
+        {
             coarse_prof::profile!("update_view");
-
-            view.set_window_size(
-                comn::Vector::new(window.size().x, window.size().y),
-                window.scale_factor(),
-            );
             view.update(
                 start_time,
                 last_dt,
-                &pressed_keys,
+                ctx.input_state(),
                 state.as_ref(),
                 &game_events,
                 runner.interp_game_time(),
             );
-        }*/
+        }
 
         coarse_prof::profile!("render");
-        /*gfx.clear(Color::from_hex("D4D6B9"));
+        /*gfx.clear(Color::from_hex("D4D6B9"));*/
 
         {
             coarse_prof::profile!("view");
-
             view.render(
                 start_time,
-                &mut gfx,
                 state.as_ref(),
                 &runner.next_entities(),
                 runner.interp_game_time(),
-            )?;
+            )
+            .unwrap();
         }
 
-        if !runner.is_good() {
+        /*if !runner.is_good() {
             view.resources_mut().font.draw(
                 &mut gfx,
                 "Lost connection to server",
@@ -262,4 +254,6 @@ pub async fn start() {
             .record(Instant::now().duration_since(start_time).as_secs_f32() * 1000.0);
     })
     .unwrap();
+
+    Ok(())
 }
