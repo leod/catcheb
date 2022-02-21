@@ -1,5 +1,12 @@
 # Secret Project
 
+Multiplayer game with web clients that connect to an authoritative server through WebRTC.
+
+Video of a stress test:
+[![stress test](https://img.youtube.com/vi/vOkd2RIo32U/0.jpg)](https://www.youtube.com/watch?v=vOkd2RIo32U)
+
+I've abandoned this project, but learnings will go into the next iteration, which is already work in progress!
+
 ## Dependencies
 - `npm` (only needed for the `rollup` packer):
     Installation on Ubuntu (otherwise, follow https://github.com/nodesource/distributions/blob/master/README.md)
